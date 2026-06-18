@@ -34,6 +34,10 @@ def _write_stdout_json(data: dict[str, Any]) -> None:
     print(json.dumps(data, ensure_ascii=False, indent=2))
 
 
+def _write_stderr_json(data: dict[str, Any]) -> None:
+    print(json.dumps(data, ensure_ascii=False, indent=2), file=sys.stderr)
+
+
 def _default_scaffold_template_dir() -> Path:
     return Path.home() / ".codex" / "skills" / "wferp-report" / "assets" / "scaffold-template"
 
@@ -70,14 +74,26 @@ def _scaffold_report(argv: list[str]) -> int:
     parser.add_argument("--run-dir", required=True)
     parser.add_argument("--design", default="financial-control")
     parser.add_argument("--template-dir", type=Path, default=_default_scaffold_template_dir())
+    parser.add_argument("--force", action="store_true")
     args = parser.parse_args(argv)
 
-    result = scaffold_report_workspace(
-        run_dir=Path(args.run_dir),
-        template_dir=args.template_dir,
-        sections=_sections_for_design(args.design),
-        payload={"approved_query_result": {"rows": []}},
-    )
+    try:
+        result = scaffold_report_workspace(
+            run_dir=Path(args.run_dir),
+            template_dir=args.template_dir,
+            sections=_sections_for_design(args.design),
+            payload={"approved_query_result": {"rows": []}},
+            force=args.force,
+        )
+    except (FileExistsError, FileNotFoundError, ValueError) as exc:
+        _write_stderr_json(
+            {
+                "status": "error",
+                "code": "scaffold_error",
+                "message": str(exc),
+            }
+        )
+        return 2
     _write_stdout_json(
         {
             "status": "scaffolded",

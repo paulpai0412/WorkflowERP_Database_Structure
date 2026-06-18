@@ -9,9 +9,10 @@ from typing import Any
 
 def _slug_to_component_name(slug: str, index: int) -> str:
     words = re.findall(r"[A-Za-z0-9]+", slug)
-    if not words:
-        words = ["section", str(index)]
-    return "".join(word[:1].upper() + word[1:] for word in words) + "Section"
+    if not words or slug == f"section-{index:02d}":
+        words = ["section"]
+    base = "".join(word[:1].upper() + word[1:] for word in words)
+    return f"{base}{index:02d}Section"
 
 
 def _safe_slug(section: str, index: int) -> str:
@@ -19,6 +20,28 @@ def _safe_slug(section: str, index: int) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", slug)
     slug = slug.strip("-")
     return slug or f"section-{index:02d}"
+
+
+def _protected_outputs(run_dir: Path) -> list[Path]:
+    report_dir = run_dir / "report"
+    candidates = [
+        report_dir / "Report.tsx",
+        report_dir / "payload" / "approved-query-result.json",
+        report_dir / "payload" / "report-context.json",
+    ]
+    candidates.extend(sorted((report_dir / "sections").glob("*.tsx")))
+    return [path for path in candidates if path.exists()]
+
+
+def _ensure_can_write(run_dir: Path, force: bool) -> None:
+    if force:
+        return
+    existing = _protected_outputs(run_dir)
+    if existing:
+        relative = existing[0].relative_to(run_dir)
+        raise FileExistsError(
+            f"Refusing to scaffold into existing report workspace without force: {relative}"
+        )
 
 
 def _copy_template(template_dir: Path, run_dir: Path) -> None:
@@ -34,6 +57,10 @@ def _write_payload(run_dir: Path, payload: dict[str, Any]) -> None:
     approved_query_result = payload.get("approved_query_result", payload)
     (payload_dir / "approved-query-result.json").write_text(
         json.dumps(approved_query_result, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (payload_dir / "report-context.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
 
@@ -108,6 +135,38 @@ def _write_report_entry(run_dir: Path, generated_sections: list[dict[str, str]])
     )
 
 
+def _read_json(path: Path) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Payload JSON is not loadable: {path}") from exc
+
+
+def _section_export(section_path: Path) -> str:
+    section_text = section_path.read_text(encoding="utf-8")
+    exports = re.findall(r"export\s+function\s+([A-Za-z][A-Za-z0-9]*)\s*\(", section_text)
+    if len(exports) != 1:
+        raise ValueError(f"Section must export one React component: {section_path}")
+    return exports[0]
+
+
+def _report_section_imports(report_text: str) -> dict[str, str]:
+    imports: dict[str, str] = {}
+    pattern = re.compile(
+        r'import\s+\{\s*([A-Za-z][A-Za-z0-9]*)\s*\}\s+from\s+["\']\.\/sections\/([^"\']+)["\']'
+    )
+    for component, section_stem in pattern.findall(report_text):
+        if component in imports:
+            raise ValueError(f"Report.tsx imports duplicate component identifier: {component}")
+        imports[component] = section_stem
+    return imports
+
+
+def _rendered_components(report_text: str) -> list[str]:
+    names = re.findall(r"<([A-Z][A-Za-z0-9]*)\b", report_text)
+    return [name for name in names if name not in {"React"}]
+
+
 def validate_report_protocol(run_dir: Path) -> None:
     report_path = run_dir / "report" / "Report.tsx"
     if not report_path.exists():
@@ -118,15 +177,28 @@ def validate_report_protocol(run_dir: Path) -> None:
     if not section_files:
         raise ValueError("Report scaffold must contain at least one generated section file")
 
+    expected_by_stem: dict[str, str] = {}
     for section_path in section_files:
-        import_reference = f"./sections/{section_path.stem}"
-        if import_reference not in report_text and section_path.stem not in report_text:
-            raise ValueError(f"Report.tsx does not reference generated section: {section_path.name}")
+        expected_by_stem[section_path.stem] = _section_export(section_path)
 
-        section_text = section_path.read_text(encoding="utf-8")
-        exports = re.findall(r"export function [A-Za-z][A-Za-z0-9]*\(", section_text)
-        if len(exports) != 1:
-            raise ValueError(f"Section must export one React component: {section_path}")
+    exported_components = list(expected_by_stem.values())
+    if len(set(exported_components)) != len(exported_components):
+        raise ValueError("Section component identifiers must be unique")
+
+    imports = _report_section_imports(report_text)
+    imported_by_stem = {section_stem: component for component, section_stem in imports.items()}
+    if set(imported_by_stem) != set(expected_by_stem):
+        raise ValueError("Report.tsx section imports do not exactly match generated section files")
+    for section_stem, exported_component in expected_by_stem.items():
+        imported_component = imported_by_stem[section_stem]
+        if imported_component != exported_component:
+            raise ValueError(
+                f"Report.tsx imports {imported_component} but {section_stem} exports {exported_component}"
+            )
+
+    rendered = _rendered_components(report_text)
+    if sorted(rendered) != sorted(exported_components):
+        raise ValueError("Report.tsx render linkage does not exactly match generated sections")
 
     raw_blocks_dir = run_dir / "report" / "raw-blocks"
     if not raw_blocks_dir.exists() or not raw_blocks_dir.is_dir():
@@ -135,6 +207,12 @@ def validate_report_protocol(run_dir: Path) -> None:
     payload_path = run_dir / "report" / "payload" / "approved-query-result.json"
     if not payload_path.exists():
         raise ValueError(f"approved query result payload missing: {payload_path}")
+    _read_json(payload_path)
+
+    context_path = run_dir / "report" / "payload" / "report-context.json"
+    if not context_path.exists():
+        raise ValueError(f"report context payload missing: {context_path}")
+    _read_json(context_path)
 
 
 def scaffold_report_workspace(
@@ -142,10 +220,13 @@ def scaffold_report_workspace(
     template_dir: Path,
     sections: list[str],
     payload: dict[str, Any],
+    *,
+    force: bool = False,
 ) -> dict[str, Any]:
     if not sections:
         raise ValueError("At least one report section is required")
 
+    _ensure_can_write(run_dir, force)
     _copy_template(template_dir, run_dir)
     _write_payload(run_dir, payload)
     generated_sections = _create_section_files(run_dir, sections)
