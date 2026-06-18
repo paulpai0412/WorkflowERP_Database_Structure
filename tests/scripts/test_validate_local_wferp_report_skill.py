@@ -5,6 +5,45 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = ROOT / "scripts" / "validate_local_wferp_report_skill.py"
 
+REQUIRED_PARITY_FILES = [
+    "SKILL.md",
+    "manifest.json",
+    "README.md",
+    "references/harness.md",
+    "references/db-config.md",
+    "references/excel-intake.md",
+    "references/schema-context.md",
+    "references/sql-safety.md",
+    "references/checkpoint-payload-schema.md",
+    "references/report-payload-schema.md",
+    "references/component-policy.md",
+    "references/rawblock-policy.md",
+    "references/scaffold.md",
+    "references/section-build.md",
+    "references/report-plan-template.md",
+    "references/review-checklist.md",
+    "references/repair-policy.md",
+    "references/html-output.md",
+    "references/validators.md",
+    "references/e2e-expense-analysis.md",
+    "scripts/scaffold-report.sh",
+    "scripts/validate-skill.sh",
+    "scripts/print-expense-fixture-sql.sh",
+    "scripts/run-expense-sqlite-e2e.sh",
+    "scripts/run-expense-postgres-e2e.sh",
+    "report_designs/index.json",
+    "report_designs/design.md",
+    "report_designs/financial-control.md",
+    "report_designs/executive-summary.md",
+    "report_designs/detail-ledger.md",
+    "report_designs/exception-audit.md",
+    "report_designs/operations-review.md",
+    "report_designs/trend-briefing.md",
+    "assets/scaffold-template/package.json",
+    "assets/scaffold-template/index.html",
+    "assets/scaffold-template/report/Report.tsx",
+]
+
 
 def load_validator_module():
     spec = importlib.util.spec_from_file_location("validate_local_wferp_report_skill", SCRIPT_PATH)
@@ -39,17 +78,11 @@ def create_complete_skill_tree(root: Path) -> None:
             ]
         ),
     )
-    for name in [
-        "harness.md",
-        "db-config.md",
-        "schema-context.md",
-        "excel-intake.md",
-        "sql-safety.md",
-        "validators.md",
-        "react-renderer.md",
-        "e2e-expense-analysis.md",
-    ]:
-        write_file(root / "references" / name, f"# {name}\n")
+    for relative_path in REQUIRED_PARITY_FILES:
+        path = root / relative_path
+        if path.exists():
+            continue
+        write_file(path, f"# {path.name}\n")
     write_file(
         root / "references" / "validators.md",
         "\n".join(
@@ -76,6 +109,36 @@ def create_complete_skill_tree(root: Path) -> None:
     ]:
         write_file(root / "report_designs" / name, f"# {name}\nrequired_sections\nvalidator_checklist\n")
     write_file(root / "assets" / "sample-expense-analysis-prompt.md", "請產出2026第一季費用分析")
+
+
+def validate_skill_directory(skill_dir: Path) -> dict[str, list[dict[str, str]]]:
+    module = load_validator_module()
+    result = module.validate_skill_tree(skill_dir)
+    missing = []
+    for error in result.errors:
+        if ": " not in error:
+            continue
+        path = error.rsplit(": ", 1)[1]
+        missing.append({"path": path})
+    return {"missing": missing}
+
+
+def test_validator_requires_harness_parity_files(tmp_path):
+    skill_dir = tmp_path / "wferp-report"
+    (skill_dir / "references").mkdir(parents=True)
+    (skill_dir / "scripts").mkdir()
+    (skill_dir / "report_designs").mkdir()
+    (skill_dir / "SKILL.md").write_text("## 背景原則\n", encoding="utf-8")
+
+    result = validate_skill_directory(skill_dir)
+
+    missing = {item["path"] for item in result["missing"]}
+    assert "manifest.json" in missing
+    assert "references/checkpoint-payload-schema.md" in missing
+    assert "references/rawblock-policy.md" in missing
+    assert "references/scaffold.md" in missing
+    assert "report_designs/index.json" in missing
+    assert "assets/scaffold-template/package.json" in missing
 
 
 def test_validator_accepts_complete_skill_tree(tmp_path):

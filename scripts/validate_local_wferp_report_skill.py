@@ -7,25 +7,43 @@ import argparse
 from pathlib import Path
 
 
-REQUIRED_REFERENCES = [
-    "harness.md",
-    "db-config.md",
-    "schema-context.md",
-    "excel-intake.md",
-    "sql-safety.md",
-    "validators.md",
-    "react-renderer.md",
-    "e2e-expense-analysis.md",
-]
-
-REQUIRED_REPORT_DESIGNS = [
-    "design.md",
-    "executive-summary.md",
-    "financial-control.md",
-    "operations-review.md",
-    "exception-audit.md",
-    "trend-briefing.md",
-    "detail-ledger.md",
+REQUIRED_FILES = [
+    "SKILL.md",
+    "manifest.json",
+    "README.md",
+    "references/harness.md",
+    "references/db-config.md",
+    "references/excel-intake.md",
+    "references/schema-context.md",
+    "references/sql-safety.md",
+    "references/checkpoint-payload-schema.md",
+    "references/report-payload-schema.md",
+    "references/component-policy.md",
+    "references/rawblock-policy.md",
+    "references/scaffold.md",
+    "references/section-build.md",
+    "references/report-plan-template.md",
+    "references/review-checklist.md",
+    "references/repair-policy.md",
+    "references/html-output.md",
+    "references/validators.md",
+    "references/e2e-expense-analysis.md",
+    "scripts/scaffold-report.sh",
+    "scripts/validate-skill.sh",
+    "scripts/print-expense-fixture-sql.sh",
+    "scripts/run-expense-sqlite-e2e.sh",
+    "scripts/run-expense-postgres-e2e.sh",
+    "report_designs/index.json",
+    "report_designs/design.md",
+    "report_designs/financial-control.md",
+    "report_designs/executive-summary.md",
+    "report_designs/detail-ledger.md",
+    "report_designs/exception-audit.md",
+    "report_designs/operations-review.md",
+    "report_designs/trend-briefing.md",
+    "assets/scaffold-template/package.json",
+    "assets/scaffold-template/index.html",
+    "assets/scaffold-template/report/Report.tsx",
 ]
 
 REQUIRED_SKILL_SECTIONS = {
@@ -70,37 +88,25 @@ def validate_skill_tree(skill_root: str | Path) -> ValidationResult:
     root = Path(skill_root)
     errors: list[str] = []
 
+    for relative_path in REQUIRED_FILES:
+        path = root / relative_path
+        if not path.is_file():
+            errors.append(f"Missing required file: {relative_path}")
+
     skill_md = root / "SKILL.md"
-    if not skill_md.is_file():
-        errors.append(f"Missing required file: {skill_md.name}")
-    else:
+    if skill_md.is_file():
         skill_text = read_text(skill_md)
         for needle, message in REQUIRED_SKILL_SECTIONS.items():
             if needle not in skill_text:
                 errors.append(message)
 
     references_root = root / "references"
-    for name in REQUIRED_REFERENCES:
-        path = references_root / name
-        if not path.is_file():
-            errors.append(f"Missing required reference: references/{name}")
-
     validators_path = references_root / "validators.md"
     if validators_path.is_file():
         validators_text = read_text(validators_path)
         for needle, message in REQUIRED_VALIDATOR_TEXT.items():
             if needle not in validators_text:
                 errors.append(message)
-
-    designs_root = root / "report_designs"
-    for name in REQUIRED_REPORT_DESIGNS:
-        path = designs_root / name
-        if not path.is_file():
-            errors.append(f"Missing required report design: report_designs/{name}")
-
-    sample_prompt = root / "assets" / "sample-expense-analysis-prompt.md"
-    if not sample_prompt.is_file():
-        errors.append("Missing required asset: assets/sample-expense-analysis-prompt.md")
 
     return ValidationResult(errors)
 
