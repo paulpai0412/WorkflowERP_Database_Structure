@@ -99,6 +99,8 @@ export interface FinalReportPayload {
   };
   sections?: ReportSection[];
   dataPreview?: DataPreview;
+  validatorEvidence?: ValidatorEvidence[];
+  validatorEvidenceSummary?: ValidatorEvidence[];
 }
 
 export type ReportPayload = CheckpointPayload | FinalReportPayload;

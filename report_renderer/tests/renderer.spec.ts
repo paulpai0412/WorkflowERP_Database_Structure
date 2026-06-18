@@ -82,6 +82,7 @@ const reportPayload = {
     },
   ],
   dataPreview: checkpointPayload.dataPreview,
+  validatorEvidence: checkpointPayload.validatorEvidence,
 };
 
 const expensePreview = {
@@ -244,6 +245,29 @@ describe("WFERP report renderer", () => {
     expect(screen.getByText("建議")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "重點分析" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "建議事項" })).toBeTruthy();
+  });
+
+  it("filters report charts and tables through offline cross-filter controls", () => {
+    render(React.createElement(App, { payload: reportPayload }));
+
+    const table = screen.getByRole("table", { name: "資料預覽" });
+    expect(within(table).getByText("D001")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /篩選 D002/ }));
+
+    expect(within(table).queryByText("D001")).toBeNull();
+    expect(within(table).getByText("D002")).toBeTruthy();
+    expect(screen.getByText(/已套用篩選/)).toBeTruthy();
+  });
+
+  it("opens evidence drawer without network calls", () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    render(React.createElement(App, { payload: reportPayload }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Evidence" }));
+
+    expect(screen.getByText(/validator/i)).toBeTruthy();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("does not render legacy iframe or static HTML links", () => {

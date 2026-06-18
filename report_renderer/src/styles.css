@@ -641,6 +641,35 @@ tbody tr:last-child td {
   border-left-color: #596c2d;
 }
 
+.cross-filter-panel {
+  border-left: 5px solid #596c2d;
+}
+
+.filter-button-row {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.active-filter-text {
+  margin: 10px 0 0;
+  font-size: 13px;
+  font-weight: 730;
+}
+
+.evidence-drawer pre {
+  overflow: auto;
+  max-height: 320px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid #d7dee7;
+  border-radius: 4px;
+  color: #122033;
+  background: #f8fafc;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
 .report-section {
   min-height: 150px;
 }

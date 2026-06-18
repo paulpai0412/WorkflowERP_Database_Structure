@@ -1,3 +1,4 @@
+import React from "react";
 import { FinalReportPayload } from "../App";
 import ChartBlock, { ChartDatum } from "./ChartBlock";
 import DataPreviewTable from "./DataPreviewTable";
@@ -36,9 +37,29 @@ function buildChartData(payload: FinalReportPayload): ChartDatum[] {
 }
 
 export default function ReportPage({ payload }: ReportPageProps) {
+  const useReactState = (React as unknown as {
+    useState: <T>(initial: T) => [T, (value: T | ((current: T) => T)) => void];
+  }).useState;
+  const [selectedLabel, setSelectedLabel] = useReactState<string | null>(null);
+  const [evidenceOpen, setEvidenceOpen] = useReactState(false);
   const enabledOptions = optionLabels.filter(([key]) => payload.options?.[key]);
   const sections = payload.sections ?? [];
   const chartData = buildChartData(payload);
+  const selectedRows =
+    selectedLabel && payload.dataPreview
+      ? payload.dataPreview.rows.filter((row) =>
+          Object.values(row).some((value) => String(value) === selectedLabel),
+        )
+      : null;
+  const filteredPreview =
+    selectedRows && payload.dataPreview
+      ? {
+          ...payload.dataPreview,
+          rowCount: selectedRows.length,
+          rows: selectedRows,
+        }
+      : payload.dataPreview;
+  const evidence = payload.validatorEvidence ?? payload.validatorEvidenceSummary ?? [];
 
   return (
     <main className="app-shell report-shell">
@@ -84,10 +105,54 @@ export default function ReportPage({ payload }: ReportPageProps) {
       </section>
 
       {payload.options?.charts ? (
-        <ChartBlock type="bar" title="費用占比圖表" subtitle="依第一個文字欄位彙總第一個數值欄位" data={chartData} />
+        <>
+          <ChartBlock type="bar" title="費用占比圖表" subtitle="依第一個文字欄位彙總第一個數值欄位" data={chartData} />
+          {chartData.length > 0 ? (
+            <section className="panel cross-filter-panel" aria-label="離線交叉篩選">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">Offline Filter</p>
+                  <h2>圖表交叉篩選</h2>
+                </div>
+                {selectedLabel ? <span className="count-pill">已篩選</span> : null}
+              </div>
+              <div className="button-row filter-button-row">
+                {chartData.map((datum) => (
+                  <button
+                    key={datum.label}
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => setSelectedLabel(datum.label)}
+                  >
+                    篩選 {datum.label}
+                  </button>
+                ))}
+                {selectedLabel ? (
+                  <button type="button" className="secondary-button" onClick={() => setSelectedLabel(null)}>
+                    清除篩選
+                  </button>
+                ) : null}
+              </div>
+              {selectedLabel ? <p className="muted active-filter-text">已套用篩選：{selectedLabel}</p> : null}
+            </section>
+          ) : null}
+        </>
       ) : null}
 
-      {payload.options?.tables ? <DataPreviewTable preview={payload.dataPreview} enableControls /> : null}
+      {payload.options?.tables ? <DataPreviewTable preview={filteredPreview} enableControls /> : null}
+
+      <section className="panel evidence-drawer">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Evidence</p>
+            <h2>驗證證據</h2>
+          </div>
+          <button type="button" className="secondary-button" onClick={() => setEvidenceOpen((current) => !current)}>
+            Evidence
+          </button>
+        </div>
+        {evidenceOpen ? <pre>{JSON.stringify(evidence, null, 2)}</pre> : null}
+      </section>
     </main>
   );
 }
