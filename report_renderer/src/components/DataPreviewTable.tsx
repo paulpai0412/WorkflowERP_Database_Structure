@@ -92,6 +92,10 @@ function csvEscape(value: string) {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
+function csvSafeValue(value: string) {
+  return /^[=+\-@]/.test(value) ? `'${value}` : value;
+}
+
 function matchesCondition(row: TableRow, condition: ConditionalFormat) {
   const current = row[condition.column];
   if (typeof condition.value === "number") {
@@ -178,7 +182,7 @@ export default function DataPreviewTable({
       }
 
       for (const [column, selected] of Object.entries(categorySelections)) {
-        if (selected.size > 0 && !selected.has(String(row[column] ?? ""))) {
+        if (!selected.has(String(row[column] ?? ""))) {
           return false;
         }
       }
@@ -250,7 +254,9 @@ export default function DataPreviewTable({
     const csv = [
       visibleColumns.map(csvEscape).join(","),
       ...filteredRows.map((row) =>
-        visibleColumns.map((column) => csvEscape(formatCell(row[column], columnTypes[column] ?? "text"))).join(","),
+        visibleColumns
+          .map((column) => csvEscape(csvSafeValue(formatCell(row[column], columnTypes[column] ?? "text"))))
+          .join(","),
       ),
     ].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });

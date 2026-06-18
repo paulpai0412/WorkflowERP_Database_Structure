@@ -380,6 +380,65 @@ describe("WFERP report renderer", () => {
     expect(screen.getByText(/第 2 \/ 3 頁/)).toBeTruthy();
   });
 
+  it("shows zero data rows when every category option is unchecked", () => {
+    render(
+      React.createElement(DataPreviewTable, {
+        preview: expensePreview,
+        enableControls: true,
+        columnTypes: { 部門: "category" },
+      }),
+    );
+
+    fireEvent.click(screen.getByLabelText("部門: 行政部"));
+    fireEvent.click(screen.getByLabelText("部門: 研發部"));
+    fireEvent.click(screen.getByLabelText("部門: 業務部"));
+
+    expect(screen.queryAllByTestId("data-row")).toHaveLength(0);
+    expect(screen.queryByText("差旅費")).toBeNull();
+    expect(screen.queryByText("雲端費")).toBeNull();
+  });
+
+  it("escapes spreadsheet formulas in exported CSV blob contents", async () => {
+    let exportedBlob: Blob | undefined;
+    vi.stubGlobal("URL", {
+      createObjectURL: vi.fn((blob: Blob) => {
+        exportedBlob = blob;
+        return "blob:safe-csv";
+      }),
+      revokeObjectURL: vi.fn(),
+    });
+
+    render(
+      React.createElement(DataPreviewTable, {
+        preview: {
+          rowCount: 4,
+          columns: ["欄位", "內容"],
+          rows: [
+            { 欄位: "equals", 內容: "=SUM(A1:A2)" },
+            { 欄位: "plus", 內容: "+cmd" },
+            { 欄位: "minus", 內容: "-10" },
+            { 欄位: "at", 內容: "@HYPERLINK" },
+          ],
+        },
+        enableControls: true,
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "下載 CSV" }));
+
+    expect(exportedBlob).toBeTruthy();
+    const csv = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(exportedBlob as Blob);
+    });
+    expect(csv).toContain("\"'=SUM(A1:A2)\"");
+    expect(csv).toContain("\"'+cmd\"");
+    expect(csv).toContain("\"'-10\"");
+    expect(csv).toContain("\"'@HYPERLINK\"");
+  });
+
   it("renders RawBlock policy metadata without executing arbitrary code", () => {
     const sideEffect = vi.fn();
     const { container } = render(
