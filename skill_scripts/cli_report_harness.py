@@ -10,14 +10,82 @@ from typing import Any
 
 from skill_scripts.excel_intake import build_excel_confirmation_payload, parse_excel_requirement
 from skill_scripts.report_catalog import build_report_selection_payload
+from skill_scripts.report_catalog import list_report_designs
 from skill_scripts.report_harness import ReportHarness
 from skill_scripts.report_harness_state import load_run_state
+from skill_scripts.report_scaffold import scaffold_report_workspace
 from skill_scripts.schema_loader import load_schema_bundle
 from skill_scripts.sql_generator import generate_select_sql
+
+DEFAULT_REPORT_SECTIONS = [
+    "executive-summary",
+    "kpi-overview",
+    "exception-review",
+    "data-table",
+    "recommendations",
+]
+
+DESIGN_SECTION_DEFAULTS = {
+    "financial-control": DEFAULT_REPORT_SECTIONS,
+}
 
 
 def _write_stdout_json(data: dict[str, Any]) -> None:
     print(json.dumps(data, ensure_ascii=False, indent=2))
+
+
+def _default_scaffold_template_dir() -> Path:
+    return Path.home() / ".codex" / "skills" / "wferp-report" / "assets" / "scaffold-template"
+
+
+def _slugify_section(value: str) -> str:
+    slug = "".join(char.lower() if char.isalnum() and char.isascii() else "-" for char in value)
+    return "-".join(part for part in slug.split("-") if part)
+
+
+def _sections_for_design(design: str) -> list[str]:
+    if design in DESIGN_SECTION_DEFAULTS:
+        return list(DESIGN_SECTION_DEFAULTS[design])
+
+    sections: list[str] = []
+    for profile in list_report_designs():
+        if profile["id"] != design:
+            continue
+        for section in profile.get("required_sections", []):
+            slug = _slugify_section(str(section))
+            if slug:
+                sections.append(slug)
+        break
+
+    for fallback in DEFAULT_REPORT_SECTIONS:
+        if fallback not in sections:
+            sections.append(fallback)
+        if len(sections) >= 5:
+            break
+    return sections[:5]
+
+
+def _scaffold_report(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Scaffold a per-run WFERP React report workspace.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--design", default="financial-control")
+    parser.add_argument("--template-dir", type=Path, default=_default_scaffold_template_dir())
+    args = parser.parse_args(argv)
+
+    result = scaffold_report_workspace(
+        run_dir=Path(args.run_dir),
+        template_dir=args.template_dir,
+        sections=_sections_for_design(args.design),
+        payload={"approved_query_result": {"rows": []}},
+    )
+    _write_stdout_json(
+        {
+            "status": "scaffolded",
+            "section_count": result["section_count"],
+            "run_dir": result["run_dir"],
+        }
+    )
+    return 0
 
 
 def _serve_checkpoint(argv: list[str]) -> int:
@@ -67,7 +135,12 @@ def _parse_excel_inputs(harness: ReportHarness, input_files: list[Path]) -> dict
         return None
     requirement = parse_excel_requirement(excel_files[0])
     payload = build_excel_confirmation_payload(requirement)
-    harness.update_state(excel_requirement=requirement.to_dict())
+    requirement_state = requirement.to_dict()
+    requirement_state.setdefault(
+        "database_fields",
+        [asdict(field) for field in requirement.database_fields],
+    )
+    harness.update_state(excel_requirement=requirement_state)
     return payload
 
 
@@ -113,6 +186,8 @@ def main(argv: list[str] | None = None) -> int:
     argv = list(argv if argv is not None else sys.argv[1:])
     if argv and argv[0] == "serve-checkpoint":
         return _serve_checkpoint(argv[1:])
+    if argv and argv[0] == "scaffold-report":
+        return _scaffold_report(argv[1:])
 
     parser = argparse.ArgumentParser(description="Create and advance WFERP report harness runs.")
     parser.add_argument("--prompt", default="")
