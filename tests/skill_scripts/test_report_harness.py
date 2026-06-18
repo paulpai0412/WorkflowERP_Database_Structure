@@ -172,18 +172,109 @@ def test_delivery_allows_explicitly_accepted_residual_risk_at_final_checkpoint(t
     harness.write_final_review(
         {
             "validator_results": _all_validator_results({"visual_taste_reviewer": "warning"}),
-            "accepted_residual_risks": ["visual_taste_reviewer: chart label may need manual rewrite"],
         }
     )
 
     assert harness.can_deliver()["allowed"] is False
 
-    harness.confirm("final_review", "完成")
+    harness.confirm(
+        "final_review",
+        "完成",
+        selected_options={
+            "acceptedResidualRisks": ["visual_taste_reviewer: accepted risk for visual_taste_reviewer"],
+        },
+    )
 
     assert harness.can_deliver() == {
         "allowed": True,
         "blocking_validators": [],
-        "accepted_residual_risks": ["visual_taste_reviewer: chart label may need manual rewrite"],
+        "accepted_residual_risks": ["visual_taste_reviewer: accepted risk for visual_taste_reviewer"],
+    }
+
+
+def test_final_review_payload_string_residual_risks_do_not_allow_delivery(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
+    harness.write_report_selection(
+        {"selected_report_type": "管理摘要", "selected_report_design": "financial-control"}
+    )
+    harness.confirm("report_selection", "產生報告")
+    harness.write_report_draft({"sections": ["摘要"]})
+    harness.confirm("report_draft", "接受")
+    harness.write_final_review(
+        {
+            "validator_results": _all_validator_results({"visual_taste_reviewer": "warning"}),
+            "accepted_residual_risks": "yes",
+        }
+    )
+    harness.confirm("final_review", "完成")
+
+    assert harness.can_deliver() == {
+        "allowed": False,
+        "blocking_validators": ["visual_taste_reviewer"],
+        "accepted_residual_risks": [],
+    }
+
+
+def test_non_pass_validator_delivers_only_with_matching_user_accepted_risk(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
+    harness.write_report_selection(
+        {"selected_report_type": "管理摘要", "selected_report_design": "financial-control"}
+    )
+    harness.confirm("report_selection", "產生報告")
+    harness.write_report_draft({"sections": ["摘要"]})
+    harness.confirm("report_draft", "接受")
+    harness.write_final_review(
+        {
+            "validator_results": _all_validator_results({"visual_taste_reviewer": "warning"}),
+        }
+    )
+
+    harness.confirm(
+        "final_review",
+        "完成",
+        selected_options={
+            "acceptedResidualRisks": ["visual_taste_reviewer: accepted risk for visual_taste_reviewer"],
+        },
+    )
+
+    assert harness.can_deliver() == {
+        "allowed": True,
+        "blocking_validators": [],
+        "accepted_residual_risks": ["visual_taste_reviewer: accepted risk for visual_taste_reviewer"],
+    }
+
+
+def test_partial_residual_risk_acceptance_still_blocks_other_non_pass_validators(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
+    harness.write_report_selection(
+        {"selected_report_type": "管理摘要", "selected_report_design": "financial-control"}
+    )
+    harness.confirm("report_selection", "產生報告")
+    harness.write_report_draft({"sections": ["摘要"]})
+    harness.confirm("report_draft", "接受")
+    harness.write_final_review(
+        {
+            "validator_results": _all_validator_results(
+                {
+                    "visual_taste_reviewer": "warning",
+                    "data_visualization_reviewer": "warning",
+                }
+            ),
+        }
+    )
+
+    harness.confirm(
+        "final_review",
+        "完成",
+        selected_options={
+            "acceptedResidualRisks": ["visual_taste_reviewer: accepted risk for visual_taste_reviewer"],
+        },
+    )
+
+    assert harness.can_deliver() == {
+        "allowed": False,
+        "blocking_validators": ["data_visualization_reviewer"],
+        "accepted_residual_risks": ["visual_taste_reviewer: accepted risk for visual_taste_reviewer"],
     }
 
 

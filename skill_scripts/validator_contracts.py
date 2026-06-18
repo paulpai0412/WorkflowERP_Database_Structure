@@ -121,8 +121,25 @@ def build_final_review_gate(
         for role in REQUIRED_VALIDATORS
         if role in by_role and by_role[role]["status"] != "pass"
     ]
-    accepted = list(accepted_residual_risks or [])
-    blocking = [] if explicit_user_acceptance and not missing_roles else [*non_pass_roles, *missing_roles]
+    if accepted_residual_risks is None:
+        accepted = []
+    else:
+        _require(isinstance(accepted_residual_risks, list), "accepted_residual_risks must be a list")
+        _require(
+            all(isinstance(item, str) for item in accepted_residual_risks),
+            "accepted_residual_risks must contain strings",
+        )
+        accepted = list(accepted_residual_risks)
+
+    accepted_set = set(accepted)
+    blocking = list(missing_roles)
+    for role in non_pass_roles:
+        residual_risks = by_role[role]["residualRisks"]
+        role_accepted = explicit_user_acceptance and any(
+            f"{role}: {risk}" in accepted_set for risk in residual_risks
+        )
+        if not role_accepted:
+            blocking.append(role)
 
     return {
         "allowed": not blocking,

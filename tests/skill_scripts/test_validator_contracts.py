@@ -123,12 +123,22 @@ def test_report_final_review_requires_all_validators_pass_or_explicit_user_accep
 
     assert build_final_review_gate(packets)["allowed"] is True
 
-    packets[0] = dict(packets[0], status="fail", findings=["來源不完整"], requiredFixes=["補齊來源檔案"])
+    packets[0] = dict(
+        packets[0],
+        status="fail",
+        findings=["來源不完整"],
+        requiredFixes=["補齊來源檔案"],
+        residualRisks=["使用者確認來源缺口後仍接受"],
+    )
     gate = build_final_review_gate(packets)
     assert gate["allowed"] is False
     assert gate["blocking_validators"] == ["source_requirement_reviewer"]
 
-    gate = build_final_review_gate(packets, explicit_user_acceptance=True)
+    gate = build_final_review_gate(
+        packets,
+        explicit_user_acceptance=True,
+        accepted_residual_risks=["source_requirement_reviewer: 使用者確認來源缺口後仍接受"],
+    )
     assert gate["allowed"] is True
 
 
