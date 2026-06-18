@@ -65,6 +65,8 @@ class ReportHarness:
             definition = CHECKPOINT_DEFINITIONS.get(checkpoint)
             if definition:
                 (self.run_dir / "checkpoints" / definition["file"]).unlink(missing_ok=True)
+            if checkpoint == "visual_design":
+                (self.run_dir / "visual" / "visual-checkpoint.html").unlink(missing_ok=True)
         state.update(state_resets)
         return save_run_state(self.run_dir, state)
 
@@ -145,12 +147,25 @@ class ReportHarness:
         self.update_state(report_design_brief=payload)
         return record_checkpoint(self.run_dir, "design_brief", payload)
 
+    def write_visual_design(self, payload: dict[str, Any]) -> dict[str, Any]:
+        if self.state().get("user_confirmations", {}).get("design_brief") != "確認設計":
+            raise ReportHarnessError("Design brief must be confirmed before visual checkpoint")
+        self.clear_downstream(
+            ["report_draft", "final_review"],
+            validator_results=[],
+        )
+        self.invalidate_confirmations("visual_design")
+        self.update_state(visual_design_checkpoint=payload)
+        return record_checkpoint(self.run_dir, "visual_design", payload)
+
     def write_report_draft(self, payload: dict[str, Any]) -> dict[str, Any]:
         confirmations = self.state().get("user_confirmations", {})
         if confirmations.get("report_selection") != "產生報告":
             raise ReportHarnessError("Report selection must be confirmed before writing draft")
         if confirmations.get("design_brief") != "確認設計":
             raise ReportHarnessError("Design brief must be confirmed before writing draft")
+        if confirmations.get("visual_design") != "確認視覺設計":
+            raise ReportHarnessError("Visual design must be confirmed before writing draft")
         self.clear_downstream(["final_review"], validator_results=[])
         self.invalidate_confirmations("report_draft")
         return record_checkpoint(self.run_dir, "report_draft", payload)

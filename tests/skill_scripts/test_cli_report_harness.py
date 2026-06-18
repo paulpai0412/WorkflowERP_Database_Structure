@@ -341,6 +341,62 @@ def test_cli_full_flow_writes_draft_final_review_and_delivery_gate(tmp_path: Pat
         json.dumps(_passing_final_review_payload(), ensure_ascii=False),
         encoding="utf-8",
     )
+    visual_brief = json.dumps(
+        {
+            "schema_version": "wferp.design-brief.v1",
+            "report_intent": {
+                "prompt": "查詢費用分析",
+                "report_type": "管理摘要",
+                "primary_goal": "Expose financial-control exceptions.",
+            },
+            "catalog_guardrail": "financial-control",
+            "target_audience": {"role": "finance controller", "needs": ["expense review"]},
+            "layout_recipe": {
+                "mode": "kpi-first-dashboard",
+                "sections": ["executive-summary", "kpi-overview", "data-table"],
+                "density": "analysis-first",
+            },
+            "chart_recipe": [
+                {
+                    "id": "expense-trend",
+                    "type": "line",
+                    "purpose": "Reveal period trend and month-over-month movement.",
+                }
+            ],
+            "table_recipe": [
+                {
+                    "id": "expense-detail-table",
+                    "type": "data-table",
+                    "features": ["filter", "sort", "drilldown", "column_visibility"],
+                    "row_count": 1,
+                }
+            ],
+            "interaction_recipe": {
+                "filters": ["department", "amount"],
+                "drilldowns": ["department"],
+            },
+            "visual_direction": {
+                "tone": "quiet financial operations dashboard",
+                "emphasis": ["variance", "outliers"],
+            },
+            "embedded_data_policy": {"mode": "smart-tiered", "summary_threshold_rows": 5000},
+        },
+        ensure_ascii=False,
+    )
+    visual_package = json.dumps(
+        {
+            "catalog_guardrail": "financial-control",
+            "prompt": "查詢費用分析",
+            "report_type": "管理摘要",
+            "data_profile": {"columns": ["department", "amount"], "row_count": 1},
+            "datasets": {
+                "columns": ["department", "amount"],
+                "embedded_rows": [{"department": "管理部", "amount": 1000}],
+            },
+            "aggregates": {"amount_sum": 1000, "amount_avg": 1000},
+        },
+        ensure_ascii=False,
+    )
 
     steps = [
         [
@@ -412,6 +468,24 @@ def test_cli_full_flow_writes_draft_final_review_and_delivery_gate(tmp_path: Pat
             "確認設計",
         ],
         [
+            "write-visual-checkpoint",
+            "--run-dir",
+            str(run_dir),
+            "--brief",
+            visual_brief,
+            "--package",
+            visual_package,
+        ],
+        [
+            "confirm",
+            "--run-dir",
+            str(run_dir),
+            "--checkpoint",
+            "visual_design",
+            "--action",
+            "確認視覺設計",
+        ],
+        [
             "write-report-draft",
             "--run-dir",
             str(run_dir),
@@ -445,6 +519,8 @@ def test_cli_full_flow_writes_draft_final_review_and_delivery_gate(tmp_path: Pat
     assert delivery.returncode == 0, delivery.stderr
     assert json.loads(delivery.stdout)["allowed"] is True
     assert (run_dir / "checkpoints" / "04a_design_brief.json").exists()
+    assert (run_dir / "checkpoints" / "04b_visual_design.json").exists()
+    assert (run_dir / "visual" / "visual-checkpoint.html").exists()
     assert (run_dir / "checkpoints" / "05_report_draft.json").exists()
     assert (run_dir / "checkpoints" / "06_final_review.json").exists()
 
@@ -492,6 +568,283 @@ def test_cli_write_design_brief_success(tmp_path: Path):
     assert checkpoint["checkpoint"] == "design_brief"
     assert checkpoint["payload"]["embedded_data_policy"]["mode"] == "smart-tiered"
     assert checkpoint["payload"]["chart_recipe"][0]["type"] == "line"
+
+
+def test_cli_write_visual_checkpoint_success(tmp_path: Path):
+    run_root = tmp_path / "runs"
+    run_dir = run_root / "run-visual"
+    created = _run_cli(
+        [
+            "create-run",
+            "--run-root",
+            str(run_root),
+            "--run-id",
+            "run-visual",
+            "--prompt",
+            "查詢費用分析",
+        ],
+        cwd=Path.cwd(),
+    )
+    assert created.returncode == 0, created.stderr
+
+    brief = {
+        "schema_version": "wferp.design-brief.v1",
+        "report_intent": {
+            "prompt": "查詢費用分析",
+            "report_type": "管理摘要",
+            "primary_goal": "Expose financial-control exceptions.",
+        },
+        "catalog_guardrail": "financial-control",
+        "target_audience": {"role": "finance controller", "needs": ["expense review"]},
+        "layout_recipe": {
+            "mode": "kpi-first-dashboard",
+            "sections": ["executive-summary", "kpi-overview", "data-table"],
+            "density": "analysis-first",
+        },
+        "chart_recipe": [
+            {
+                "id": "expense-trend",
+                "type": "line",
+                "purpose": "Reveal period trend and month-over-month movement.",
+            }
+        ],
+        "table_recipe": [
+            {
+                "id": "expense-detail-table",
+                "type": "data-table",
+                "features": ["filter", "sort", "drilldown", "column_visibility"],
+                "row_count": 1,
+            }
+        ],
+        "interaction_recipe": {"filters": ["department", "amount"], "drilldowns": ["department"]},
+        "visual_direction": {
+            "tone": "quiet financial operations dashboard",
+            "emphasis": ["variance", "outliers"],
+        },
+        "embedded_data_policy": {"mode": "smart-tiered", "summary_threshold_rows": 5000},
+    }
+    package = {
+        "catalog_guardrail": "financial-control",
+        "prompt": "查詢費用分析",
+        "report_type": "管理摘要",
+        "data_profile": {"columns": ["department", "amount"], "row_count": 1},
+        "datasets": {
+            "columns": ["department", "amount"],
+            "embedded_rows": [{"department": "管理部", "amount": 1000}],
+        },
+        "aggregates": {"amount_sum": 1000, "amount_avg": 1000},
+    }
+    harness_steps = [
+        [
+            "write-design-brief",
+            "--run-dir",
+            str(run_dir),
+            "--package",
+            json.dumps(package, ensure_ascii=False),
+        ],
+        [
+            "confirm",
+            "--run-dir",
+            str(run_dir),
+            "--checkpoint",
+            "design_brief",
+            "--action",
+            "確認設計",
+        ],
+    ]
+    for step in harness_steps:
+        result = _run_cli(step, cwd=Path.cwd())
+        assert result.returncode == 0, result.stderr
+
+    result = _run_cli(
+        [
+            "write-visual-checkpoint",
+            "--run-dir",
+            str(run_dir),
+            "--brief",
+            json.dumps(brief, ensure_ascii=False),
+            "--package",
+            json.dumps(package, ensure_ascii=False),
+        ],
+        cwd=Path.cwd(),
+    )
+
+    assert result.returncode == 0, result.stderr
+    checkpoint = json.loads(result.stdout)
+    html_text = (run_dir / "visual" / "visual-checkpoint.html").read_text(encoding="utf-8")
+    assert checkpoint["checkpoint"] == "visual_design"
+    assert checkpoint["payload"]["kpis"][0] == {"label": "amount_sum", "value": 1000}
+    assert "費用分析視覺設計確認" in html_text or "visual-checkpoint" in html_text
+    assert not html_text.lstrip().startswith("{")
+    assert '"html":' not in html_text
+    assert "fetch(" not in html_text
+
+
+def test_cli_rewriting_design_brief_removes_stale_visual_checkpoint_html(tmp_path: Path):
+    run_root = tmp_path / "runs"
+    run_dir = run_root / "run-visual-invalidation"
+    created = _run_cli(
+        [
+            "create-run",
+            "--run-root",
+            str(run_root),
+            "--run-id",
+            "run-visual-invalidation",
+            "--prompt",
+            "查詢費用分析",
+        ],
+        cwd=Path.cwd(),
+    )
+    assert created.returncode == 0, created.stderr
+
+    package = {
+        "catalog_guardrail": "financial-control",
+        "prompt": "查詢費用分析",
+        "report_type": "管理摘要",
+        "data_profile": {"columns": ["department", "amount"], "row_count": 1},
+        "datasets": {
+            "columns": ["department", "amount"],
+            "embedded_rows": [{"department": "管理部", "amount": 1000}],
+        },
+        "aggregates": {"amount_sum": 1000, "amount_avg": 1000},
+    }
+    design_brief = _run_cli(
+        [
+            "write-design-brief",
+            "--run-dir",
+            str(run_dir),
+            "--package",
+            json.dumps(package, ensure_ascii=False),
+        ],
+        cwd=Path.cwd(),
+    )
+    assert design_brief.returncode == 0, design_brief.stderr
+    brief_payload = json.loads(design_brief.stdout)["payload"]
+
+    confirmed = _run_cli(
+        [
+            "confirm",
+            "--run-dir",
+            str(run_dir),
+            "--checkpoint",
+            "design_brief",
+            "--action",
+            "確認設計",
+        ],
+        cwd=Path.cwd(),
+    )
+    assert confirmed.returncode == 0, confirmed.stderr
+
+    visual = _run_cli(
+        [
+            "write-visual-checkpoint",
+            "--run-dir",
+            str(run_dir),
+            "--brief",
+            json.dumps(brief_payload, ensure_ascii=False),
+            "--package",
+            json.dumps(package, ensure_ascii=False),
+        ],
+        cwd=Path.cwd(),
+    )
+    assert visual.returncode == 0, visual.stderr
+    assert (run_dir / "checkpoints" / "04b_visual_design.json").exists()
+    assert (run_dir / "visual" / "visual-checkpoint.html").exists()
+
+    rewritten = _run_cli(
+        [
+            "write-design-brief",
+            "--run-dir",
+            str(run_dir),
+            "--package",
+            json.dumps({**package, "prompt": "重寫費用分析設計"}, ensure_ascii=False),
+        ],
+        cwd=Path.cwd(),
+    )
+    assert rewritten.returncode == 0, rewritten.stderr
+    rewritten_brief_payload = json.loads(rewritten.stdout)["payload"]
+    assert not (run_dir / "checkpoints" / "04b_visual_design.json").exists()
+    assert not (run_dir / "visual" / "visual-checkpoint.html").exists()
+
+    blocked_visual = _run_cli(
+        [
+            "write-visual-checkpoint",
+            "--run-dir",
+            str(run_dir),
+            "--brief",
+            json.dumps(rewritten_brief_payload, ensure_ascii=False),
+            "--package",
+            json.dumps(package, ensure_ascii=False),
+        ],
+        cwd=Path.cwd(),
+    )
+    assert blocked_visual.returncode == 2
+    error = json.loads(blocked_visual.stderr)
+    assert error["code"] == "visual_checkpoint_error"
+    assert "Design brief must be confirmed" in error["message"]
+    assert not (run_dir / "visual" / "visual-checkpoint.html").exists()
+
+
+def test_cli_write_visual_checkpoint_does_not_leave_html_when_design_brief_unconfirmed(
+    tmp_path: Path,
+):
+    run_root = tmp_path / "runs"
+    run_dir = run_root / "run-visual-unconfirmed"
+    created = _run_cli(
+        [
+            "create-run",
+            "--run-root",
+            str(run_root),
+            "--run-id",
+            "run-visual-unconfirmed",
+            "--prompt",
+            "查詢費用分析",
+        ],
+        cwd=Path.cwd(),
+    )
+    assert created.returncode == 0, created.stderr
+
+    package = {
+        "catalog_guardrail": "financial-control",
+        "prompt": "查詢費用分析",
+        "report_type": "管理摘要",
+        "data_profile": {"columns": ["department", "amount"], "row_count": 1},
+        "datasets": {
+            "columns": ["department", "amount"],
+            "embedded_rows": [{"department": "管理部", "amount": 1000}],
+        },
+        "aggregates": {"amount_sum": 1000, "amount_avg": 1000},
+    }
+    design_brief = _run_cli(
+        [
+            "write-design-brief",
+            "--run-dir",
+            str(run_dir),
+            "--package",
+            json.dumps(package, ensure_ascii=False),
+        ],
+        cwd=Path.cwd(),
+    )
+    assert design_brief.returncode == 0, design_brief.stderr
+
+    result = _run_cli(
+        [
+            "write-visual-checkpoint",
+            "--run-dir",
+            str(run_dir),
+            "--brief",
+            json.dumps(json.loads(design_brief.stdout)["payload"], ensure_ascii=False),
+            "--package",
+            json.dumps(package, ensure_ascii=False),
+        ],
+        cwd=Path.cwd(),
+    )
+
+    assert result.returncode == 2
+    error = json.loads(result.stderr)
+    assert error["code"] == "visual_checkpoint_error"
+    assert "Design brief must be confirmed" in error["message"]
+    assert not (run_dir / "visual" / "visual-checkpoint.html").exists()
 
 
 def test_cli_write_design_brief_reports_validation_errors_from_overrides(tmp_path: Path):

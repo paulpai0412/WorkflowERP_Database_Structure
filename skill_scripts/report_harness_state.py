@@ -38,6 +38,12 @@ CHECKPOINT_DEFINITIONS: dict[str, dict[str, Any]] = {
         "title": "動態設計確認",
         "actions": ["確認設計", "調整設計"],
     },
+    "visual_design": {
+        "index": 4.2,
+        "file": "04b_visual_design.json",
+        "title": "視覺設計確認",
+        "actions": ["確認視覺設計", "調整視覺設計"],
+    },
     "report_draft": {
         "index": 5,
         "file": "05_report_draft.json",

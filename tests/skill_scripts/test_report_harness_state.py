@@ -124,6 +124,22 @@ def test_records_design_brief_checkpoint(tmp_path: Path):
     assert (tmp_path / "demo-run" / "checkpoints" / "04a_design_brief.json").is_file()
 
 
+def test_records_visual_design_checkpoint(tmp_path: Path):
+    create_report_run(tmp_path, run_id="demo-run", prompt="prompt")
+
+    checkpoint = record_checkpoint(
+        tmp_path / "demo-run",
+        "visual_design",
+        {"title": "費用分析視覺設計確認"},
+    )
+
+    assert checkpoint["title"] == "視覺設計確認"
+    assert checkpoint["actions"] == ["確認視覺設計", "調整視覺設計"]
+    assert CHECKPOINT_DEFINITIONS["visual_design"]["index"] == 4.2
+    assert CHECKPOINT_DEFINITIONS["visual_design"]["file"] == "04b_visual_design.json"
+    assert (tmp_path / "demo-run" / "checkpoints" / "04b_visual_design.json").is_file()
+
+
 def test_all_checkpoint_payloads_have_chinese_titles_and_actions():
     expected_actions = {
         "excel_confirmation": ["確認欄位與公式", "要求修正"],
@@ -131,6 +147,7 @@ def test_all_checkpoint_payloads_have_chinese_titles_and_actions():
         "data_preview": ["資料正確", "確認資料", "重新查詢"],
         "report_selection": ["產生報告", "修改格式"],
         "design_brief": ["確認設計", "調整設計"],
+        "visual_design": ["確認視覺設計", "調整視覺設計"],
         "report_draft": ["接受", "修正報告"],
         "final_review": ["完成", "回到初稿"],
     }

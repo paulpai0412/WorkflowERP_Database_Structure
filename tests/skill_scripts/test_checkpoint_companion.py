@@ -9,6 +9,7 @@ from skill_scripts.checkpoint_companion import CheckpointCompanionServer
 from skill_scripts.dynamic_design_brief import build_design_brief, validate_design_brief
 from skill_scripts.report_harness import ReportHarness
 from skill_scripts.validator_contracts import REQUIRED_VALIDATORS
+from skill_scripts.visual_checkpoint import build_visual_checkpoint_payload
 
 
 def _validator_result(role: str, status: str = "pass") -> dict[str, object]:
@@ -49,6 +50,26 @@ def _confirm_design_brief(harness: ReportHarness) -> None:
     assert validate_design_brief(brief)["valid"] is True
     harness.write_design_brief(brief)
     harness.confirm("design_brief", "確認設計")
+
+
+def _confirm_visual_design(harness: ReportHarness) -> None:
+    package = {
+        "catalog_guardrail": "financial-control",
+        "prompt": harness.state().get("prompt"),
+        "report_type": harness.state().get("report_type"),
+        "data_profile": {"columns": ["department", "amount"], "row_count": 2},
+        "datasets": {
+            "columns": ["department", "amount"],
+            "embedded_rows": [
+                {"department": "管理部", "amount": 1000},
+                {"department": "研發部", "amount": 2500},
+            ],
+        },
+        "aggregates": {"amount_sum": 3500, "amount_avg": 1750},
+    }
+    payload = build_visual_checkpoint_payload(harness.state()["report_design_brief"], package)
+    harness.write_visual_design(payload)
+    harness.confirm("visual_design", "確認視覺設計")
 
 
 def post_json(url: str, payload: dict) -> dict:
@@ -170,6 +191,7 @@ def test_final_review_post_selected_options_allow_matching_residual_risk_deliver
     )
     harness.confirm("report_selection", "產生報告")
     _confirm_design_brief(harness)
+    _confirm_visual_design(harness)
     harness.write_report_draft({"sections": ["摘要"]})
     harness.confirm("report_draft", "接受")
     harness.write_final_review(

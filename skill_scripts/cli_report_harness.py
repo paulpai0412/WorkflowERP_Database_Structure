@@ -21,6 +21,8 @@ from skill_scripts.report_harness_state import write_confirmation
 from skill_scripts.report_scaffold import scaffold_report_workspace
 from skill_scripts.schema_loader import load_schema_bundle
 from skill_scripts.sql_generator import generate_select_sql
+from skill_scripts.visual_checkpoint import build_visual_checkpoint_payload
+from skill_scripts.visual_checkpoint import render_visual_checkpoint_html
 
 DEFAULT_REPORT_SECTIONS = [
     "executive-summary",
@@ -71,6 +73,12 @@ def _write_run_json(run_dir: Path, relative_path: str, payload: dict[str, Any]) 
     path = run_dir / relative_path
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _write_run_text(run_dir: Path, relative_path: str, text: str) -> None:
+    path = run_dir / relative_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
 
 
 def _slugify_section(value: str) -> str:
@@ -449,6 +457,27 @@ def _write_design_brief(argv: list[str]) -> int:
     return 0
 
 
+def _write_visual_checkpoint(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Write the semi-real visual design checkpoint.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--brief", required=True)
+    parser.add_argument("--package", required=True)
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        brief = _load_json_arg(args.brief)
+        package = _load_json_arg(args.package)
+        payload = build_visual_checkpoint_payload(brief, package)
+        html_text = render_visual_checkpoint_html(payload)
+        checkpoint = harness.write_visual_design(payload)
+        _write_run_text(harness.run_dir, "visual/visual-checkpoint.html", html_text)
+    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("visual_checkpoint_error", str(exc))
+    _write_stdout_json(checkpoint)
+    return 0
+
+
 def _write_report_draft(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Write the report draft checkpoint after report selection.")
     parser.add_argument("--run-dir", required=True)
@@ -505,6 +534,7 @@ COMMANDS = {
     "write-data-preview": _write_data_preview,
     "write-report-selection": _write_report_selection,
     "write-design-brief": _write_design_brief,
+    "write-visual-checkpoint": _write_visual_checkpoint,
     "scaffold-report": _scaffold_report,
     "write-report-draft": _write_report_draft,
     "write-final-review": _write_final_review,
