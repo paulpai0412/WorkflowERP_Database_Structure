@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import re
 import zipfile
 from pathlib import Path
@@ -60,8 +60,8 @@ class WorkbookRequirement:
     formula_fields: list[FormulaFieldRequirement]
     report_fields: list[ReportFieldRequirement]
     formula_lineage: list[FormulaLineage]
-    report_outputs: list[dict[str, Any]]
     warnings: list[str]
+    report_outputs: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         lineage_by_formula = {

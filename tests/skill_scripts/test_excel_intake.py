@@ -5,6 +5,7 @@ from pathlib import Path
 from xml.sax.saxutils import escape
 
 from skill_scripts.excel_intake import (
+    WorkbookRequirement,
     build_excel_confirmation_payload,
     parse_excel_requirement,
 )
@@ -354,3 +355,15 @@ def test_builds_excel_requirement_contract_with_formula_lineage_and_report_outpu
         "report_outputs"
     ][0]["cells"]
     assert requirement_dict["warnings"] == []
+
+
+def test_workbook_requirement_keeps_legacy_constructor_without_report_outputs():
+    requirement = WorkbookRequirement(
+        database_fields=[],
+        formula_fields=[],
+        report_fields=[],
+        formula_lineage=[],
+        warnings=[],
+    )
+
+    assert requirement.to_dict()["report_outputs"] == []
