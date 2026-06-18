@@ -7,9 +7,11 @@ import pytest
 
 from skill_scripts.report_harness_state import (
     CHECKPOINT_DEFINITIONS,
+    append_audit_event,
     create_report_run,
     load_run_state,
     record_checkpoint,
+    write_confirmation,
 )
 
 
@@ -24,7 +26,18 @@ def test_creates_run_directory_with_state_json(tmp_path: Path):
     run_dir = tmp_path / "demo-run"
     assert run_dir.is_dir()
     assert (run_dir / "state.json").is_file()
-    for child in ["inputs", "sql", "data", "checkpoints", "reports"]:
+    for child in [
+        "inputs",
+        "sql",
+        "data",
+        "checkpoints",
+        "reports",
+        "source",
+        "plan",
+        "audit",
+        "review",
+        "report/payload",
+    ]:
         assert (run_dir / child).is_dir()
 
     persisted = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
@@ -135,3 +148,41 @@ def test_repeated_checkpoint_replaces_history_entry(tmp_path: Path):
         (tmp_path / "demo-run" / "checkpoints" / "02_sql_review.json").read_text(encoding="utf-8")
     )
     assert checkpoint["payload"]["sql"] == "SELECT 2"
+
+
+def test_write_confirmation_uses_checkpoint_filename_and_preserves_payload(tmp_path: Path):
+    create_report_run(tmp_path, run_id="demo-run", prompt="prompt")
+
+    confirmation = write_confirmation(
+        tmp_path / "demo-run",
+        "sql_review",
+        {
+            "action": "同意查詢",
+            "comment": "條件正確，可以查詢",
+            "selectedOptions": {"view": "management"},
+        },
+    )
+
+    path = tmp_path / "demo-run" / "checkpoints" / "02_sql_review.confirmation.json"
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+    assert persisted == confirmation
+    assert persisted["checkpoint"] == "sql_review"
+    assert persisted["action"] == "同意查詢"
+    assert persisted["comment"] == "條件正確，可以查詢"
+    assert persisted["selectedOptions"] == {"view": "management"}
+
+
+def test_append_audit_event_writes_jsonl(tmp_path: Path):
+    create_report_run(tmp_path, run_id="demo-run", prompt="prompt")
+
+    entry = append_audit_event(
+        tmp_path / "demo-run",
+        "checkpoint_confirmed",
+        {"checkpoint": "sql_review", "action": "同意查詢"},
+    )
+
+    lines = (tmp_path / "demo-run" / "audit" / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    assert json.loads(lines[0]) == entry
+    assert entry["event"] == "checkpoint_confirmed"
+    assert entry["payload"]["checkpoint"] == "sql_review"

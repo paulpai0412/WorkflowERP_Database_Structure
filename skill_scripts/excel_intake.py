@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass, field
 import re
 import zipfile
 from pathlib import Path
@@ -43,15 +43,55 @@ class FormulaLineage:
 
 
 @dataclass(frozen=True)
+class FormulaCell:
+    address: str
+    formula: str
+
+
+@dataclass(frozen=True)
+class XlsxSheet:
+    rows: list[list[str]]
+    formula_cells: list[FormulaCell]
+
+
+@dataclass(frozen=True)
 class WorkbookRequirement:
     database_fields: list[DatabaseFieldRequirement]
     formula_fields: list[FormulaFieldRequirement]
     report_fields: list[ReportFieldRequirement]
     formula_lineage: list[FormulaLineage]
     warnings: list[str]
+    report_outputs: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        lineage_by_formula = {
+            (item.field_name, item.formula): item.references for item in self.formula_lineage
+        }
+        return {
+            "source_type": "excel",
+            "db_fields": [
+                {
+                    "label": field.display_name or field.field,
+                    "required": True,
+                    "matched_schema_field": None,
+                }
+                for field in self.database_fields
+            ],
+            "formula_fields": [
+                {
+                    "name": field.name,
+                    "formula": field.formula,
+                    "dependencies": [
+                        reference["name"]
+                        for reference in lineage_by_formula.get((field.name, field.formula), [])
+                    ],
+                    "requires_user_confirmation": True,
+                }
+                for field in self.formula_fields
+            ],
+            "report_outputs": self.report_outputs,
+            "warnings": self.warnings,
+        }
 
 
 def _text(element: ET.Element | None) -> str:
@@ -106,7 +146,7 @@ def _normalise_target(target: str) -> str:
     return f"xl/{target}"
 
 
-def _read_xlsx_sheets(path: Path) -> dict[str, list[list[str]]]:
+def _read_xlsx_sheets_with_metadata(path: Path) -> dict[str, XlsxSheet]:
     with zipfile.ZipFile(path) as archive:
         shared_strings = _load_shared_strings(archive)
         workbook = ET.fromstring(archive.read("xl/workbook.xml"))
@@ -116,21 +156,32 @@ def _read_xlsx_sheets(path: Path) -> dict[str, list[list[str]]]:
             for rel in rel_root.findall(f"{{{REL_NS}}}Relationship")
         }
 
-        sheets: dict[str, list[list[str]]] = {}
+        sheets: dict[str, XlsxSheet] = {}
         for sheet in workbook.findall(f".//{{{MAIN_NS}}}sheet"):
             name = sheet.attrib["name"]
             rel_id = sheet.attrib[f"{{{DOC_REL_NS}}}id"]
             sheet_root = ET.fromstring(archive.read(rel_targets[rel_id]))
             rows: list[list[str]] = []
+            formula_cells: list[FormulaCell] = []
             for row in sheet_root.findall(f".//{{{MAIN_NS}}}row"):
                 values: dict[int, str] = {}
                 for cell in row.findall(f"{{{MAIN_NS}}}c"):
                     ref = cell.attrib.get("r", "")
-                    values[_cell_column(ref)] = _read_cell_value(cell, shared_strings)
+                    value = _read_cell_value(cell, shared_strings)
+                    values[_cell_column(ref)] = value
+                    if cell.find(f"{{{MAIN_NS}}}f") is not None:
+                        formula_cells.append(FormulaCell(address=ref, formula=value))
                 max_column = max(values, default=0)
                 rows.append([values.get(index, "") for index in range(1, max_column + 1)])
-            sheets[name] = rows
+            sheets[name] = XlsxSheet(rows=rows, formula_cells=formula_cells)
         return sheets
+
+
+def _read_xlsx_sheets(path: Path) -> dict[str, list[list[str]]]:
+    return {
+        name: sheet.rows
+        for name, sheet in _read_xlsx_sheets_with_metadata(path).items()
+    }
 
 
 def _rows_as_dicts(rows: list[list[str]]) -> list[dict[str, str]]:
@@ -152,6 +203,7 @@ def _rows_as_dicts(rows: list[list[str]]) -> list[dict[str, str]]:
 
 def _formula_references(formula: str) -> list[str]:
     body = formula.lstrip("=")
+    body = re.sub(r'"[^"]*"|\'[^\']*\'', "", body)
     tokens = re.findall(r"[\u4e00-\u9fffA-Za-z_][\u4e00-\u9fffA-Za-z0-9_]*", body)
     seen: set[str] = set()
     references = []
@@ -185,7 +237,8 @@ def _build_lineage(
 
 def parse_excel_requirement(path: str | Path) -> WorkbookRequirement:
     workbook_path = Path(path)
-    sheets = _read_xlsx_sheets(workbook_path)
+    sheet_data = _read_xlsx_sheets_with_metadata(workbook_path)
+    sheets = {name: sheet.rows for name, sheet in sheet_data.items()}
     missing = [name for name in ("需求欄位", "自訂公式", "管理報表") if name not in sheets]
     if missing:
         raise ValueError("Missing required workbook sheets: " + ", ".join(missing))
@@ -229,11 +282,15 @@ def parse_excel_requirement(path: str | Path) -> WorkbookRequirement:
         if field.formula
     )
 
+    formula_field_keys = {
+        (field.name, field.formula)
+        for field in formula_fields
+    }
     warnings = [
         f"Formula field '{item.field_name}' references unresolved source '{ref['name']}'."
         for item in lineage
         for ref in item.references
-        if ref["source"] == "unresolved"
+        if ref["source"] == "unresolved" and (item.field_name, item.formula) not in formula_field_keys
     ]
     warnings.extend(
         f"Formula field '{field.name}' appears to use an empty or shared formula that cannot be resolved locally."
@@ -245,12 +302,24 @@ def parse_excel_requirement(path: str | Path) -> WorkbookRequirement:
         for field in report_fields
         if field.formula.strip() == "="
     )
+    report_outputs = [
+        {
+            "sheet": sheet_name,
+            "cells": [
+                {"address": cell.address, "formula": cell.formula}
+                for cell in sheet.formula_cells
+            ],
+        }
+        for sheet_name, sheet in sheet_data.items()
+        if sheet_name not in {"需求欄位", "自訂公式"} and sheet.formula_cells
+    ]
 
     return WorkbookRequirement(
         database_fields=database_fields,
         formula_fields=formula_fields,
         report_fields=report_fields,
         formula_lineage=lineage,
+        report_outputs=report_outputs,
         warnings=warnings,
     )
 

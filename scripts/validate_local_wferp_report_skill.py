@@ -4,28 +4,47 @@
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 
 
-REQUIRED_REFERENCES = [
-    "harness.md",
-    "db-config.md",
-    "schema-context.md",
-    "excel-intake.md",
-    "sql-safety.md",
-    "validators.md",
-    "react-renderer.md",
-    "e2e-expense-analysis.md",
-]
-
-REQUIRED_REPORT_DESIGNS = [
-    "design.md",
-    "executive-summary.md",
-    "financial-control.md",
-    "operations-review.md",
-    "exception-audit.md",
-    "trend-briefing.md",
-    "detail-ledger.md",
+REQUIRED_FILES = [
+    "SKILL.md",
+    "manifest.json",
+    "README.md",
+    "references/harness.md",
+    "references/db-config.md",
+    "references/excel-intake.md",
+    "references/schema-context.md",
+    "references/sql-safety.md",
+    "references/checkpoint-payload-schema.md",
+    "references/report-payload-schema.md",
+    "references/component-policy.md",
+    "references/rawblock-policy.md",
+    "references/scaffold.md",
+    "references/section-build.md",
+    "references/report-plan-template.md",
+    "references/review-checklist.md",
+    "references/repair-policy.md",
+    "references/html-output.md",
+    "references/validators.md",
+    "references/e2e-expense-analysis.md",
+    "scripts/scaffold-report.sh",
+    "scripts/validate-skill.sh",
+    "scripts/print-expense-fixture-sql.sh",
+    "scripts/run-expense-sqlite-e2e.sh",
+    "scripts/run-expense-postgres-e2e.sh",
+    "report_designs/index.json",
+    "report_designs/design.md",
+    "report_designs/financial-control.md",
+    "report_designs/executive-summary.md",
+    "report_designs/detail-ledger.md",
+    "report_designs/exception-audit.md",
+    "report_designs/operations-review.md",
+    "report_designs/trend-briefing.md",
+    "assets/scaffold-template/package.json",
+    "assets/scaffold-template/index.html",
+    "assets/scaffold-template/report/Report.tsx",
 ]
 
 REQUIRED_SKILL_SECTIONS = {
@@ -52,6 +71,34 @@ REQUIRED_VALIDATOR_TEXT = {
     "視覺/技術 validator": "validators.md must define 視覺/技術 validator.",
 }
 
+REQUIRED_PHASES = [
+    "Phase 0 —— Intake",
+    "Phase 1 —— Source / Excel Requirement",
+    "Phase 2 —— Report Planning",
+    "Phase 3 —— Field & Formula Checkpoint",
+    "Phase 4 —— SQL Review Checkpoint",
+    "Phase 5 —— Confirmed DB Execution",
+    "Phase 6 —— Data Preview Checkpoint",
+    "Phase 7 —— Report Selection Checkpoint",
+    "Phase 8 —— Final Report Scaffold",
+    "Phase 9 —— Section Build",
+    "Phase 10 —— Final Review",
+    "Phase 11 —— Repair",
+    "Phase 12 —— Delivery",
+]
+
+REQUIRED_PHASE_FIELDS = [
+    "目標：",
+    "輸入：",
+    "必讀 references：",
+    "執行步驟：",
+    "產物：",
+    "停止條件：",
+    "使用者 checkpoint：",
+    "validator：",
+    "失敗時 repair slice：",
+]
+
 
 class ValidationResult:
     def __init__(self, errors: list[str]):
@@ -62,45 +109,65 @@ class ValidationResult:
         return not self.errors
 
 
-def read_text(path: Path) -> str:
-    return path.read_text(encoding="utf-8", errors="ignore")
+def relative_path(root: Path, path: Path) -> str:
+    return path.relative_to(root).as_posix()
+
+
+def read_text(root: Path, path: Path, errors: list[str]) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        errors.append(f"Invalid UTF-8: {relative_path(root, path)}")
+        return None
+
+
+def markdown_section(text: str, heading: str) -> str | None:
+    match = re.search(rf"^## {re.escape(heading)}\s*$", text, flags=re.MULTILINE)
+    if not match:
+        return None
+    start = match.end()
+    next_heading = re.search(r"^## .+$", text[start:], flags=re.MULTILINE)
+    end = start + next_heading.start() if next_heading else len(text)
+    return text[start:end]
+
+
+def validate_phase_structure(skill_text: str, errors: list[str]) -> None:
+    for phase in REQUIRED_PHASES:
+        section = markdown_section(skill_text, phase)
+        if section is None:
+            errors.append(f"Missing required SKILL.md phase: {phase}")
+            continue
+        for field in REQUIRED_PHASE_FIELDS:
+            if field not in section:
+                errors.append(f"{phase} missing required field: {field}")
 
 
 def validate_skill_tree(skill_root: str | Path) -> ValidationResult:
     root = Path(skill_root)
     errors: list[str] = []
 
+    for relative_path in REQUIRED_FILES:
+        path = root / relative_path
+        if not path.is_file():
+            errors.append(f"Missing required file: {relative_path}")
+
     skill_md = root / "SKILL.md"
-    if not skill_md.is_file():
-        errors.append(f"Missing required file: {skill_md.name}")
-    else:
-        skill_text = read_text(skill_md)
-        for needle, message in REQUIRED_SKILL_SECTIONS.items():
-            if needle not in skill_text:
-                errors.append(message)
+    if skill_md.is_file():
+        skill_text = read_text(root, skill_md, errors)
+        if skill_text is not None:
+            for needle, message in REQUIRED_SKILL_SECTIONS.items():
+                if needle not in skill_text:
+                    errors.append(message)
+            validate_phase_structure(skill_text, errors)
 
     references_root = root / "references"
-    for name in REQUIRED_REFERENCES:
-        path = references_root / name
-        if not path.is_file():
-            errors.append(f"Missing required reference: references/{name}")
-
     validators_path = references_root / "validators.md"
     if validators_path.is_file():
-        validators_text = read_text(validators_path)
-        for needle, message in REQUIRED_VALIDATOR_TEXT.items():
-            if needle not in validators_text:
-                errors.append(message)
-
-    designs_root = root / "report_designs"
-    for name in REQUIRED_REPORT_DESIGNS:
-        path = designs_root / name
-        if not path.is_file():
-            errors.append(f"Missing required report design: report_designs/{name}")
-
-    sample_prompt = root / "assets" / "sample-expense-analysis-prompt.md"
-    if not sample_prompt.is_file():
-        errors.append("Missing required asset: assets/sample-expense-analysis-prompt.md")
+        validators_text = read_text(root, validators_path, errors)
+        if validators_text is not None:
+            for needle, message in REQUIRED_VALIDATOR_TEXT.items():
+                if needle not in validators_text:
+                    errors.append(message)
 
     return ValidationResult(errors)
 

@@ -1,5 +1,8 @@
 import { FinalReportPayload } from "../App";
+import ChartBlock, { ChartDatum } from "./ChartBlock";
 import DataPreviewTable from "./DataPreviewTable";
+import InsightBlock from "./InsightBlock";
+import RecommendationList from "./RecommendationList";
 
 interface ReportPageProps {
   payload: FinalReportPayload;
@@ -12,9 +15,30 @@ const optionLabels: Array<[keyof NonNullable<FinalReportPayload["options"]>, str
   ["recommendations", "建議"],
 ];
 
+function buildChartData(payload: FinalReportPayload): ChartDatum[] {
+  const preview = payload.dataPreview;
+  if (!preview || preview.rows.length === 0) {
+    return [];
+  }
+  const labelColumn =
+    preview.columns.find((column) => preview.rows.some((row) => typeof row[column] === "string")) ?? preview.columns[0];
+  const valueColumn = preview.columns.find((column) => preview.rows.some((row) => typeof row[column] === "number"));
+  if (!valueColumn) {
+    return [];
+  }
+  const totals = new Map<string, number>();
+  preview.rows.forEach((row) => {
+    const label = String(row[labelColumn] ?? "未分類");
+    const value = typeof row[valueColumn] === "number" ? row[valueColumn] : Number(row[valueColumn] ?? 0);
+    totals.set(label, (totals.get(label) ?? 0) + (Number.isFinite(value) ? value : 0));
+  });
+  return Array.from(totals.entries()).map(([label, value]) => ({ label, value }));
+}
+
 export default function ReportPage({ payload }: ReportPageProps) {
   const enabledOptions = optionLabels.filter(([key]) => payload.options?.[key]);
   const sections = payload.sections ?? [];
+  const chartData = buildChartData(payload);
 
   return (
     <main className="app-shell report-shell">
@@ -34,40 +58,36 @@ export default function ReportPage({ payload }: ReportPageProps) {
       </header>
 
       <section className="report-grid" aria-label="報告章節">
-        {sections.map((section) => (
-          <article className={`panel report-section ${section.type}`} key={`${section.type}-${section.title}`}>
-            <p className="eyebrow">{section.type}</p>
-            <h2>{section.title}</h2>
-            {section.body ? <p>{section.body}</p> : null}
-            {section.items ? (
-              <ul>
-                {section.items.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            ) : null}
-          </article>
-        ))}
+        {sections.map((section) => {
+          if (section.type === "analysis") {
+            return (
+              <div key={`${section.type}-${section.title}`}>
+                <InsightBlock title={section.title} body={section.body} />
+              </div>
+            );
+          }
+          if (section.type === "recommendations") {
+            return (
+              <div key={`${section.type}-${section.title}`}>
+                <RecommendationList title={section.title} items={section.items} />
+              </div>
+            );
+          }
+          return (
+            <article className={`panel report-section ${section.type}`} key={`${section.type}-${section.title}`}>
+              <p className="eyebrow">{section.type}</p>
+              <h2>{section.title}</h2>
+              {section.body ? <p>{section.body}</p> : null}
+            </article>
+          );
+        })}
       </section>
 
       {payload.options?.charts ? (
-        <section className="panel chart-panel" aria-label="圖表摘要">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Chart</p>
-              <h2>費用占比圖表</h2>
-            </div>
-          </div>
-          <div className="bar-chart" aria-hidden="true">
-            <span style={{ height: "72%" }} />
-            <span style={{ height: "48%" }} />
-            <span style={{ height: "64%" }} />
-            <span style={{ height: "36%" }} />
-          </div>
-        </section>
+        <ChartBlock type="bar" title="費用占比圖表" subtitle="依第一個文字欄位彙總第一個數值欄位" data={chartData} />
       ) : null}
 
-      {payload.options?.tables ? <DataPreviewTable preview={payload.dataPreview} /> : null}
+      {payload.options?.tables ? <DataPreviewTable preview={payload.dataPreview} enableControls /> : null}
     </main>
   );
 }

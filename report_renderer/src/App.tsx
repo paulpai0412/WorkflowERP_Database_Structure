@@ -17,6 +17,10 @@ export interface SqlReview {
     blockedKeywords?: string[];
     executionStatus?: "not_executed" | "executed" | "blocked";
   };
+  schemaMapping?: FieldMapping[];
+  relationshipPath?: string[];
+  safetyChecks?: string[];
+  executionEnvironment?: string;
 }
 
 export interface ReportTypeChoice {
@@ -25,13 +29,54 @@ export interface ReportTypeChoice {
   description: string;
 }
 
+export interface FieldFormulaReviewPayload {
+  fields?: FieldFormulaItem[];
+  formulas?: FieldFormulaItem[];
+}
+
+export interface FieldFormulaItem {
+  label: string;
+  source?: string;
+  expression?: string;
+  confirmation?: string;
+}
+
+export interface FieldMapping {
+  field: string;
+  table: string;
+  column: string;
+  note?: string;
+}
+
+export interface AggregateCheck {
+  label: string;
+  expected?: string | number;
+  actual?: string | number;
+  status: "pass" | "warning" | "fail";
+  note?: string;
+}
+
+export interface ValidatorEvidence {
+  validator: string;
+  status: "pass" | "warning" | "fail";
+  message: string;
+  evidencePath?: string;
+}
+
 export interface CheckpointPayload {
   kind: "checkpoint";
+  checkpointId?: string;
   title: string;
   step?: string;
+  confirmUrl?: string;
+  requirementSummary?: string;
+  fieldFormulaReview?: FieldFormulaReviewPayload;
   sqlReview?: SqlReview;
   dataPreview?: DataPreview;
+  aggregateChecks?: AggregateCheck[];
   reportTypes?: ReportTypeChoice[];
+  exceptions?: string[];
+  validatorEvidence?: ValidatorEvidence[];
   actions?: string[];
 }
 
