@@ -92,7 +92,7 @@ def test_records_data_preview_checkpoint(tmp_path: Path):
     )
 
     assert checkpoint["title"] == "資料預覽確認"
-    assert checkpoint["actions"] == ["資料正確", "重新查詢"]
+    assert checkpoint["actions"] == ["資料正確", "確認資料", "重新查詢"]
 
 
 def test_records_report_selection_checkpoint(tmp_path: Path):
@@ -112,7 +112,7 @@ def test_all_checkpoint_payloads_have_chinese_titles_and_actions():
     expected_actions = {
         "excel_confirmation": ["確認欄位與公式", "要求修正"],
         "sql_review": ["同意查詢", "調整需求"],
-        "data_preview": ["資料正確", "重新查詢"],
+        "data_preview": ["資料正確", "確認資料", "重新查詢"],
         "report_selection": ["產生報告", "修改格式"],
         "report_draft": ["接受", "修正報告"],
         "final_review": ["完成", "回到初稿"],

@@ -105,6 +105,13 @@ class ReportHarness:
     def write_data_preview(self, payload: dict[str, Any]) -> dict[str, Any]:
         if self.state().get("user_confirmations", {}).get("sql_review") != "同意查詢":
             raise ReportHarnessError("SQL must be confirmed before writing data preview")
+        self.clear_downstream(
+            ["report_selection", "report_draft", "final_review"],
+            report_type=None,
+            report_design=None,
+            report_options={},
+            validator_results=[],
+        )
         self.update_state(execution_result_summary=payload)
         return record_checkpoint(self.run_dir, "data_preview", payload)
 

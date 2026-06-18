@@ -24,7 +24,7 @@ CHECKPOINT_DEFINITIONS: dict[str, dict[str, Any]] = {
         "index": 3,
         "file": "03_data_preview.json",
         "title": "資料預覽確認",
-        "actions": ["資料正確", "重新查詢"],
+        "actions": ["資料正確", "確認資料", "重新查詢"],
     },
     "report_selection": {
         "index": 4,
