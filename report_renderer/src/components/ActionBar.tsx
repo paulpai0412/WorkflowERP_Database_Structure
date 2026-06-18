@@ -1,6 +1,6 @@
 import React from "react";
 
-type ActionState = "idle" | "submitting" | "confirmed" | "failed";
+type ActionState = "idle" | "submitting" | "confirmed" | "failed" | "preview";
 
 interface ActionBarProps {
   actions?: string[];
@@ -19,6 +19,9 @@ function statusText(state: ActionState) {
   if (state === "failed") {
     return "送出失敗，請重試";
   }
+  if (state === "preview") {
+    return "此頁僅供預覽，未連接確認端點";
+  }
   return "";
 }
 
@@ -31,35 +34,47 @@ export default function ActionBar({
   const useReactState = (React as unknown as {
     useState: <T>(initial: T) => [T, (value: T) => void];
   }).useState;
+  const useReactRef = (React as unknown as {
+    useRef: <T>(initial: T) => { current: T };
+  }).useRef;
   const [comment, setComment] = useReactState("");
-  const [state, setState] = useReactState<ActionState>("idle");
+  const [state, setState] = useReactState<ActionState>(confirmUrl ? "idle" : "preview");
+  const submittingRef = useReactRef(false);
 
   if (actions.length === 0) {
     return null;
   }
 
   async function submitAction(action: string) {
+    if (!confirmUrl) {
+      setState("preview");
+      return;
+    }
+    if (submittingRef.current) {
+      return;
+    }
+    submittingRef.current = true;
     setState("submitting");
     try {
-      if (confirmUrl) {
-        const response = await fetch(confirmUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action,
-            checkpointId,
-            comment,
-            selectedOptions,
-          }),
-        });
+      const response = await fetch(confirmUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          checkpointId,
+          comment,
+          selectedOptions,
+        }),
+      });
 
-        if (!response.ok) {
-          throw new Error(`Confirmation failed: ${response.status}`);
-        }
+      if (!response.ok) {
+        throw new Error(`Confirmation failed: ${response.status}`);
       }
       setState("confirmed");
     } catch {
       setState("failed");
+    } finally {
+      submittingRef.current = false;
     }
   }
 
@@ -83,7 +98,7 @@ export default function ActionBar({
           {actions.map((action, index) => (
             <button
               className={index === 0 ? "primary-button" : "secondary-button"}
-              disabled={state === "submitting"}
+              disabled={!confirmUrl || state === "submitting"}
               key={action}
               onClick={() => void submitAction(action)}
               type="button"

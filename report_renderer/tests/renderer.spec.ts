@@ -84,6 +84,7 @@ const reportPayload = {
 describe("WFERP report renderer", () => {
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   it("renders checkpoint page title in Chinese", () => {
@@ -144,7 +145,56 @@ describe("WFERP report renderer", () => {
       }),
     );
 
-    fetchSpy.mockRestore();
+  });
+
+  it("does not show persisted confirmation when confirmUrl is missing", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    render(React.createElement(App, { payload: checkpointPayload }));
+
+    fireEvent.click(screen.getByRole("button", { name: "同意查詢" }));
+
+    expect(await screen.findByText("此頁僅供預覽，未連接確認端點")).toBeTruthy();
+    expect(screen.queryByText("已送出確認")).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("shows failed state when checkpoint confirmation is rejected", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network unavailable"));
+
+    render(
+      React.createElement(App, {
+        payload: {
+          ...checkpointPayload,
+          confirmUrl: "/api/runs/run-001/checkpoints/sql_review/confirm",
+        },
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "同意查詢" }));
+
+    expect(await screen.findByText("送出失敗，請重試")).toBeTruthy();
+  });
+
+  it("does not post twice while checkpoint confirmation is pending", () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockReturnValue(new Promise<Response>(() => undefined));
+
+    render(
+      React.createElement(App, {
+        payload: {
+          ...checkpointPayload,
+          confirmUrl: "/api/runs/run-001/checkpoints/sql_review/confirm",
+        },
+      }),
+    );
+
+    const approveButton = screen.getByRole("button", { name: "同意查詢" });
+    fireEvent.click(approveButton);
+    fireEvent.click(approveButton);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
   it("renders data preview table with row count", () => {
