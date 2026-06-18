@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from skill_scripts.validator_contracts import ValidatorContractError, build_final_review_gate
 from skill_scripts.report_harness_state import (
     CHECKPOINT_DEFINITIONS,
     create_report_run,
@@ -116,5 +117,56 @@ class ReportHarness:
     def write_final_review(self, payload: dict[str, Any]) -> dict[str, Any]:
         if self.state().get("user_confirmations", {}).get("report_draft") != "接受":
             raise ReportHarnessError("Draft must be accepted before final review")
-        self.update_state(validator_results=payload.get("validator_results", []))
+        self.update_state(
+            validator_results=payload.get("validator_results", []),
+            accepted_residual_risks=payload.get("accepted_residual_risks", []),
+        )
         return record_checkpoint(self.run_dir, "final_review", payload)
+
+    def can_deliver(self) -> dict[str, Any]:
+        state = self.state()
+        accepted_residual_risks = state.get("accepted_residual_risks", [])
+        explicit_user_acceptance = (
+            state.get("user_confirmations", {}).get("final_review") == "完成"
+            and bool(accepted_residual_risks)
+        )
+        try:
+            return build_final_review_gate(
+                state.get("validator_results", []),
+                explicit_user_acceptance=explicit_user_acceptance,
+                accepted_residual_risks=accepted_residual_risks,
+            )
+        except ValidatorContractError as exc:
+            return {
+                "allowed": False,
+                "blocking_validators": ["validator_contract"],
+                "accepted_residual_risks": accepted_residual_risks,
+                "error": str(exc),
+            }
+
+    def append_repair_log(
+        self,
+        *,
+        validator: str,
+        failure: str,
+        scope: str,
+        minimal_vertical_slice: str,
+        files_changed: list[str],
+        validation_rerun: str,
+        residual_risk: str,
+    ) -> Path:
+        path = self.run_dir / "review" / "repair-log.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        changed = "\n".join(f"- {item}" for item in files_changed) if files_changed else "- None"
+        entry = (
+            f"## {validator}\n\n"
+            f"Failure:\n{failure}\n\n"
+            f"Scope:\n{scope}\n\n"
+            f"Minimal vertical slice:\n{minimal_vertical_slice}\n\n"
+            f"Files changed:\n{changed}\n\n"
+            f"Validation rerun:\n{validation_rerun}\n\n"
+            f"Residual risk:\n{residual_risk}\n\n"
+        )
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(entry)
+        return path

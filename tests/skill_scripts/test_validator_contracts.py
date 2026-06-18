@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 import pytest
 
+from skill_scripts import validator_contracts
 from skill_scripts.validator_contracts import (
     REQUIRED_VALIDATORS,
     ValidatorContractError,
@@ -14,44 +13,65 @@ from skill_scripts.validator_contracts import (
 
 def test_validator_contracts_include_required_roles():
     assert REQUIRED_VALIDATORS == [
-        "source_intake",
-        "excel_formula",
-        "sql_safety",
-        "schema_relationship",
-        "data_preview",
-        "report_content",
-        "visual_technical",
+        "source_requirement_reviewer",
+        "excel_formula_reviewer",
+        "sql_safety_reviewer",
+        "schema_relationship_reviewer",
+        "data_preview_reviewer",
+        "report_content_reviewer",
+        "visual_taste_reviewer",
+        "data_visualization_reviewer",
+        "react_technical_reviewer",
     ]
 
 
-def test_validator_contract_requires_status_evidence_and_findings():
+def test_validator_result_requires_evidence_and_repair_fields():
+    result = validator_contracts.ValidatorResult(
+        role="sql_safety_reviewer",
+        status="fail",
+        evidence=[{"command": "python3 -m skill_scripts.cli_report_harness validate-sql"}],
+        findings=["SELECT INTO is blocked"],
+        requiredFixes=["Remove SELECT INTO"],
+        residualRisks=[],
+    )
+
+    assert result.to_dict() == {
+        "role": "sql_safety_reviewer",
+        "status": "fail",
+        "evidence": [{"command": "python3 -m skill_scripts.cli_report_harness validate-sql"}],
+        "findings": ["SELECT INTO is blocked"],
+        "requiredFixes": ["Remove SELECT INTO"],
+        "residualRisks": [],
+    }
+
+
+def test_validator_contract_requires_status_evidence_findings_and_repair_fields():
     packet = {
-        "validator": "sql_safety",
+        "role": "sql_safety_reviewer",
         "status": "pass",
-        "checked_at": datetime.now(timezone.utc).isoformat(),
-        "inputs": ["sql/query.sql"],
-        "checks": [{"name": "readonly_select_only", "status": "pass", "evidence": "blocked keywords: 0"}],
+        "evidence": [{"command": "python3 -m skill_scripts.cli_report_harness validate-sql"}],
         "findings": [],
-        "residual_risks": [],
+        "requiredFixes": [],
+        "residualRisks": [],
     }
 
     assert validate_evidence_packet(packet) == packet
 
-    incomplete = dict(packet)
-    incomplete.pop("findings")
-    with pytest.raises(ValidatorContractError, match="findings"):
-        validate_evidence_packet(incomplete)
+    for field in ("role", "status", "evidence", "findings", "requiredFixes", "residualRisks"):
+        incomplete = dict(packet)
+        incomplete.pop(field)
+        with pytest.raises(ValidatorContractError, match=field):
+            validate_evidence_packet(incomplete)
 
 
 def test_validator_contract_rejects_missing_quantitative_checks_for_data_validator():
     packet = {
-        "validator": "data_preview",
+        "role": "data_preview_reviewer",
         "status": "pass",
-        "checked_at": datetime.now(timezone.utc).isoformat(),
-        "inputs": ["data/preview.json"],
-        "checks": [{"name": "preview_shape", "status": "pass", "evidence": "looks ok"}],
+        "evidence": [{"name": "preview_shape", "status": "pass", "metrics": {"row_count": 10}}],
         "findings": [],
-        "residual_risks": [],
+        "requiredFixes": [],
+        "residualRisks": [],
     }
 
     with pytest.raises(ValidatorContractError, match="quantitative"):
@@ -60,54 +80,69 @@ def test_validator_contract_rejects_missing_quantitative_checks_for_data_validat
 
 def test_data_preview_quantitative_checks_require_numeric_metrics():
     packet = {
-        "validator": "data_preview",
+        "role": "data_preview_reviewer",
         "status": "pass",
-        "checked_at": datetime.now(timezone.utc).isoformat(),
-        "inputs": ["data/preview.json"],
-        "checks": [
+        "evidence": [
             {
                 "name": "preview_shape",
                 "status": "pass",
-                "evidence": "row_count=10; column_count=4",
+                "detail": "row_count=10; column_count=4",
             }
         ],
         "findings": [],
-        "residual_risks": [],
+        "requiredFixes": [],
+        "residualRisks": [],
     }
 
     with pytest.raises(ValidatorContractError, match="quantitative"):
         validate_evidence_packet(packet)
 
-    packet["checks"][0]["metrics"] = {"row_count": 10, "column_count": 4}
+    packet["evidence"][0]["metrics"] = {"row_count": 10, "column_count": 4}
     assert validate_evidence_packet(packet) == packet
 
 
 def test_report_final_review_requires_all_validators_pass_or_explicit_user_acceptance():
     packets = [
         {
-            "validator": validator,
+            "role": validator,
             "status": "pass",
-            "checked_at": datetime.now(timezone.utc).isoformat(),
-            "inputs": ["input.json"],
-            "checks": [
+            "evidence": [
                 {
                     "name": "row_count",
                     "status": "pass",
-                    "evidence": "row_count=10; column_count=4",
+                    "detail": "row_count=10; column_count=4",
                     "metrics": {"row_count": 10, "column_count": 4},
                 }
             ],
             "findings": [],
-            "residual_risks": [],
+            "requiredFixes": [],
+            "residualRisks": [],
         }
         for validator in REQUIRED_VALIDATORS
     ]
 
-    assert build_final_review_gate(packets)["status"] == "pass"
+    assert build_final_review_gate(packets)["allowed"] is True
 
-    packets[0] = dict(packets[0], status="fail", findings=["來源不完整"])
-    with pytest.raises(ValidatorContractError, match="explicit user acceptance"):
-        build_final_review_gate(packets)
+    packets[0] = dict(packets[0], status="fail", findings=["來源不完整"], requiredFixes=["補齊來源檔案"])
+    gate = build_final_review_gate(packets)
+    assert gate["allowed"] is False
+    assert gate["blocking_validators"] == ["source_requirement_reviewer"]
 
     gate = build_final_review_gate(packets, explicit_user_acceptance=True)
-    assert gate["status"] == "accepted_with_risks"
+    assert gate["allowed"] is True
+
+
+def test_report_final_review_blocks_missing_validator_roles():
+    packet = {
+        "role": "source_requirement_reviewer",
+        "status": "pass",
+        "evidence": [{"command": "review source inputs"}],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": [],
+    }
+
+    gate = build_final_review_gate([packet])
+
+    assert gate["allowed"] is False
+    assert "excel_formula_reviewer" in gate["blocking_validators"]

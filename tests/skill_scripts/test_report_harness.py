@@ -5,6 +5,32 @@ from pathlib import Path
 import pytest
 
 from skill_scripts.report_harness import ReportHarness, ReportHarnessError
+from skill_scripts.validator_contracts import REQUIRED_VALIDATORS
+
+
+def _validator_result(role: str, status: str = "pass") -> dict[str, object]:
+    evidence: list[dict[str, object]] = [{"command": f"review {role}"}]
+    if role == "data_preview_reviewer":
+        evidence = [
+            {
+                "name": "preview_shape",
+                "status": "pass",
+                "metrics": {"row_count": 10, "column_count": 4},
+            }
+        ]
+    return {
+        "role": role,
+        "status": status,
+        "evidence": evidence,
+        "findings": [] if status == "pass" else [f"{role} failed"],
+        "requiredFixes": [] if status == "pass" else [f"repair {role}"],
+        "residualRisks": [] if status == "pass" else [f"accepted risk for {role}"],
+    }
+
+
+def _all_validator_results(status_overrides: dict[str, str] | None = None) -> list[dict[str, object]]:
+    overrides = status_overrides or {}
+    return [_validator_result(role, overrides.get(role, "pass")) for role in REQUIRED_VALIDATORS]
 
 
 def test_rejects_state_transition_without_required_confirmation(tmp_path: Path):
@@ -112,3 +138,73 @@ def test_final_review_requires_draft_acceptance(tmp_path: Path):
 
     with pytest.raises(ReportHarnessError, match="Draft must be accepted"):
         harness.write_final_review({"status": "ready"})
+
+
+def test_success_is_blocked_when_any_validator_fails(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
+    harness.write_report_selection(
+        {"selected_report_type": "管理摘要", "selected_report_design": "financial-control"}
+    )
+    harness.confirm("report_selection", "產生報告")
+    harness.write_report_draft({"sections": ["摘要"]})
+    harness.confirm("report_draft", "接受")
+    harness.write_final_review(
+        {
+            "validator_results": _all_validator_results({"visual_taste_reviewer": "fail"}),
+        }
+    )
+
+    assert harness.can_deliver() == {
+        "allowed": False,
+        "blocking_validators": ["visual_taste_reviewer"],
+        "accepted_residual_risks": [],
+    }
+
+
+def test_delivery_allows_explicitly_accepted_residual_risk_at_final_checkpoint(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
+    harness.write_report_selection(
+        {"selected_report_type": "管理摘要", "selected_report_design": "financial-control"}
+    )
+    harness.confirm("report_selection", "產生報告")
+    harness.write_report_draft({"sections": ["摘要"]})
+    harness.confirm("report_draft", "接受")
+    harness.write_final_review(
+        {
+            "validator_results": _all_validator_results({"visual_taste_reviewer": "warning"}),
+            "accepted_residual_risks": ["visual_taste_reviewer: chart label may need manual rewrite"],
+        }
+    )
+
+    assert harness.can_deliver()["allowed"] is False
+
+    harness.confirm("final_review", "完成")
+
+    assert harness.can_deliver() == {
+        "allowed": True,
+        "blocking_validators": [],
+        "accepted_residual_risks": ["visual_taste_reviewer: chart label may need manual rewrite"],
+    }
+
+
+def test_append_repair_log_writes_minimal_vertical_slice_entry(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
+
+    path = harness.append_repair_log(
+        validator="sql_safety_reviewer",
+        failure="SELECT INTO is blocked",
+        scope="sql/query.sql",
+        minimal_vertical_slice="Remove SELECT INTO while preserving selected columns",
+        files_changed=["sql/query.sql", "skill_scripts/report_harness.py"],
+        validation_rerun="pytest tests/skill_scripts/test_report_harness.py -v",
+        residual_risk="None",
+    )
+
+    content = path.read_text(encoding="utf-8")
+    assert "sql_safety_reviewer" in content
+    assert "Failure:\nSELECT INTO is blocked" in content
+    assert "Scope:\nsql/query.sql" in content
+    assert "Minimal vertical slice:\nRemove SELECT INTO while preserving selected columns" in content
+    assert "Files changed:\n- sql/query.sql\n- skill_scripts/report_harness.py" in content
+    assert "Validation rerun:\npytest tests/skill_scripts/test_report_harness.py -v" in content
+    assert "Residual risk:\nNone" in content
