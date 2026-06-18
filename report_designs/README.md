@@ -1,5 +1,7 @@
 # WFERP Report Designs
 
-This directory contains reusable markdown design contracts for WFERP report generation. Each concrete design declares machine-readable metadata in a front matter block and human guidance for the renderer, report writer, and validators.
+This directory contains reusable product report design contracts for WFERP report generation.
 
-The catalog in `skill_scripts/report_catalog.py` loads these files and exposes them to the report harness selection checkpoint.
+`index.json` is the canonical catalog order and allowlist. `skill_scripts/report_catalog.py` rejects missing profile files, unindexed profile IDs, and profiles missing required product metadata.
+
+Each concrete design declares machine-readable front matter for the harness, renderer, report scaffold, and validators, followed by human guidance for section writing and review.

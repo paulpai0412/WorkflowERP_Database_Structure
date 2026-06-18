@@ -10,6 +10,7 @@ from typing import Any
 
 from skill_scripts.excel_intake import build_excel_confirmation_payload, parse_excel_requirement
 from skill_scripts.report_catalog import build_report_selection_payload
+from skill_scripts.report_catalog import get_report_design_defaults
 from skill_scripts.report_catalog import list_report_designs
 from skill_scripts.report_harness import ReportHarness
 from skill_scripts.report_harness_state import load_run_state
@@ -48,6 +49,11 @@ def _slugify_section(value: str) -> str:
 
 
 def _sections_for_design(design: str) -> list[str]:
+    defaults = get_report_design_defaults(design)
+    sections = [str(section) for section in defaults["sections"] if str(section).strip()]
+    if sections:
+        return sections
+
     if design in DESIGN_SECTION_DEFAULTS:
         return list(DESIGN_SECTION_DEFAULTS[design])
 
