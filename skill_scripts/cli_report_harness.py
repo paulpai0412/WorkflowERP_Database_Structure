@@ -13,7 +13,9 @@ from skill_scripts.report_catalog import build_report_selection_payload
 from skill_scripts.report_catalog import get_report_design_defaults
 from skill_scripts.report_catalog import list_report_designs
 from skill_scripts.report_harness import ReportHarness
+from skill_scripts.report_harness import ReportHarnessError
 from skill_scripts.report_harness_state import load_run_state
+from skill_scripts.report_harness_state import write_confirmation
 from skill_scripts.report_scaffold import scaffold_report_workspace
 from skill_scripts.schema_loader import load_schema_bundle
 from skill_scripts.sql_generator import generate_select_sql
@@ -39,8 +41,34 @@ def _write_stderr_json(data: dict[str, Any]) -> None:
     print(json.dumps(data, ensure_ascii=False, indent=2), file=sys.stderr)
 
 
+def _json_error(code: str, message: str) -> int:
+    _write_stderr_json({"status": "error", "code": code, "message": message})
+    return 2
+
+
 def _default_scaffold_template_dir() -> Path:
     return Path.home() / ".codex" / "skills" / "wferp-report" / "assets" / "scaffold-template"
+
+
+def _load_json_arg(value: str) -> dict[str, Any]:
+    path = Path(value)
+    if path.exists():
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    else:
+        loaded = json.loads(value)
+    if not isinstance(loaded, dict):
+        raise ValueError("JSON payload must be an object")
+    return loaded
+
+
+def _load_json_arg_or_empty(value: str | None) -> dict[str, Any]:
+    return _load_json_arg(value) if value else {}
+
+
+def _write_run_json(run_dir: Path, relative_path: str, payload: dict[str, Any]) -> None:
+    path = run_dir / relative_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def _slugify_section(value: str) -> str:
@@ -78,17 +106,27 @@ def _sections_for_design(design: str) -> list[str]:
 def _scaffold_report(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Scaffold a per-run WFERP React report workspace.")
     parser.add_argument("--run-dir", required=True)
-    parser.add_argument("--design", default="financial-control")
+    parser.add_argument("--design", default="")
     parser.add_argument("--template-dir", type=Path, default=_default_scaffold_template_dir())
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args(argv)
 
+    run_dir = Path(args.run_dir)
+    try:
+        state = load_run_state(run_dir)
+    except FileNotFoundError:
+        state = {}
+    design = args.design or state.get("report_design") or "financial-control"
+    payload = {
+        "run": state,
+        "approved_query_result": state.get("execution_result_summary") or {"rows": []},
+    }
     try:
         result = scaffold_report_workspace(
-            run_dir=Path(args.run_dir),
+            run_dir=run_dir,
             template_dir=args.template_dir,
-            sections=_sections_for_design(args.design),
-            payload={"approved_query_result": {"rows": []}},
+            sections=_sections_for_design(design),
+            payload=payload,
             force=args.force,
         )
     except (FileExistsError, FileNotFoundError, ValueError) as exc:
@@ -105,6 +143,7 @@ def _scaffold_report(argv: list[str]) -> int:
             "status": "scaffolded",
             "section_count": result["section_count"],
             "run_dir": result["run_dir"],
+            "design": design,
         }
     )
     return 0
@@ -121,11 +160,13 @@ def _serve_checkpoint(argv: list[str]) -> int:
 
     run_dir = Path(args.run_dir)
     if not (run_dir / "state.json").exists():
-        raise SystemExit(f"Report run does not exist: {run_dir}")
+        return _json_error("run_not_found", f"Report run does not exist: {run_dir}")
     with CheckpointCompanionServer.serve(run_dir, host=args.host, port=args.port) as server:
-        print(
-            f"checkpoint_companion_url={server.base_url}/runs/{run_dir.name}/checkpoints/current",
-            flush=True,
+        _write_stdout_json(
+            {
+                "status": "serving",
+                "url": f"{server.base_url}/runs/{run_dir.name}/checkpoints/current",
+            }
         )
         try:
             server.thread.join()
@@ -149,6 +190,13 @@ def _ensure_harness(args: argparse.Namespace) -> ReportHarness:
         prompt=args.prompt,
         input_files=[str(path) for path in args.input_file],
     )
+
+
+def _open_harness(run_dir: str | Path) -> ReportHarness:
+    path = Path(run_dir)
+    if not (path / "state.json").exists():
+        raise ReportHarnessError(f"Report run does not exist: {path}")
+    return ReportHarness(path)
 
 
 def _parse_excel_inputs(harness: ReportHarness, input_files: list[Path]) -> dict[str, Any] | None:
@@ -204,12 +252,228 @@ def _guard_execution(args: argparse.Namespace, harness: ReportHarness) -> bool:
     return True
 
 
+def _create_run(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Create a WFERP report harness run.")
+    parser.add_argument("--run-root", required=True)
+    parser.add_argument("--run-id", required=True)
+    parser.add_argument("--prompt", required=True)
+    parser.add_argument("--input-file", action="append", type=Path, default=[])
+    args = parser.parse_args(argv)
+
+    try:
+        harness = ReportHarness.create(
+            args.run_root,
+            run_id=args.run_id,
+            prompt=args.prompt,
+            input_files=[str(path) for path in args.input_file],
+        )
+    except FileExistsError as exc:
+        return _json_error("run_exists", str(exc))
+    _write_stdout_json({"status": "created", "run_dir": str(harness.run_dir), "state": harness.state()})
+    return 0
+
+
+def _write_excel_confirmation(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Write the Excel field/formula confirmation checkpoint.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--payload", default="")
+    parser.add_argument("--input-file", type=Path, default=None)
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        if args.input_file:
+            payload = _parse_excel_inputs(harness, [args.input_file])
+            if payload is None:
+                return _json_error("excel_required", f"Not an Excel file: {args.input_file}")
+        else:
+            payload = _load_json_arg_or_empty(args.payload)
+        checkpoint = harness.write_excel_confirmation(payload)
+    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("excel_confirmation_error", str(exc))
+    _write_stdout_json(checkpoint)
+    return 0
+
+
+def _write_sql_review(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Write the SQL review checkpoint.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--sql", default="")
+    parser.add_argument("--prompt", default="")
+    parser.add_argument("--mode", choices=["rule", "shadow", "llm-first"], default="rule")
+    parser.add_argument("--validation", default="")
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        state = harness.state()
+        prompt = args.prompt or state.get("prompt", "")
+        sql = args.sql or _build_sql(prompt, args.mode)
+        validation = _load_json_arg_or_empty(args.validation) or {"status": "pending_user_confirmation"}
+        _write_run_json(harness.run_dir, "sql/query.sql.json", {"sql": sql, "validation": validation})
+        (harness.run_dir / "sql" / "query.sql").write_text(sql + "\n", encoding="utf-8")
+        checkpoint = harness.write_sql_review(sql, validation)
+    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("sql_review_error", str(exc))
+    _write_stdout_json(checkpoint)
+    return 0
+
+
+def _parse_selected_option_values(values: list[str]) -> dict[str, Any]:
+    selected: dict[str, Any] = {}
+    for value in values:
+        if "=" not in value:
+            raise ValueError(f"selected option must use key=value: {value}")
+        key, raw_value = value.split("=", 1)
+        lowered = raw_value.lower()
+        if lowered in {"true", "false"}:
+            selected[key] = lowered == "true"
+        else:
+            selected[key] = raw_value
+    return selected
+
+
+def _confirm(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Confirm a checkpoint and persist selected options.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--checkpoint", required=True)
+    parser.add_argument("--action", required=True)
+    parser.add_argument("--comment", default="")
+    parser.add_argument("--selected-options", default="")
+    parser.add_argument("--selected-option", action="append", default=[])
+    parser.add_argument("--accepted-residual-risk", action="append", default=[])
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        selected_options = _load_json_arg_or_empty(args.selected_options)
+        selected_options.update(_parse_selected_option_values(args.selected_option))
+        if args.accepted_residual_risk:
+            selected_options["acceptedResidualRisks"] = list(args.accepted_residual_risk)
+        state = harness.confirm(args.checkpoint, args.action, selected_options=selected_options)
+        write_confirmation(
+            harness.run_dir,
+            args.checkpoint,
+            {
+                "action": args.action,
+                "comment": args.comment,
+                "selectedOptions": selected_options,
+            },
+        )
+    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("confirmation_error", str(exc))
+    _write_stdout_json(
+        {
+            "status": "confirmed",
+            "checkpoint": args.checkpoint,
+            "action": args.action,
+            "selectedOptions": selected_options,
+            "state": state,
+        }
+    )
+    return 0
+
+
+def _write_data_preview(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Write the data preview checkpoint after SQL confirmation.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--payload", required=True)
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        payload = _load_json_arg(args.payload)
+        _write_run_json(harness.run_dir, "data/execution-result.json", payload)
+        checkpoint = harness.write_data_preview(payload)
+    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("data_preview_error", str(exc))
+    _write_stdout_json(checkpoint)
+    return 0
+
+
+def _write_report_selection(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Write the report selection checkpoint.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--payload", default="")
+    parser.add_argument("--report-type", default="")
+    parser.add_argument("--report-design", default="")
+    parser.add_argument("--include-chart", action="store_true")
+    parser.add_argument("--include-table", action="store_true")
+    parser.add_argument("--include-analysis", action="store_true")
+    parser.add_argument("--include-recommendations", action="store_true")
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        payload = _load_json_arg_or_empty(args.payload) or build_report_selection_payload()
+        if args.report_type:
+            payload["selected_report_type"] = args.report_type
+        if args.report_design:
+            get_report_design_defaults(args.report_design)
+            payload["selected_report_design"] = args.report_design
+        payload["selected_options"] = {
+            **payload.get("selected_options", {}),
+            "include_chart": args.include_chart,
+            "include_table": args.include_table,
+            "include_analysis": args.include_analysis,
+            "include_recommendations": args.include_recommendations,
+        }
+        checkpoint = harness.write_report_selection(payload)
+    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("report_selection_error", str(exc))
+    _write_stdout_json(checkpoint)
+    return 0
+
+
+def _write_final_review(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Write the final review checkpoint with validator evidence.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--payload", required=True)
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        payload = _load_json_arg(args.payload)
+        _write_run_json(harness.run_dir, "review/final-review.json", payload)
+        checkpoint = harness.write_final_review(payload)
+    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("final_review_error", str(exc))
+    _write_stdout_json(checkpoint)
+    return 0
+
+
+def _can_deliver(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Evaluate final delivery gate.")
+    parser.add_argument("--run-dir", required=True)
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        result = harness.can_deliver()
+    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("delivery_gate_error", str(exc))
+    _write_stdout_json({"status": "ok", **result})
+    return 0 if result.get("allowed") else 2
+
+
+COMMANDS = {
+    "create-run": _create_run,
+    "write-excel-confirmation": _write_excel_confirmation,
+    "write-sql-review": _write_sql_review,
+    "confirm": _confirm,
+    "write-data-preview": _write_data_preview,
+    "write-report-selection": _write_report_selection,
+    "scaffold-report": _scaffold_report,
+    "write-final-review": _write_final_review,
+    "can-deliver": _can_deliver,
+    "serve-checkpoint": _serve_checkpoint,
+}
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(argv if argv is not None else sys.argv[1:])
-    if argv and argv[0] == "serve-checkpoint":
-        return _serve_checkpoint(argv[1:])
-    if argv and argv[0] == "scaffold-report":
-        return _scaffold_report(argv[1:])
+    if argv and argv[0] in COMMANDS:
+        return COMMANDS[argv[0]](argv[1:])
 
     parser = argparse.ArgumentParser(description="Create and advance WFERP report harness runs.")
     parser.add_argument("--prompt", default="")

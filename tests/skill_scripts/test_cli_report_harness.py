@@ -225,3 +225,82 @@ def test_cli_report_selection_rejects_unknown_report_design(tmp_path: Path):
     state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
     assert state["report_design"] is None
     assert not (run_dir / "checkpoints" / "04_report_selection.json").exists()
+
+
+def test_cli_full_flow_blocks_and_advances_by_confirmation(tmp_path: Path):
+    run_root = tmp_path / "runs"
+    run_dir = run_root / "run-001"
+
+    created = _run_cli(
+        [
+            "create-run",
+            "--run-root",
+            str(run_root),
+            "--run-id",
+            "run-001",
+            "--prompt",
+            "查詢費用分析",
+        ],
+        cwd=Path.cwd(),
+    )
+
+    assert created.returncode == 0, created.stderr
+    assert json.loads(created.stdout)["status"] == "created"
+
+    sql_review = _run_cli(
+        [
+            "write-sql-review",
+            "--run-dir",
+            str(run_dir),
+            "--sql",
+            "SELECT department, amount FROM expenses",
+        ],
+        cwd=Path.cwd(),
+    )
+
+    assert sql_review.returncode == 0, sql_review.stderr
+    assert json.loads(sql_review.stdout)["checkpoint"] == "sql_review"
+
+    blocked_preview = _run_cli(
+        [
+            "write-data-preview",
+            "--run-dir",
+            str(run_dir),
+            "--payload",
+            '{"rows":[]}',
+        ],
+        cwd=Path.cwd(),
+    )
+
+    assert blocked_preview.returncode == 2
+    assert "SQL must be confirmed" in blocked_preview.stderr
+
+    confirmed = _run_cli(
+        [
+            "confirm",
+            "--run-dir",
+            str(run_dir),
+            "--checkpoint",
+            "sql_review",
+            "--action",
+            "同意查詢",
+        ],
+        cwd=Path.cwd(),
+    )
+
+    assert confirmed.returncode == 0, confirmed.stderr
+    assert json.loads(confirmed.stdout)["status"] == "confirmed"
+
+    data_preview = _run_cli(
+        [
+            "write-data-preview",
+            "--run-dir",
+            str(run_dir),
+            "--payload",
+            '{"rows":[{"department":"管理部","amount":1000}],"columns":["department","amount"],"row_count":1}',
+        ],
+        cwd=Path.cwd(),
+    )
+
+    assert data_preview.returncode == 0, data_preview.stderr
+    assert json.loads(data_preview.stdout)["checkpoint"] == "data_preview"
