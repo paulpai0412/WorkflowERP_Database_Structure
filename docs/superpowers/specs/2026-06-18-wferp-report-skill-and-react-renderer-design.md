@@ -31,6 +31,7 @@
 7. 全流程使用 HTML review page 讓使用者確認。
 8. 內建報告格式 catalog 與 `DESIGN.md` repository，讓使用者明確選擇報告結構與設計風格。
 9. 使用 SubAgent validators 驗證 SQL、資料、報告內容、視覺與技術輸出，通過後才交付。
+10. 支援 Excel workbook 作為需求來源：解析使用者需要的資料庫欄位、Excel 公式新增欄位、跨 sheet 公式連結，以及使用者想產出的管理報表樣式。
 
 ## 3. 非目標
 
@@ -100,8 +101,9 @@ Schema extraction 的資料庫設定要與報表查詢資料庫設定分開。�
 1. 使用既有 schema loader 從 `_Source/` 載入 schema metadata。
 2. 使用既有 relationship tooling 建立或讀取 relationship artifacts。
 3. 將使用者需求、上傳欄位、欄位格式與貼上內容轉成 structured request packet。
-4. 透過既有 SQL router/generator 產生一條 candidate SQL。
-5. 在查詢資料庫前做本地驗證：
+4. 若使用者上傳 Excel workbook，先解析 workbook 欄位來源與公式 lineage，再產生 Excel field/formula review 給使用者確認。
+5. 透過既有 SQL router/generator 產生一條 candidate SQL。
+6. 在查詢資料庫前做本地驗證：
    - 單一 statement；
    - 只能是 `SELECT`；
    - SQL Server 2000 compatible；
@@ -109,8 +111,8 @@ Schema extraction 的資料庫設定要與報表查詢資料庫設定分開。�
    - metadata references 存在；
    - prompt 要求有反映在 SQL；
    - join 有 relationship evidence。
-6. SQL 與語意驗證通過後才執行資料庫查詢。
-7. 捕捉 data evidence：
+7. SQL 與語意驗證通過後才執行資料庫查詢。
+8. 捕捉 data evidence：
    - SQL；
    - route 與 route reason；
    - execution timestamp；
@@ -119,11 +121,51 @@ Schema extraction 的資料庫設定要與報表查詢資料庫設定分開。�
    - sample rows；
    - validation checks；
    - redacted database connection summary。
-8. 顯示 data preview，讓使用者確認後才進入報告生成。
+9. 顯示 data preview，讓使用者確認後才進入報告生成。
 
 若使用者拒絕 data preview，harness 必須回到需求修正或 SQL 生成，而不是繼續產報告。
 
-## 7. 本機 Skill 結構
+## 7. Excel Workbook Intake 與公式解析
+
+使用者可能上傳 Excel workbook 作為需求來源。這類 workbook 可能同時包含：
+
+- 想從資料庫查出的原始欄位；
+- 使用者在 Excel 以公式新增的衍生欄位；
+- 跨 sheet、跨表格或跨區塊的公式連結；
+- 使用者已經做出的管理報表版型；
+- 圖表、彙總表、KPI 或文字註解，暗示最終報告的呈現方式。
+
+`wferp-report` 不能把 Excel 只當成資料檔。它必須先解析 workbook 的需求語意，並在 SQL 生成前讓使用者確認。
+
+解析輸出至少包含：
+
+- workbook sheets 清單；
+- 每個 sheet 的 used range；
+- 欄位標題、欄位位置、資料型態與樣本值；
+- 欄位分類：
+  - `db-source-field`：應由資料庫查詢取得；
+  - `excel-derived-field`：由 Excel 公式算出；
+  - `manual-input-field`：使用者手填或無明確資料庫來源；
+  - `report-layout-field`：只用於報表呈現、標題、分組或註解；
+- 公式欄位清單；
+- 公式 dependencies，包括同 sheet、跨 sheet、固定儲存格、命名範圍、彙總區間；
+- 公式是否能轉成 SQL expression；
+- 公式是否應保留在報告層計算；
+- 無法安全轉換的公式與原因；
+- 推測出的管理報表區塊，例如明細表、彙總表、KPI 區、圖表來源區。
+
+SQL 生成前必須先產生 `Excel Field / Formula Review` checkpoint。使用者需確認：
+
+1. 哪些欄位要從資料庫查詢；
+2. 哪些欄位是 Excel 衍生欄位；
+3. 哪些公式要轉成 SQL；
+4. 哪些公式要保留在報告渲染層；
+5. 哪些公式或欄位不納入報告；
+6. 原 Excel 管理報表版型是否作為 final report layout 參考。
+
+Codex 可以推薦分類與公式處理策略，但不能替使用者默選。若 formula lineage 不清楚，harness 必須停在 checkpoint，要求使用者確認或提供補充。
+
+## 8. 本機 Skill 結構
 
 本機 skill 放在 worktree 之外：
 
@@ -133,6 +175,7 @@ Schema extraction 的資料庫設定要與報表查詢資料庫設定分開。�
   references/
     harness.md
     report-types.md
+    excel-intake.md
     db-configuration.md
     validator-checklist.md
     checkpoint-pages.md
@@ -152,7 +195,7 @@ Schema extraction 的資料庫設定要與報表查詢資料庫設定分開。�
 
 `SKILL.md` 必須保持精簡。詳細 workflow、報告格式、validator 與 renderer 規則放在 reference files，需要時再讀取。
 
-## 8. Harness Workspace
+## 9. Harness Workspace
 
 每次報告 run 建立一個持久 workspace，位置可在 repo 外或設定好的 reports 目錄。run workspace 用來保存決策與 evidence，讓 agent 可恢復流程，不依賴聊天上下文。
 
@@ -164,6 +207,9 @@ wferp-report-runs/<timestamp-or-slug>/
     request.md
     uploaded-fields.md
     uploaded-content.md
+    workbook-summary.md
+    workbook-field-map.md
+    workbook-formula-lineage.md
     intake-notes.md
   db/
     db-summary.md
@@ -182,6 +228,7 @@ wferp-report-runs/<timestamp-or-slug>/
     selected-design.md
   checkpoint/
     intake-review.html
+    excel-field-formula-review.html
     sql-review.html
     data-preview.html
     report-planning.html
@@ -191,6 +238,7 @@ wferp-report-runs/<timestamp-or-slug>/
     report.html
   review/
     source-review.md
+    workbook-formula-review.md
     sql-safety-review.md
     sql-semantic-review.md
     data-preview-review.md
@@ -201,7 +249,7 @@ wferp-report-runs/<timestamp-or-slug>/
 
 Review files 只在對應 validation step 使用時建立。`repair-log.md` 只有發生修復時才建立。
 
-## 9. HTML Checkpoint Pages
+## 10. HTML Checkpoint Pages
 
 Harness 採用類似 `brainstorming` 與 `beautiful-article` 的 checkpoint 模式，但每個主要 checkpoint 都產生本機 HTML review page。
 
@@ -215,7 +263,18 @@ Checkpoints：
    - 推測的報告目的；
    - 缺漏或模糊的需求。
 
-2. **SQL Review**
+2. **Excel Field / Formula Review**
+   - workbook sheets 與 used ranges；
+   - DB source fields；
+   - Excel-derived fields；
+   - manual input fields；
+   - formula dependencies；
+   - 建議轉成 SQL 的公式；
+   - 建議保留在報告層的公式；
+   - 無法安全解析或轉換的公式；
+   - 原 workbook 管理報表區塊與 final report layout 參考價值。
+
+3. **SQL Review**
    - generated SQL；
    - referenced tables and fields；
    - relationship path evidence；
@@ -223,7 +282,7 @@ Checkpoints：
    - semantic validation；
    - blocked risks。
 
-3. **Data Preview**
+4. **Data Preview**
    - row count；
    - returned columns；
    - sample rows；
@@ -231,28 +290,28 @@ Checkpoints：
    - null/duplicate/anomaly summary；
    - explicit user confirmation request。
 
-4. **Report Planning**
+5. **Report Planning**
    - report type catalog options；
    - design repository options；
    - Codex recommendation with reason；
    - chart/table/analysis/recommendation choices；
    - 不允許 user-facing report decisions 有 silent defaults。
 
-5. **First Report Draft**
+6. **First Report Draft**
    - report cover/hero；
    - first data section；
    - one representative chart or table；
    - applied `DESIGN.md` style；
    - validation result。
 
-6. **Final Review**
+7. **Final Review**
    - full report；
    - SQL and data evidence；
    - selected report type and design；
    - final validator findings；
    - `report.html` 與 `result.csv` 交付連結。
 
-## 10. Report Type Catalog
+## 11. Report Type Catalog
 
 報告格式選擇必須明確發生在 final report generation 前。Codex 可以推薦一種格式，但必須等使用者確認。
 
@@ -277,7 +336,7 @@ Checkpoints：
 - 表格/圖表/文字比例；
 - 必要使用者確認項目。
 
-## 11. Report Design Repository
+## 12. Report Design Repository
 
 Report design repository 讓使用者做第二個明確選擇：報告結構與視覺/呈現風格分開決策。
 
@@ -315,7 +374,7 @@ report_designs/
 - `trend-analysis + trend-briefing`
 - `detail-query + detail-ledger`
 
-## 12. React Renderer
+## 13. React Renderer
 
 Repository 應擁有 React report renderer，用於新的 report 與 checkpoint HTML output。它不重建舊版 schema browser。
 
@@ -331,6 +390,8 @@ Renderer 必須支援：
 
 - checkpoint pages；
 - final report pages；
+- Excel field/formula review tables；
+- formula lineage diagrams or dependency tables；
 - SQL evidence blocks；
 - data preview tables；
 - KPI cards；
@@ -340,11 +401,11 @@ Renderer 必須支援：
 
 Renderer 消費 harness 產生的 structured JSON/state files。Renderer 不直接查詢資料庫。
 
-## 13. Validator System
+## 14. Validator System
 
 Validation 參考 `beautiful-article` 原則：每個階段使用正確的驗證方式，且必須先修復 fail items 才能前進。
 
-### 13.1 Source / Intake Validator
+### 14.1 Source / Intake Validator
 
 預設：main agent inline checklist。
 
@@ -360,7 +421,26 @@ Validation 參考 `beautiful-article` 原則：每個階段使用正確的驗證
 
 產物：只有使用 SubAgent 時才產生 `review/source-review.md`。
 
-### 13.2 SQL Safety Validator
+### 14.2 Excel Workbook / Formula Validator
+
+當使用者上傳 Excel workbook 時必跑。Validator 可使用 workbook inspection/render 結果與公式清單，但不得猜測不明公式的業務意義。
+
+檢查項目：
+
+- workbook sheets 與 used ranges 有完整列出；
+- 欄位標題、位置、資料型態與樣本值有被正確抽取；
+- database source 欄位、Excel-derived 欄位、manual input 欄位與 report layout 欄位分類合理；
+- 公式欄位有列出原始公式；
+- formula dependencies 有追蹤到同 sheet、跨 sheet、固定儲存格、命名範圍與彙總區間；
+- 能轉成 SQL 的公式有轉換理由；
+- 不應轉成 SQL、應保留在報告層的公式有保留理由；
+- 無法支援或高風險公式有明確列出；
+- 推測出的管理報表區塊與 workbook 視覺/公式 evidence 一致；
+- 沒有把 Excel sample values 誤當成資料庫完整結果。
+
+產物：`review/workbook-formula-review.md`。
+
+### 14.3 SQL Safety Validator
 
 查詢真實資料庫前必跑。
 
@@ -376,7 +456,7 @@ Validation 參考 `beautiful-article` 原則：每個階段使用正確的驗證
 
 產物：`review/sql-safety-review.md`。
 
-### 13.3 Schema / Relationship Validator
+### 14.4 Schema / Relationship Validator
 
 針對 WFERP schema 與 relationship evidence 驗證語意正確性。
 
@@ -390,7 +470,7 @@ Validation 參考 `beautiful-article` 原則：每個階段使用正確的驗證
 
 產物：`review/sql-semantic-review.md`。
 
-### 13.4 Data Preview Validator
+### 14.5 Data Preview Validator
 
 資料庫查詢後執行。SubAgent 只讀 redacted evidence 與 samples，不取得 raw credentials。
 
@@ -404,7 +484,7 @@ Validation 參考 `beautiful-article` 原則：每個階段使用正確的驗證
 
 產物：`review/data-preview-review.md`。
 
-### 13.5 First Report Draft Validator
+### 14.6 First Report Draft Validator
 
 SubAgent validator，類似 `beautiful-article` 的 First Spread review。
 
@@ -413,6 +493,7 @@ SubAgent validator，類似 `beautiful-article` 的 First Spread review。
 - first screen 清楚呈現報告目的；
 - 第一個 data section 只使用已確認資料；
 - representative table/chart 不誤導；
+- Excel-derived 欄位若出現在報告中，計算邏輯與 workbook formula review 一致；
 - 有遵守選定的 `DESIGN.md`；
 - HTML 可 build；
 - desktop 與 mobile 可讀；
@@ -420,7 +501,7 @@ SubAgent validator，類似 `beautiful-article` 的 First Spread review。
 
 產物：`review/first-report-review.md`。
 
-### 13.6 Final Review Validators
+### 14.7 Final Review Validators
 
 使用三個 SubAgent 視角，優先並行。
 
@@ -429,6 +510,8 @@ SubAgent validator，類似 `beautiful-article` 的 First Spread review。
 - SQL evidence 與 report data 一致；
 - tables、KPI values、chart values、summaries 一致；
 - aggregation math 正確；
+- 從 Excel 公式轉換或保留的衍生欄位計算正確；
+- final report 中的公式連結、彙總、KPI 與 workbook formula lineage 一致；
 - report 不把 sample data 當作 full data 呈現。
 
 **Report Editorial Reviewer**
@@ -451,7 +534,7 @@ SubAgent validator，類似 `beautiful-article` 的 First Spread review。
 
 Main agent 必須先修復 fail items 才能交付。只有 validator output 不代表完成。
 
-## 14. 安全與資料處理
+## 15. 安全與資料處理
 
 - 不把真實 credential 寫進 repository files。
 - HTML checkpoint pages 不顯示完整 connection string。
@@ -460,8 +543,9 @@ Main agent 必須先修復 fail items 才能交付。只有 validator output 不
 - 預設只允許 read-only query execution。
 - non-test execution 必須明確且可稽核。
 - 除非使用者要求 full export，否則不要保存超過 preview/report 所需的 result rows。
+- Excel workbook 內可能含敏感資料、內部公式與管理報表邏輯；checkpoint pages 只能顯示必要樣本與公式摘要，避免暴露超出報告需求的原始內容。
 
-## 15. 測試策略
+## 16. 測試策略
 
 測試應聚焦 contract 與 observable behavior。
 
@@ -472,6 +556,10 @@ Main agent 必須先修復 fail items 才能交付。只有 validator output 不
 - legacy static docs quarantine manifest generation；
 - report type catalog loading and validation；
 - `DESIGN.md` repository index loading and design validation；
+- Excel workbook sheet/range extraction；
+- Excel formula lineage extraction；
+- Excel 欄位分類與使用者確認 checkpoint；
+- 公式轉 SQL 與保留在報告層的決策記錄；
 - checkpoint state file creation；
 - SQL safety and semantic validation gates；
 - data preview evidence redaction；
@@ -481,7 +569,7 @@ Main agent 必須先修復 fail items 才能交付。只有 validator output 不
 
 React-rendered checkpoint pages 與 final report pages 必須做 browser verification。
 
-## 16. 待 Implementation Plan 決定的事項
+## 17. 待 Implementation Plan 決定的事項
 
 下列事項留到 implementation plan 決定：
 
@@ -489,6 +577,7 @@ React-rendered checkpoint pages 與 final report pages 必須做 browser verific
 - repository 內 report renderer 的精確目錄名稱；
 - renderer 直接使用 Reacticle，或包一層 WFERP-specific components；
 - 圖表 library 選擇；
+- Excel workbook parsing 的實作工具與支援公式範圍；
 - preview 與 CSV export 的最大 row limit；
 - report run workspace 放在 `/tmp`、`~/.codex`，或設定的 project directory。
 
