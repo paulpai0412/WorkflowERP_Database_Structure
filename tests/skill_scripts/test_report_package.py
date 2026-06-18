@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from skill_scripts.dynamic_design_brief import build_design_brief, validate_design_brief
 from skill_scripts.report_harness import ReportHarness
 from skill_scripts.report_package import build_report_package, validate_report_package
 from skill_scripts.validator_contracts import REQUIRED_VALIDATORS
@@ -29,6 +30,21 @@ def _validator_result(role: str, status: str = "pass") -> dict[str, object]:
 
 def _all_validator_results() -> list[dict[str, object]]:
     return [_validator_result(role) for role in REQUIRED_VALIDATORS]
+
+
+def _confirm_design_brief(harness: ReportHarness) -> None:
+    brief = build_design_brief(
+        {
+            "catalog_guardrail": "financial-control",
+            "prompt": harness.state().get("prompt"),
+            "report_type": harness.state().get("report_type"),
+            "data_profile": {"columns": ["department", "amount"], "row_count": 2},
+            "datasets": {"columns": ["department", "amount"]},
+        }
+    )
+    assert validate_design_brief(brief)["valid"] is True
+    harness.write_design_brief(brief)
+    harness.confirm("design_brief", "確認設計")
 
 
 def _accepted_report_run(tmp_path: Path) -> ReportHarness:
@@ -63,6 +79,7 @@ def _accepted_report_run(tmp_path: Path) -> ReportHarness:
         }
     )
     harness.confirm("report_selection", "產生報告")
+    _confirm_design_brief(harness)
     harness.write_report_draft({"sections": ["executive-summary", "data-table"]})
     harness.confirm("report_draft", "接受")
     harness.write_final_review({"validator_results": _all_validator_results()})

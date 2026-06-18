@@ -6,6 +6,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from skill_scripts.checkpoint_companion import CheckpointCompanionServer
+from skill_scripts.dynamic_design_brief import build_design_brief, validate_design_brief
 from skill_scripts.report_harness import ReportHarness
 from skill_scripts.validator_contracts import REQUIRED_VALIDATORS
 
@@ -33,6 +34,21 @@ def _validator_result(role: str, status: str = "pass") -> dict[str, object]:
 def _all_validator_results(status_overrides: dict[str, str] | None = None) -> list[dict[str, object]]:
     overrides = status_overrides or {}
     return [_validator_result(role, overrides.get(role, "pass")) for role in REQUIRED_VALIDATORS]
+
+
+def _confirm_design_brief(harness: ReportHarness) -> None:
+    brief = build_design_brief(
+        {
+            "catalog_guardrail": "financial-control",
+            "prompt": harness.state().get("prompt"),
+            "report_type": harness.state().get("report_type"),
+            "data_profile": {"columns": ["department", "amount"], "row_count": 1},
+            "datasets": {"columns": ["department", "amount"]},
+        }
+    )
+    assert validate_design_brief(brief)["valid"] is True
+    harness.write_design_brief(brief)
+    harness.confirm("design_brief", "確認設計")
 
 
 def post_json(url: str, payload: dict) -> dict:
@@ -153,6 +169,7 @@ def test_final_review_post_selected_options_allow_matching_residual_risk_deliver
         {"selected_report_type": "管理摘要", "selected_report_design": "financial-control"}
     )
     harness.confirm("report_selection", "產生報告")
+    _confirm_design_brief(harness)
     harness.write_report_draft({"sections": ["摘要"]})
     harness.confirm("report_draft", "接受")
     harness.write_final_review(

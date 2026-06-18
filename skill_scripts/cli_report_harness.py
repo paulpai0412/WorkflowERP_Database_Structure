@@ -8,6 +8,8 @@ from pathlib import Path
 import sys
 from typing import Any
 
+from skill_scripts.dynamic_design_brief import build_design_brief
+from skill_scripts.dynamic_design_brief import validate_design_brief
 from skill_scripts.excel_intake import build_excel_confirmation_payload, parse_excel_requirement
 from skill_scripts.report_catalog import build_report_selection_payload
 from skill_scripts.report_catalog import get_report_design_defaults
@@ -425,6 +427,28 @@ def _write_report_selection(argv: list[str]) -> int:
     return 0
 
 
+def _write_design_brief(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Write the dynamic design brief checkpoint.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--package", required=True)
+    parser.add_argument("--overrides", default="")
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        package = _load_json_arg(args.package)
+        overrides = _load_json_arg_or_empty(args.overrides)
+        brief = build_design_brief(package, user_overrides=overrides)
+        result = validate_design_brief(brief)
+        if not result["valid"]:
+            return _json_error("design_brief_invalid", ", ".join(result["errors"]))
+        checkpoint = harness.write_design_brief(brief)
+    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("design_brief_error", str(exc))
+    _write_stdout_json(checkpoint)
+    return 0
+
+
 def _write_report_draft(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Write the report draft checkpoint after report selection.")
     parser.add_argument("--run-dir", required=True)
@@ -480,6 +504,7 @@ COMMANDS = {
     "confirm": _confirm,
     "write-data-preview": _write_data_preview,
     "write-report-selection": _write_report_selection,
+    "write-design-brief": _write_design_brief,
     "scaffold-report": _scaffold_report,
     "write-report-draft": _write_report_draft,
     "write-final-review": _write_final_review,

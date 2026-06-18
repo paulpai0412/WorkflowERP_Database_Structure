@@ -32,6 +32,12 @@ CHECKPOINT_DEFINITIONS: dict[str, dict[str, Any]] = {
         "title": "報表格式選擇",
         "actions": ["產生報告", "修改格式"],
     },
+    "design_brief": {
+        "index": 4.1,
+        "file": "04a_design_brief.json",
+        "title": "動態設計確認",
+        "actions": ["確認設計", "調整設計"],
+    },
     "report_draft": {
         "index": 5,
         "file": "05_report_draft.json",
@@ -95,6 +101,8 @@ def create_report_run(
         "execution_result_summary": None,
         "report_type": None,
         "report_design": None,
+        "report_design_brief": None,
+        "visual_design_checkpoint": None,
         "report_options": {},
         "validator_results": [],
         "user_confirmations": {},

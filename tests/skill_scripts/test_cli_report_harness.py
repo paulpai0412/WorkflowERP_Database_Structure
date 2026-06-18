@@ -396,6 +396,22 @@ def test_cli_full_flow_writes_draft_final_review_and_delivery_gate(tmp_path: Pat
             "產生報告",
         ],
         [
+            "write-design-brief",
+            "--run-dir",
+            str(run_dir),
+            "--package",
+            '{"catalog_guardrail":"financial-control","prompt":"查詢費用分析","data_profile":{"columns":["department","amount"],"row_count":1},"datasets":{"columns":["department","amount"]}}',
+        ],
+        [
+            "confirm",
+            "--run-dir",
+            str(run_dir),
+            "--checkpoint",
+            "design_brief",
+            "--action",
+            "確認設計",
+        ],
+        [
             "write-report-draft",
             "--run-dir",
             str(run_dir),
@@ -428,5 +444,121 @@ def test_cli_full_flow_writes_draft_final_review_and_delivery_gate(tmp_path: Pat
 
     assert delivery.returncode == 0, delivery.stderr
     assert json.loads(delivery.stdout)["allowed"] is True
+    assert (run_dir / "checkpoints" / "04a_design_brief.json").exists()
     assert (run_dir / "checkpoints" / "05_report_draft.json").exists()
     assert (run_dir / "checkpoints" / "06_final_review.json").exists()
+
+
+def test_cli_write_design_brief_success(tmp_path: Path):
+    run_root = tmp_path / "runs"
+    run_dir = run_root / "run-design"
+    package = tmp_path / "package.json"
+    package.write_text(
+        json.dumps(
+            {
+                "catalog_guardrail": "financial-control",
+                "prompt": "查詢費用分析",
+                "data_profile": {
+                    "columns": ["month", "department", "amount"],
+                    "row_count": 1,
+                },
+                "datasets": {"columns": ["month", "department", "amount"]},
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    created = _run_cli(
+        [
+            "create-run",
+            "--run-root",
+            str(run_root),
+            "--run-id",
+            "run-design",
+            "--prompt",
+            "查詢費用分析",
+        ],
+        cwd=Path.cwd(),
+    )
+    assert created.returncode == 0, created.stderr
+
+    result = _run_cli(
+        ["write-design-brief", "--run-dir", str(run_dir), "--package", str(package)],
+        cwd=Path.cwd(),
+    )
+
+    assert result.returncode == 0, result.stderr
+    checkpoint = json.loads(result.stdout)
+    assert checkpoint["checkpoint"] == "design_brief"
+    assert checkpoint["payload"]["embedded_data_policy"]["mode"] == "smart-tiered"
+    assert checkpoint["payload"]["chart_recipe"][0]["type"] == "line"
+
+
+def test_cli_write_design_brief_reports_validation_errors_from_overrides(tmp_path: Path):
+    run_root = tmp_path / "runs"
+    run_dir = run_root / "run-invalid-design"
+    created = _run_cli(
+        [
+            "create-run",
+            "--run-root",
+            str(run_root),
+            "--run-id",
+            "run-invalid-design",
+            "--prompt",
+            "查詢費用分析",
+        ],
+        cwd=Path.cwd(),
+    )
+    assert created.returncode == 0, created.stderr
+
+    result = _run_cli(
+        [
+            "write-design-brief",
+            "--run-dir",
+            str(run_dir),
+            "--package",
+            '{"catalog_guardrail":"financial-control","data_profile":{"columns":["department","amount"]},"datasets":{"columns":["department","amount"]}}',
+            "--overrides",
+            '{"chart_recipe":[{"type":"combo"}]}',
+        ],
+        cwd=Path.cwd(),
+    )
+
+    assert result.returncode == 2
+    error = json.loads(result.stderr)
+    assert error["code"] == "design_brief_invalid"
+    assert "chart_recipe[0].purpose" in error["message"]
+
+
+def test_cli_write_design_brief_rejects_malformed_package_catalog_guardrail(tmp_path: Path):
+    run_root = tmp_path / "runs"
+    run_dir = run_root / "run-invalid-catalog"
+    created = _run_cli(
+        [
+            "create-run",
+            "--run-root",
+            str(run_root),
+            "--run-id",
+            "run-invalid-catalog",
+            "--prompt",
+            "查詢費用分析",
+        ],
+        cwd=Path.cwd(),
+    )
+    assert created.returncode == 0, created.stderr
+
+    result = _run_cli(
+        [
+            "write-design-brief",
+            "--run-dir",
+            str(run_dir),
+            "--package",
+            '{"catalog_guardrail":["bad"],"data_profile":{"columns":["department","amount"]},"datasets":{"columns":["department","amount"]}}',
+        ],
+        cwd=Path.cwd(),
+    )
+
+    assert result.returncode == 2
+    error = json.loads(result.stderr)
+    assert error["code"] == "design_brief_invalid"
+    assert "catalog_guardrail" in error["message"]
