@@ -2,6 +2,7 @@ import { DataPreview } from "../App";
 
 interface DataPreviewTableProps {
   preview?: DataPreview;
+  title?: string;
 }
 
 function formatCell(value: string | number | boolean | null) {
@@ -14,11 +15,11 @@ function formatCell(value: string | number | boolean | null) {
   return String(value);
 }
 
-export default function DataPreviewTable({ preview }: DataPreviewTableProps) {
+export default function DataPreviewTable({ preview, title = "資料預覽" }: DataPreviewTableProps) {
   if (!preview) {
     return (
       <section className="panel">
-        <h2>資料預覽</h2>
+        <h2>{title}</h2>
         <p className="muted">尚無預覽資料。</p>
       </section>
     );
@@ -29,7 +30,7 @@ export default function DataPreviewTable({ preview }: DataPreviewTableProps) {
       <div className="section-heading">
         <div>
           <p className="eyebrow">Data Preview</p>
-          <h2>資料預覽：{preview.rowCount} 筆</h2>
+          <h2>{title}：{preview.rowCount} 筆</h2>
         </div>
         <span className="count-pill">{preview.columns.length} 欄</span>
       </div>

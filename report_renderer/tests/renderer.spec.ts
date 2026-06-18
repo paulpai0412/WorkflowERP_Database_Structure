@@ -1,12 +1,23 @@
 import React from "react";
-import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import App from "../src/App";
 
 const checkpointPayload = {
   kind: "checkpoint",
+  checkpointId: "run-001-sql-review",
   title: "費用分析查詢確認",
   step: "sql_review",
+  requirementSummary: "查詢 2026 第一季已確認且未作廢的費用資料，依部門與會計科目彙總。",
+  fieldFormulaReview: {
+    fields: [
+      { label: "部門", source: "ACPTA.TA004", confirmation: "依請購單表頭部門代號輸出。" },
+      { label: "未稅金額", source: "ACPTB.TB013", confirmation: "明細未稅金額加總。" },
+    ],
+    formulas: [
+      { label: "總額", expression: "未稅金額 + 稅額", confirmation: "用於主管檢視金額合計。" },
+    ],
+  },
   sqlReview: {
     title: "SQL 查詢審核",
     sql: "SELECT TOP 20 TA001, TA002 FROM [DSCSYS].[dbo].[ACPTA] WHERE TA024 = 'Y'",
@@ -15,6 +26,13 @@ const checkpointPayload = {
       blockedKeywords: [],
       executionStatus: "not_executed",
     },
+    schemaMapping: [
+      { field: "部門", table: "ACPTA", column: "TA004", note: "表頭部門" },
+      { field: "未稅金額", table: "ACPTB", column: "TB013", note: "明細未稅金額" },
+    ],
+    relationshipPath: ["ACPTA.TA001 = ACPTB.TB001", "ACPTA.TA002 = ACPTB.TB002"],
+    safetyChecks: ["只允許 SELECT", "未偵測 UPDATE/DELETE/INSERT"],
+    executionEnvironment: "DB_ENV=test，尚未連線正式資料庫",
   },
   dataPreview: {
     rowCount: 2,
@@ -24,9 +42,16 @@ const checkpointPayload = {
       { 部門: "D002", 會計科目: "6251", 未稅金額: 18000 },
     ],
   },
+  aggregateChecks: [
+    { label: "未稅金額合計", expected: 30000, actual: 30000, status: "pass" },
+  ],
   reportTypes: [
     { id: "financial-control", label: "財務控管", description: "適合費用異常追蹤" },
     { id: "executive-summary", label: "主管摘要", description: "適合高階快速瀏覽" },
+  ],
+  exceptions: ["排除未確認與作廢單據。"],
+  validatorEvidence: [
+    { validator: "sql_safety", status: "pass", message: "SQL 為唯讀 SELECT。" },
   ],
   actions: ["同意查詢", "調整需求"],
 };
@@ -67,12 +92,59 @@ describe("WFERP report renderer", () => {
     expect(screen.getByRole("heading", { name: "費用分析查詢確認" })).toBeTruthy();
   });
 
-  it("renders SQL review payload without executing SQL", () => {
+  it("renders management view by default and hides SQL until technical tab is selected", () => {
     render(React.createElement(App, { payload: checkpointPayload }));
 
+    expect(screen.getByRole("heading", { name: "費用分析查詢確認" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "主管檢視" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.queryByText(/SELECT TOP 20/)).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: "技術明細" }));
+
     expect(screen.getByText(/SELECT TOP 20/)).toBeTruthy();
-    expect(screen.getByText("尚未執行 SQL")).toBeTruthy();
+  });
+
+  it("renders SQL review payload without executing SQL in the technical view", () => {
+    render(React.createElement(App, { payload: checkpointPayload }));
+
+    fireEvent.click(screen.getByRole("tab", { name: "技術明細" }));
+
+    expect(screen.getAllByText("尚未執行 SQL").length).toBeGreaterThan(0);
     expect(screen.queryByText(/執行查詢中|已連線資料庫/)).toBeNull();
+  });
+
+  it("posts checkpoint confirmation to the harness endpoint", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ status: "confirmed" }), { status: 200 }),
+    );
+
+    render(
+      React.createElement(App, {
+        payload: {
+          ...checkpointPayload,
+          confirmUrl: "/api/runs/run-001/checkpoints/sql_review/confirm",
+        },
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "同意查詢" }));
+
+    expect(await screen.findByText("已送出確認")).toBeTruthy();
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/runs/run-001/checkpoints/sql_review/confirm",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "同意查詢",
+          checkpointId: "run-001-sql-review",
+          comment: "",
+          selectedOptions: { reportType: "financial-control" },
+        }),
+      }),
+    );
+
+    fetchSpy.mockRestore();
   });
 
   it("renders data preview table with row count", () => {
