@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from skill_scripts.report_harness import ReportHarness, ReportHarnessError
+from skill_scripts.report_harness_state import write_confirmation
 from skill_scripts.validator_contracts import REQUIRED_VALIDATORS
 
 
@@ -274,6 +275,41 @@ def test_partial_residual_risk_acceptance_still_blocks_other_non_pass_validators
     assert harness.can_deliver() == {
         "allowed": False,
         "blocking_validators": ["data_visualization_reviewer"],
+        "accepted_residual_risks": ["visual_taste_reviewer: accepted risk for visual_taste_reviewer"],
+    }
+
+
+def test_can_deliver_reads_final_confirmation_file_when_state_options_are_empty(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
+    harness.write_report_selection(
+        {"selected_report_type": "管理摘要", "selected_report_design": "financial-control"}
+    )
+    harness.confirm("report_selection", "產生報告")
+    harness.write_report_draft({"sections": ["摘要"]})
+    harness.confirm("report_draft", "接受")
+    harness.write_final_review(
+        {
+            "validator_results": _all_validator_results({"visual_taste_reviewer": "warning"}),
+        }
+    )
+    harness.confirm("final_review", "完成")
+    write_confirmation(
+        harness.run_dir,
+        "final_review",
+        {
+            "action": "完成",
+            "selectedOptions": {
+                "acceptedResidualRisks": [
+                    "visual_taste_reviewer: accepted risk for visual_taste_reviewer"
+                ]
+            },
+        },
+    )
+
+    assert harness.state()["user_confirmation_options"]["final_review"] == {}
+    assert harness.can_deliver() == {
+        "allowed": True,
+        "blocking_validators": [],
         "accepted_residual_risks": ["visual_taste_reviewer: accepted risk for visual_taste_reviewer"],
     }
 

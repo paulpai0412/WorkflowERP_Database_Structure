@@ -137,7 +137,7 @@ class ReportHarness:
 
     def _final_confirmation_selected_options(self, state: dict[str, Any]) -> dict[str, Any]:
         options = state.get("user_confirmation_options", {}).get("final_review")
-        if isinstance(options, dict):
+        if isinstance(options, dict) and options:
             return options
 
         definition = CHECKPOINT_DEFINITIONS["final_review"]

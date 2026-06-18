@@ -155,7 +155,12 @@ class CheckpointCompanionServer:
                         return
 
                     harness = ReportHarness(run_path)
-                    harness.confirm(checkpoint, action)
+                    selected_options = payload.get("selectedOptions")
+                    harness.confirm(
+                        checkpoint,
+                        action,
+                        selected_options=selected_options if isinstance(selected_options, dict) else None,
+                    )
                     confirmation = write_confirmation(run_path, checkpoint, payload)
                     append_audit_event(
                         run_path,
