@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from skill_scripts.report_package import validate_report_package
+from skill_scripts.style_replay import build_style_capsule
 
 
 def _canonical_json(value: Any) -> str:
@@ -164,9 +165,11 @@ def export_single_html_report(
 
     package_text = _pretty_json(package)
     brief_text = _pretty_json(brief)
+    style_capsule = build_style_capsule(brief)
     sql_text = _sql_text(package)
     (evidence_dir / "report-package.json").write_text(package_text, encoding="utf-8")
     (evidence_dir / "report-design-brief.json").write_text(brief_text, encoding="utf-8")
+    (evidence_dir / "report-style-capsule.json").write_text(_pretty_json(style_capsule), encoding="utf-8")
     (evidence_dir / "query.sql").write_text(sql_text + ("\n" if sql_text else ""), encoding="utf-8")
 
     html_path = delivery_dir / "report.html"
@@ -181,6 +184,7 @@ def export_single_html_report(
         "catalog_guardrail": package.get("catalog_guardrail"),
         "row_count": _row_count(package),
         "validator_status": _validator_status(package),
+        "style_fingerprint": style_capsule["style_fingerprint"],
     }
     (delivery_dir / "delivery-manifest.json").write_text(_pretty_json(manifest), encoding="utf-8")
 

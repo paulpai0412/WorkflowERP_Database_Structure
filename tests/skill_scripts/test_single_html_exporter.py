@@ -35,6 +35,8 @@ def test_export_single_html_report_writes_delivery_manifest_and_evidence(tmp_pat
     assert manifest_path.exists()
     assert (evidence_dir / "report-package.json").exists()
     assert (evidence_dir / "report-design-brief.json").exists()
+    style_capsule = json.loads((evidence_dir / "report-style-capsule.json").read_text(encoding="utf-8"))
+    assert style_capsule["style_version"] == "wferp.style-capsule.v1"
     assert (evidence_dir / "query.sql").read_text(encoding="utf-8").strip() == (
         "SELECT department, amount FROM expenses"
     )
@@ -53,6 +55,7 @@ def test_export_single_html_report_writes_delivery_manifest_and_evidence(tmp_pat
     assert manifest["catalog_guardrail"] == "financial-control"
     assert manifest["row_count"] == 2
     assert manifest["validator_status"] == "pass"
+    assert manifest["style_fingerprint"] == style_capsule["style_fingerprint"]
 
 
 def test_export_single_html_report_rejects_invalid_package_before_writing_html(tmp_path: Path):

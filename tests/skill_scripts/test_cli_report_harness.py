@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from skill_scripts.report_package import build_report_package
+from skill_scripts.style_replay import build_style_capsule
 from skill_scripts.validator_contracts import REQUIRED_VALIDATORS
 from tests.skill_scripts.test_excel_intake import _write_requirement_workbook
 from tests.skill_scripts.test_report_package import _accepted_report_run
@@ -62,6 +63,20 @@ def _single_html_brief() -> dict[str, object]:
         "title": "採購單查詢",
         "layout": {"sections": ["summary", "table"]},
     }
+
+
+def _style_capsule() -> dict[str, object]:
+    return build_style_capsule(
+        {
+            "catalog_guardrail": "trend-briefing",
+            "layout_recipe": {"mode": "trend-first"},
+            "chart_recipe": [{"id": "period_trend", "type": "line", "required_columns": ["period"]}],
+            "table_recipe": [{"id": "period_table", "features": ["filter"]}],
+            "interaction_recipe": {"cross_filter": True},
+            "visual_direction": {"tone": "趨勢解讀"},
+            "embedded_data_policy": {"mode": "smart-tiered"},
+        }
+    )
 
 
 def test_cli_report_harness_creates_run_from_prompt_only(tmp_path: Path):
@@ -180,6 +195,43 @@ def test_cli_validate_single_html_reports_missing_file_on_stderr(tmp_path: Path)
     assert payload["status"] == "error"
     assert payload["code"] == "single_html_validation_error"
     assert str(missing) in payload["message"]
+
+
+def test_cli_inspect_style_replay_allows_compatible_columns():
+    result = _run_cli(
+        [
+            "inspect-style-replay",
+            "--capsule",
+            json.dumps(_style_capsule(), ensure_ascii=False),
+            "--columns",
+            "period,amount",
+        ],
+        cwd=Path.cwd(),
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "checked"
+    assert payload["requires_checkpoint"] is False
+
+
+def test_cli_inspect_style_replay_requires_checkpoint_for_missing_columns():
+    result = _run_cli(
+        [
+            "inspect-style-replay",
+            "--capsule",
+            json.dumps(_style_capsule(), ensure_ascii=False),
+            "--columns",
+            "department,amount",
+        ],
+        cwd=Path.cwd(),
+    )
+
+    assert result.returncode == 2
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "checked"
+    assert payload["requires_checkpoint"] is True
+    assert payload["incompatible_charts"] == ["period_trend"]
 
 
 def test_cli_report_harness_accepts_excel_input_path(tmp_path: Path):
