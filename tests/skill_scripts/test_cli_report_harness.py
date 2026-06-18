@@ -6,8 +6,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+from skill_scripts.report_package import build_report_package
 from skill_scripts.validator_contracts import REQUIRED_VALIDATORS
 from tests.skill_scripts.test_excel_intake import _write_requirement_workbook
+from tests.skill_scripts.test_report_package import _accepted_report_run
 
 
 def _run_cli(args: list[str], cwd: Path, env: dict[str, str] | None = None):
@@ -49,6 +51,19 @@ def _passing_final_review_payload() -> dict[str, object]:
     return {"validator_results": validator_results}
 
 
+def _single_html_package(tmp_path: Path) -> dict[str, object]:
+    harness = _accepted_report_run(tmp_path)
+    return build_report_package(harness.run_dir)
+
+
+def _single_html_brief() -> dict[str, object]:
+    return {
+        "schema_version": "wferp.report-design-brief.v1",
+        "title": "採購單查詢",
+        "layout": {"sections": ["summary", "table"]},
+    }
+
+
 def test_cli_report_harness_creates_run_from_prompt_only(tmp_path: Path):
     run_dir = tmp_path / "runs" / "prompt-only"
 
@@ -67,6 +82,55 @@ def test_cli_report_harness_help_is_available():
 
     assert result.returncode == 0
     assert "Create and advance WFERP report harness runs" in result.stdout
+
+
+def test_cli_export_single_html_writes_delivery_output(tmp_path: Path):
+    run_dir = tmp_path / "runs" / "single-html"
+
+    result = _run_cli(
+        [
+            "export-single-html",
+            "--run-dir",
+            str(run_dir),
+            "--package",
+            json.dumps(_single_html_package(tmp_path), ensure_ascii=False),
+            "--brief",
+            json.dumps(_single_html_brief(), ensure_ascii=False),
+        ],
+        cwd=Path.cwd(),
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "exported"
+    assert (run_dir / "delivery" / "report.html").exists()
+    assert (run_dir / "delivery" / "delivery-manifest.json").exists()
+
+
+def test_cli_export_single_html_rejects_invalid_package_without_writing_html(tmp_path: Path):
+    run_dir = tmp_path / "runs" / "readonly-reject"
+    package = _single_html_package(tmp_path)
+    package["sql"]["text"] = "DELETE FROM expenses"
+
+    result = _run_cli(
+        [
+            "export-single-html",
+            "--run-dir",
+            str(run_dir),
+            "--package",
+            json.dumps(package, ensure_ascii=False),
+            "--brief",
+            json.dumps(_single_html_brief(), ensure_ascii=False),
+        ],
+        cwd=Path.cwd(),
+    )
+
+    assert result.returncode == 2
+    error = json.loads(result.stderr)
+    assert error["status"] == "error"
+    assert error["code"] == "single_html_export_error"
+    assert "sql_readonly" in error["message"]
+    assert not (run_dir / "delivery" / "report.html").exists()
 
 
 def test_cli_report_harness_accepts_excel_input_path(tmp_path: Path):
