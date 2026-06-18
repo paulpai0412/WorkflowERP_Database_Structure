@@ -246,6 +246,17 @@ def main(argv: list[str] | None = None) -> int:
         if args.report_type:
             payload["selected_report_type"] = args.report_type
         if args.report_design:
+            try:
+                get_report_design_defaults(args.report_design)
+            except ValueError as exc:
+                _write_stderr_json(
+                    {
+                        "status": "error",
+                        "code": "unknown_report_design",
+                        "message": str(exc),
+                    }
+                )
+                return 2
             payload["selected_report_design"] = args.report_design
         payload["selected_options"] = {
             "include_chart": args.include_chart,

@@ -196,3 +196,32 @@ def test_cli_report_selection_persists_report_type_and_design(tmp_path: Path):
     assert state["report_type"] == "管理摘要"
     assert state["report_design"] == "financial-control"
     assert state["report_options"]["include_chart"] is True
+
+
+def test_cli_report_selection_rejects_unknown_report_design(tmp_path: Path):
+    run_dir = tmp_path / "runs" / "unknown-report-design"
+
+    result = _run_cli(
+        [
+            "--prompt",
+            "請產出費用分析",
+            "--run-dir",
+            str(run_dir),
+            "--checkpoint",
+            "report-selection",
+            "--report-design",
+            "rogue-design",
+        ],
+        cwd=Path.cwd(),
+    )
+
+    assert result.returncode == 2
+    error = json.loads(result.stderr)
+    assert error == {
+        "status": "error",
+        "code": "unknown_report_design",
+        "message": "Unknown report design profile: rogue-design",
+    }
+    state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+    assert state["report_design"] is None
+    assert not (run_dir / "checkpoints" / "04_report_selection.json").exists()

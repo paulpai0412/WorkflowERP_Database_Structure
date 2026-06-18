@@ -205,10 +205,26 @@ def test_catalog_rejects_profile_not_listed_in_index(tmp_path):
     try:
         load_report_design_catalog(tmp_path)
     except ValueError as exc:
-        assert "Profile ID is not listed in index.json" in str(exc)
-        assert "rogue-design" in str(exc)
+        assert "Profile file is not listed in index.json" in str(exc)
+        assert "rogue-design.md" in str(exc)
     else:
         raise AssertionError("Expected unindexed profile to be rejected")
+
+
+def test_catalog_rejects_unindexed_filename_even_with_indexed_profile_id(tmp_path):
+    _write_complete_index(tmp_path)
+    _write_complete_profiles(tmp_path)
+    _write_profile(tmp_path, _base_profile("financial-control"))
+    (tmp_path / "financial-control.md").replace(tmp_path / "rogue.md")
+    _write_profile(tmp_path, _base_profile("financial-control"))
+
+    try:
+        load_report_design_catalog(tmp_path)
+    except ValueError as exc:
+        assert "Profile file is not listed in index.json" in str(exc)
+        assert "rogue.md" in str(exc)
+    else:
+        raise AssertionError("Expected unindexed duplicate-id profile file to be rejected")
 
 
 def test_catalog_rejects_profiles_missing_required_keys(tmp_path):

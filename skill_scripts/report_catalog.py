@@ -180,6 +180,8 @@ def load_report_design_catalog(design_dir: str | Path | None = None) -> ReportDe
     for path in root.glob("*.md"):
         if path.name in DOC_FILES:
             continue
+        if path.stem not in indexed:
+            raise ValueError(f"Profile file is not listed in index.json: {path.name}")
         profile = _parse_profile(path)
         if profile["id"] not in indexed:
             raise ValueError(f"Profile ID is not listed in index.json: {profile['id']}")
