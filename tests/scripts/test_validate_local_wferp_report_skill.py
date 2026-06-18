@@ -44,6 +44,34 @@ REQUIRED_PARITY_FILES = [
     "assets/scaffold-template/report/Report.tsx",
 ]
 
+REQUIRED_PHASES = [
+    "Phase 0 —— Intake",
+    "Phase 1 —— Source / Excel Requirement",
+    "Phase 2 —— Report Planning",
+    "Phase 3 —— Field & Formula Checkpoint",
+    "Phase 4 —— SQL Review Checkpoint",
+    "Phase 5 —— Confirmed DB Execution",
+    "Phase 6 —— Data Preview Checkpoint",
+    "Phase 7 —— Report Selection Checkpoint",
+    "Phase 8 —— Final Report Scaffold",
+    "Phase 9 —— Section Build",
+    "Phase 10 —— Final Review",
+    "Phase 11 —— Repair",
+    "Phase 12 —— Delivery",
+]
+
+REQUIRED_PHASE_FIELDS = [
+    "目標：",
+    "輸入：",
+    "必讀 references：",
+    "執行步驟：",
+    "產物：",
+    "停止條件：",
+    "使用者 checkpoint：",
+    "validator：",
+    "失敗時 repair slice：",
+]
+
 
 def load_validator_module():
     spec = importlib.util.spec_from_file_location("validate_local_wferp_report_skill", SCRIPT_PATH)
@@ -57,27 +85,39 @@ def write_file(path: Path, content: str = "content") -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def complete_skill_md(
+    omitted_phase: str | None = None,
+    omitted_field_by_phase: dict[str, str] | None = None,
+) -> str:
+    omitted_field_by_phase = omitted_field_by_phase or {}
+    lines = [
+        "# wferp-report",
+        "Intake prompt and uploaded files.",
+        "Parse Excel fields and formulas.",
+        "Generate Excel confirmation HTML.",
+        "Map requested fields to WFERP schema and relationships.",
+        "Generate read-only SQL.",
+        "Validate SQL safety locally.",
+        "Execute only after user confirmation.",
+        "Present data preview HTML.",
+        "Ask user to choose report type, design, and options.",
+        "Generate report draft HTML via React renderer.",
+        "Run validators using subagents.",
+        "Present final report and validation evidence.",
+    ]
+    for phase in REQUIRED_PHASES:
+        if phase == omitted_phase:
+            continue
+        lines.append(f"## {phase}")
+        for field in REQUIRED_PHASE_FIELDS:
+            if omitted_field_by_phase.get(phase) == field:
+                continue
+            lines.append(f"{field} phase content")
+    return "\n".join(lines)
+
+
 def create_complete_skill_tree(root: Path) -> None:
-    write_file(
-        root / "SKILL.md",
-        "\n".join(
-            [
-                "# wferp-report",
-                "Intake prompt and uploaded files.",
-                "Parse Excel fields and formulas.",
-                "Generate Excel confirmation HTML.",
-                "Map requested fields to WFERP schema and relationships.",
-                "Generate read-only SQL.",
-                "Validate SQL safety locally.",
-                "Execute only after user confirmation.",
-                "Present data preview HTML.",
-                "Ask user to choose report type, design, and options.",
-                "Generate report draft HTML via React renderer.",
-                "Run validators using subagents.",
-                "Present final report and validation evidence.",
-            ]
-        ),
-    )
+    write_file(root / "SKILL.md", complete_skill_md())
     for relative_path in REQUIRED_PARITY_FILES:
         path = root / relative_path
         if path.exists():
@@ -176,6 +216,40 @@ def test_validator_requires_harness_sections(tmp_path):
     assert any("Excel confirmation" in error or "React renderer" in error for error in result.errors)
 
 
+def test_validator_requires_exact_phase_headings(tmp_path):
+    module = load_validator_module()
+    skill_root = tmp_path / "wferp-report"
+    create_complete_skill_tree(skill_root)
+    write_file(skill_root / "SKILL.md", complete_skill_md(omitted_phase="Phase 4 —— SQL Review Checkpoint"))
+
+    result = module.validate_skill_tree(skill_root)
+
+    assert result.ok is False
+    assert any("Missing required SKILL.md phase: Phase 4 —— SQL Review Checkpoint" in error for error in result.errors)
+
+
+def test_validator_requires_phase_fields_inside_phase_section(tmp_path):
+    module = load_validator_module()
+    skill_root = tmp_path / "wferp-report"
+    create_complete_skill_tree(skill_root)
+    write_file(
+        skill_root / "SKILL.md",
+        complete_skill_md(
+            omitted_field_by_phase={
+                "Phase 4 —— SQL Review Checkpoint": "使用者 checkpoint：",
+            }
+        ),
+    )
+
+    result = module.validate_skill_tree(skill_root)
+
+    assert result.ok is False
+    assert any(
+        "Phase 4 —— SQL Review Checkpoint missing required field: 使用者 checkpoint：" in error
+        for error in result.errors
+    )
+
+
 def test_validator_requires_validator_references(tmp_path):
     module = load_validator_module()
     skill_root = tmp_path / "wferp-report"
@@ -198,3 +272,27 @@ def test_validator_requires_report_designs(tmp_path):
 
     assert result.ok is False
     assert any("financial-control.md" in error for error in result.errors)
+
+
+def test_validator_reports_invalid_utf8_in_read_files(tmp_path):
+    module = load_validator_module()
+    skill_root = tmp_path / "wferp-report"
+    create_complete_skill_tree(skill_root)
+    validators_text = "\n".join(
+        [
+            "# validators",
+            "需求/來源 validator",
+            "Excel 欄位與公式 validator",
+            "SQL 安全 validator",
+            "Schema/relationship validator",
+            "Data preview validator",
+            "報告內容 validator",
+            "視覺/技術 validator",
+        ]
+    ).encode("utf-8")
+    (skill_root / "references" / "validators.md").write_bytes(validators_text + b"\xff")
+
+    result = module.validate_skill_tree(skill_root)
+
+    assert result.ok is False
+    assert "Invalid UTF-8: references/validators.md" in result.errors

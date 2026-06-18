@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 
 
@@ -70,6 +71,34 @@ REQUIRED_VALIDATOR_TEXT = {
     "視覺/技術 validator": "validators.md must define 視覺/技術 validator.",
 }
 
+REQUIRED_PHASES = [
+    "Phase 0 —— Intake",
+    "Phase 1 —— Source / Excel Requirement",
+    "Phase 2 —— Report Planning",
+    "Phase 3 —— Field & Formula Checkpoint",
+    "Phase 4 —— SQL Review Checkpoint",
+    "Phase 5 —— Confirmed DB Execution",
+    "Phase 6 —— Data Preview Checkpoint",
+    "Phase 7 —— Report Selection Checkpoint",
+    "Phase 8 —— Final Report Scaffold",
+    "Phase 9 —— Section Build",
+    "Phase 10 —— Final Review",
+    "Phase 11 —— Repair",
+    "Phase 12 —— Delivery",
+]
+
+REQUIRED_PHASE_FIELDS = [
+    "目標：",
+    "輸入：",
+    "必讀 references：",
+    "執行步驟：",
+    "產物：",
+    "停止條件：",
+    "使用者 checkpoint：",
+    "validator：",
+    "失敗時 repair slice：",
+]
+
 
 class ValidationResult:
     def __init__(self, errors: list[str]):
@@ -80,8 +109,37 @@ class ValidationResult:
         return not self.errors
 
 
-def read_text(path: Path) -> str:
-    return path.read_text(encoding="utf-8", errors="ignore")
+def relative_path(root: Path, path: Path) -> str:
+    return path.relative_to(root).as_posix()
+
+
+def read_text(root: Path, path: Path, errors: list[str]) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        errors.append(f"Invalid UTF-8: {relative_path(root, path)}")
+        return None
+
+
+def markdown_section(text: str, heading: str) -> str | None:
+    match = re.search(rf"^## {re.escape(heading)}\s*$", text, flags=re.MULTILINE)
+    if not match:
+        return None
+    start = match.end()
+    next_heading = re.search(r"^## .+$", text[start:], flags=re.MULTILINE)
+    end = start + next_heading.start() if next_heading else len(text)
+    return text[start:end]
+
+
+def validate_phase_structure(skill_text: str, errors: list[str]) -> None:
+    for phase in REQUIRED_PHASES:
+        section = markdown_section(skill_text, phase)
+        if section is None:
+            errors.append(f"Missing required SKILL.md phase: {phase}")
+            continue
+        for field in REQUIRED_PHASE_FIELDS:
+            if field not in section:
+                errors.append(f"{phase} missing required field: {field}")
 
 
 def validate_skill_tree(skill_root: str | Path) -> ValidationResult:
@@ -95,18 +153,21 @@ def validate_skill_tree(skill_root: str | Path) -> ValidationResult:
 
     skill_md = root / "SKILL.md"
     if skill_md.is_file():
-        skill_text = read_text(skill_md)
-        for needle, message in REQUIRED_SKILL_SECTIONS.items():
-            if needle not in skill_text:
-                errors.append(message)
+        skill_text = read_text(root, skill_md, errors)
+        if skill_text is not None:
+            for needle, message in REQUIRED_SKILL_SECTIONS.items():
+                if needle not in skill_text:
+                    errors.append(message)
+            validate_phase_structure(skill_text, errors)
 
     references_root = root / "references"
     validators_path = references_root / "validators.md"
     if validators_path.is_file():
-        validators_text = read_text(validators_path)
-        for needle, message in REQUIRED_VALIDATOR_TEXT.items():
-            if needle not in validators_text:
-                errors.append(message)
+        validators_text = read_text(root, validators_path, errors)
+        if validators_text is not None:
+            for needle, message in REQUIRED_VALIDATOR_TEXT.items():
+                if needle not in validators_text:
+                    errors.append(message)
 
     return ValidationResult(errors)
 
