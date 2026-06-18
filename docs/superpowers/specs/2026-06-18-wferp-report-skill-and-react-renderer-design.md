@@ -569,7 +569,113 @@ Main agent 必須先修復 fail items 才能交付。只有 validator output 不
 
 React-rendered checkpoint pages 與 final report pages 必須做 browser verification。
 
-## 17. 待 Implementation Plan 決定的事項
+## 17. 本地 E2E 測試案例：費用分析
+
+第一版必須包含一個本地端、可重跑、可量化驗收的 E2E 測試案例：`E2E-EXPENSE-001 費用分析報告`。
+
+此測試不得使用 fake、smoke、mock。測試必須真的啟動本地 Docker 資料庫、建立 schema、寫入測試資料、產生 SQL、驗證 SQL、執行查詢、驗證查詢結果，並產出 report harness evidence。
+
+### 17.1 測試資料庫
+
+本地 E2E 先使用 Docker 內的 PostgreSQL 作為 SQL Server 測試替身：
+
+- service name：`postgres-e2e`
+- image：`postgres:16` 或 implementation plan 指定的固定版本
+- database：`wferp_e2e`
+- schema：`dbo`
+- tables：使用 WFERP schema 命名，至少包含：
+  - `ACPTA`：費用申請單單頭檔
+  - `ACPTB`：費用申請單單身檔
+
+PostgreSQL 不原生支援 SQL Server 的 `TOP`、`[bracket identifiers]` 與三段式 `[DB].[dbo].[Table]` 名稱。因此 E2E 需要一個正式的 read-only test execution adapter：
+
+1. 先對 SQL Server target SQL 做既有 safety/metadata/semantic validation。
+2. Adapter 只接受已通過 validation 的單一 `SELECT`。
+3. Adapter 將 SQL Server read-only subset 轉成 PostgreSQL 可執行 SQL，例如：
+   - `[Column]` 轉為 `"Column"`；
+   - `[dbo].[ACPTA]` 轉為 `dbo."ACPTA"`；
+   - `SELECT TOP n` 轉為 `LIMIT n`；
+   - unsupported construct 直接 fail，不做猜測式修正。
+4. Adapter 本身是受測的基礎設施，不是 fake/mock。它必須保留原始 SQL Server SQL、轉換後 PostgreSQL SQL、轉換規則與拒絕原因。
+
+### 17.2 Seed Data
+
+Seed data 必須由測試程式或 seed SQL 建立，不能依賴既有外部資料庫狀態。
+
+最小 seed：
+
+- 至少 2 個年度或期間，其中包含會被排除的對照資料，例如 2025 資料；
+- 至少 3 個費用部門；
+- 至少 2 個費用科目；
+- 至少 24 筆 `ACPTB` 明細；
+- 至少 1 筆未確認或作廢資料，用來驗證 SQL 有正確排除；
+- 每筆 detail 包含：
+  - `TB001/TB002`：對應 header；
+  - `TB013`：科目編號；
+  - `TB014`：費用部門；
+  - `TB017`：本幣未稅金額；
+  - `TB018`：本幣稅額。
+
+Header `ACPTA` 至少包含：
+
+- `TA001/TA002`：與 detail join；
+- `TA003`：憑單日期；
+- `TA024`：確認碼；
+- `TA018`：發票作廢。
+
+### 17.3 測試 Prompt
+
+固定測試 prompt：
+
+```text
+產出 2026 年第 1 季費用分析，依費用部門與費用科目彙總本幣未稅金額、本幣稅額與總費用，只包含已確認且未作廢的費用申請單，並計算各部門佔總費用比例。
+```
+
+E2E 必須跑完整本地流程：
+
+1. 建立 Postgres container；
+2. 建立 `dbo."ACPTA"`、`dbo."ACPTB"`；
+3. 寫入 seed data；
+4. 透過 real SQL generation path 產生 SQL，不使用 `LLM_MOCK_RESPONSE` 或 fake provider；
+5. 執行 SQL safety validator；
+6. 執行 schema/relationship validator；
+7. 透過 read-only Postgres execution adapter 查詢 seed DB；
+8. 驗證量化結果；
+9. 產出 data preview evidence；
+10. 產出費用分析 report draft 或 checkpoint evidence。
+
+### 17.4 量化驗收標準
+
+`E2E-EXPENSE-001` 必須通過下列量化標準：
+
+- SQL validation：
+  - exactly one statement；
+  - `SELECT` only；
+  - 無 DDL/DML/procedure token；
+  - metadata references 全部存在；
+  - SQL 必須使用或等價引用 `ACPTA` 與 `ACPTB`；
+  - join 條件必須涵蓋 `TA001 = TB001` 與 `TA002 = TB002`；
+  - 日期條件必須只包含 2026 Q1；
+  - 必須排除未確認或作廢資料。
+- Execution result：
+  - 回傳 group rows 數量必須等於 seed expectation，例如 6 組部門/科目彙總；
+  - `SUM(TB017)` 必須等於 seed expectation 的本幣未稅總額；
+  - `SUM(TB018)` 必須等於 seed expectation 的本幣稅額總額；
+  - `SUM(TB017 + TB018)` 必須等於 seed expectation 的總費用；
+  - 每個部門小計必須等於 seed expectation；
+  - 部門佔比加總必須為 `100% ± 0.01%`；
+  - 2025 對照資料不可出現在結果；
+  - 未確認或作廢資料不可出現在結果。
+- Evidence：
+  - evidence 必須包含原始 SQL Server target SQL；
+  - evidence 必須包含 PostgreSQL translated SQL；
+  - evidence 必須包含 seed manifest；
+  - evidence 必須包含 row count、columns、aggregate checks 與 sample rows；
+  - evidence 必須記錄沒有使用 fake/smoke/mock。
+
+量化金額可以在 implementation plan 中定案，但一旦 seed data 建立，expected row count、各 group subtotal、grand total、tax total 與 percentage tolerance 必須固定在測試中，不能只檢查「有資料」。
+
+## 18. 待 Implementation Plan 決定的事項
 
 下列事項留到 implementation plan 決定：
 
@@ -578,6 +684,8 @@ React-rendered checkpoint pages 與 final report pages 必須做 browser verific
 - renderer 直接使用 Reacticle，或包一層 WFERP-specific components；
 - 圖表 library 選擇；
 - Excel workbook parsing 的實作工具與支援公式範圍；
+- Postgres E2E service、seed data 與 read-only SQL Server to PostgreSQL adapter 的精確檔案位置；
+- `E2E-EXPENSE-001` 的固定 seed 金額、group expected values 與 tolerance；
 - preview 與 CSV export 的最大 row limit；
 - report run workspace 放在 `/tmp`、`~/.codex`，或設定的 project directory。
 
