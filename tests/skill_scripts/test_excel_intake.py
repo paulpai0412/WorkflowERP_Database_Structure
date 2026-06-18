@@ -127,6 +127,97 @@ def _write_requirement_workbook(path: Path) -> None:
         )
 
 
+def _write_management_requirement_workbook(path: Path) -> None:
+    sheets = [
+        (
+            "需求欄位",
+            [
+                ["表格", "欄位", "顯示名稱", "說明"],
+                ["CMSMV", "MV001", "部門代號", "部門代號"],
+                ["CMSMV", "MV002", "部門名稱", "部門名稱"],
+                ["ACTMA", "MA001", "費用科目", "費用科目"],
+                ["ACPTB", "TB017", "金額", "本幣金額"],
+            ],
+        ),
+        (
+            "自訂公式",
+            [
+                ["欄位名稱", "公式", "說明"],
+                ["費用占比", ("formula", "=金額/總金額"), "金額占全部費用比例"],
+                ["異常旗標", ("formula", '=IF(金額>預算,"超支","正常")'), "超預算提示"],
+            ],
+        ),
+        (
+            "明細",
+            [
+                ["部門代號", "部門名稱", "費用科目", "金額"],
+                ["D001", "管理部", "旅費", "1000"],
+            ],
+        ),
+        (
+            "管理報表",
+            [
+                ["部門費用管理報表"],
+                [""],
+                ["指標", "數值"],
+                ["部門數", ("formula", "=COUNTA(明細!A:A)-1")],
+                [""],
+                ["總金額", ("formula", "=SUM(明細!D:D)")],
+            ],
+        ),
+    ]
+
+    workbook_sheets = []
+    rels = []
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+            + "".join(
+                f'<Override PartName="/xl/worksheets/sheet{index}.xml" '
+                'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+                for index, _ in enumerate(sheets, start=1)
+            )
+            + "</Types>",
+        )
+        archive.writestr(
+            "_rels/.rels",
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+            "</Relationships>",
+        )
+        for index, (name, rows) in enumerate(sheets, start=1):
+            workbook_sheets.append(
+                f'<sheet name="{escape(name)}" sheetId="{index}" r:id="rId{index}"/>'
+            )
+            rels.append(
+                f'<Relationship Id="rId{index}" '
+                'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+                f'Target="worksheets/sheet{index}.xml"/>'
+            )
+            archive.writestr(f"xl/worksheets/sheet{index}.xml", _sheet_xml(rows))
+        archive.writestr(
+            "xl/workbook.xml",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            f'<sheets>{"".join(workbook_sheets)}</sheets>'
+            "</workbook>",
+        )
+        archive.writestr(
+            "xl/_rels/workbook.xml.rels",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            f'{"".join(rels)}'
+            "</Relationships>",
+        )
+
+
 def test_reads_required_database_fields_from_workbook(tmp_path: Path):
     workbook = tmp_path / "requirement.xlsx"
     _write_requirement_workbook(workbook)
@@ -231,3 +322,35 @@ def test_builds_confirmation_payload_in_chinese(tmp_path: Path):
     assert payload["使用者公式欄位"][0]["公式"] == "=未稅金額+稅額"
     assert payload["報表輸出欄位"][1]["輸出欄位"] == "總額"
     assert payload["需使用者確認"]
+
+
+def test_builds_excel_requirement_contract_with_formula_lineage_and_report_outputs(tmp_path: Path):
+    workbook = tmp_path / "management_requirement.xlsx"
+    _write_management_requirement_workbook(workbook)
+
+    requirement_dict = parse_excel_requirement(workbook).to_dict()
+
+    assert requirement_dict["source_type"] == "excel"
+    assert [field["label"] for field in requirement_dict["db_fields"]] == [
+        "部門代號",
+        "部門名稱",
+        "費用科目",
+        "金額",
+    ]
+    assert requirement_dict["db_fields"][0] == {
+        "label": "部門代號",
+        "required": True,
+        "matched_schema_field": None,
+    }
+    assert requirement_dict["formula_fields"][0]["name"] == "費用占比"
+    assert requirement_dict["formula_fields"][0]["formula"] == "=金額/總金額"
+    assert requirement_dict["formula_fields"][0]["dependencies"] == ["金額", "總金額"]
+    assert all(
+        field["requires_user_confirmation"] is True
+        for field in requirement_dict["formula_fields"]
+    )
+    assert requirement_dict["report_outputs"][0]["sheet"] == "管理報表"
+    assert {"address": "B6", "formula": "=SUM(明細!D:D)"} in requirement_dict[
+        "report_outputs"
+    ][0]["cells"]
+    assert requirement_dict["warnings"] == []
