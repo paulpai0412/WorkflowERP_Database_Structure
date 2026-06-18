@@ -133,6 +133,55 @@ def test_cli_export_single_html_rejects_invalid_package_without_writing_html(tmp
     assert not (run_dir / "delivery" / "report.html").exists()
 
 
+def test_cli_validate_single_html_reports_static_result(tmp_path: Path):
+    html = tmp_path / "report.html"
+    html.write_text(
+        """<!doctype html><html><body>
+        <script>window.__WFERP_REPORT_PACKAGE__="abc";</script>
+        </body></html>""",
+        encoding="utf-8",
+    )
+
+    result = _run_cli(["validate-single-html", "--html", str(html)], cwd=Path.cwd())
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "validated"
+    assert payload["valid"] is True
+    assert payload["errors"] == []
+
+
+def test_cli_validate_single_html_exits_nonzero_for_network_reference(tmp_path: Path):
+    html = tmp_path / "report.html"
+    html.write_text(
+        """<!doctype html><html><head>
+        <script src="https://cdn.example/app.js"></script>
+        </head><body></body></html>""",
+        encoding="utf-8",
+    )
+
+    result = _run_cli(["validate-single-html", "--html", str(html)], cwd=Path.cwd())
+
+    assert result.returncode == 2
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "validated"
+    assert "external_script" in payload["errors"]
+    assert "missing_package" in payload["errors"]
+
+
+def test_cli_validate_single_html_reports_missing_file_on_stderr(tmp_path: Path):
+    missing = tmp_path / "missing-report.html"
+
+    result = _run_cli(["validate-single-html", "--html", str(missing)], cwd=Path.cwd())
+
+    assert result.returncode == 2
+    assert result.stdout == ""
+    payload = json.loads(result.stderr)
+    assert payload["status"] == "error"
+    assert payload["code"] == "single_html_validation_error"
+    assert str(missing) in payload["message"]
+
+
 def test_cli_report_harness_accepts_excel_input_path(tmp_path: Path):
     workbook = tmp_path / "requirement.xlsx"
     _write_requirement_workbook(workbook)

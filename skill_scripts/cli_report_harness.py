@@ -11,6 +11,7 @@ from typing import Any
 from skill_scripts.dynamic_design_brief import build_design_brief
 from skill_scripts.dynamic_design_brief import validate_design_brief
 from skill_scripts.excel_intake import build_excel_confirmation_payload, parse_excel_requirement
+from skill_scripts.html_self_validator import validate_single_html_static
 from skill_scripts.report_catalog import build_report_selection_payload
 from skill_scripts.report_catalog import get_report_design_defaults
 from skill_scripts.report_catalog import list_report_designs
@@ -502,6 +503,19 @@ def _export_single_html(argv: list[str]) -> int:
     return 0
 
 
+def _validate_single_html(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Validate exported single HTML report.")
+    parser.add_argument("--html", required=True)
+    args = parser.parse_args(argv)
+
+    try:
+        result = validate_single_html_static(args.html)
+    except OSError as exc:
+        return _json_error("single_html_validation_error", str(exc))
+    _write_stdout_json({"status": "validated", **result})
+    return 0 if result["valid"] else 2
+
+
 def _write_report_draft(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Write the report draft checkpoint after report selection.")
     parser.add_argument("--run-dir", required=True)
@@ -560,6 +574,7 @@ COMMANDS = {
     "write-design-brief": _write_design_brief,
     "write-visual-checkpoint": _write_visual_checkpoint,
     "export-single-html": _export_single_html,
+    "validate-single-html": _validate_single_html,
     "scaffold-report": _scaffold_report,
     "write-report-draft": _write_report_draft,
     "write-final-review": _write_final_review,
