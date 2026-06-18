@@ -29,6 +29,9 @@ REQUIRED_FILES = [
     "references/html-output.md",
     "references/validators.md",
     "references/e2e-expense-analysis.md",
+    "references/single-html-export.md",
+    "references/dynamic-design-brief.md",
+    "references/style-replay.md",
     "scripts/scaffold-report.sh",
     "scripts/validate-skill.sh",
     "scripts/print-expense-fixture-sql.sh",
@@ -168,6 +171,14 @@ def validate_skill_tree(skill_root: str | Path) -> ValidationResult:
             for needle, message in REQUIRED_VALIDATOR_TEXT.items():
                 if needle not in validators_text:
                     errors.append(message)
+
+    single_html_path = references_root / "single-html-export.md"
+    if single_html_path.is_file():
+        single_html_text = read_text(root, single_html_path, errors)
+        if single_html_text is not None:
+            for needle in ["不得連 DB", "不得執行 SQL", "network requests = 0"]:
+                if needle not in single_html_text:
+                    errors.append(f"single-html-export.md missing required text: {needle}")
 
     return ValidationResult(errors)
 
