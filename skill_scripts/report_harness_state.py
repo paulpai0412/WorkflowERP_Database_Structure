@@ -70,7 +70,18 @@ def create_report_run(
     run_dir = Path(run_root) / run_id
     if _state_path(run_dir).exists():
         raise FileExistsError(f"Report run already exists: {run_id}")
-    for child in ["inputs", "sql", "data", "checkpoints", "reports"]:
+    for child in [
+        "inputs",
+        "sql",
+        "data",
+        "checkpoints",
+        "reports",
+        "source",
+        "plan",
+        "audit",
+        "review",
+        "report/payload",
+    ]:
         (run_dir / child).mkdir(parents=True, exist_ok=True)
 
     state = {
@@ -130,3 +141,28 @@ def record_checkpoint(run_dir: str | Path, checkpoint: str, payload: dict[str, A
     state["checkpoints"].append(entry)
     save_run_state(run_path, state)
     return checkpoint_payload
+
+
+def append_audit_event(run_dir: str | Path, event: str, payload: dict[str, Any]) -> dict[str, Any]:
+    entry = {"event": event, "payload": payload, "created_at": _now()}
+    path = Path(run_dir) / "audit" / "events.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    return entry
+
+
+def write_confirmation(run_dir: str | Path, checkpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
+    if checkpoint not in CHECKPOINT_DEFINITIONS:
+        raise ValueError(f"Unknown checkpoint: {checkpoint}")
+    definition = CHECKPOINT_DEFINITIONS[checkpoint]
+    confirmation = {
+        "checkpoint": checkpoint,
+        "action": payload["action"],
+        "comment": payload.get("comment", ""),
+        "selectedOptions": payload.get("selectedOptions", {}),
+        "created_at": _now(),
+    }
+    filename = definition["file"].replace(".json", ".confirmation.json")
+    _write_json(Path(run_dir) / "checkpoints" / filename, confirmation)
+    return confirmation

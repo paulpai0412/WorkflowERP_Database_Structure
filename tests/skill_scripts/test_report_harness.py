@@ -22,6 +22,7 @@ def test_confirmed_sql_allows_data_preview_checkpoint(tmp_path: Path):
 
     checkpoint = harness.write_data_preview({"rows": [{"部門": "D001"}], "row_count": 1})
 
+    assert harness.state()["user_confirmations"]["sql_review"] == "同意查詢"
     assert checkpoint["checkpoint"] == "data_preview"
     assert checkpoint["payload"]["row_count"] == 1
 

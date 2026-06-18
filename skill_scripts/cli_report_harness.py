@@ -20,6 +20,30 @@ def _write_stdout_json(data: dict[str, Any]) -> None:
     print(json.dumps(data, ensure_ascii=False, indent=2))
 
 
+def _serve_checkpoint(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Serve WFERP checkpoint companion confirmations.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=0)
+    args = parser.parse_args(argv)
+
+    from skill_scripts.checkpoint_companion import CheckpointCompanionServer
+
+    run_dir = Path(args.run_dir)
+    if not (run_dir / "state.json").exists():
+        raise SystemExit(f"Report run does not exist: {run_dir}")
+    with CheckpointCompanionServer.serve(run_dir, host=args.host, port=args.port) as server:
+        print(
+            f"checkpoint_companion_url={server.base_url}/runs/{run_dir.name}/checkpoints/current",
+            flush=True,
+        )
+        try:
+            server.thread.join()
+        except KeyboardInterrupt:
+            return 0
+    return 0
+
+
 def _ensure_harness(args: argparse.Namespace) -> ReportHarness:
     run_dir = Path(args.run_dir)
     if (run_dir / "state.json").exists():
@@ -86,6 +110,10 @@ def _guard_execution(args: argparse.Namespace, harness: ReportHarness) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = list(argv if argv is not None else sys.argv[1:])
+    if argv and argv[0] == "serve-checkpoint":
+        return _serve_checkpoint(argv[1:])
+
     parser = argparse.ArgumentParser(description="Create and advance WFERP report harness runs.")
     parser.add_argument("--prompt", default="")
     parser.add_argument("--input-file", action="append", type=Path, default=[])
