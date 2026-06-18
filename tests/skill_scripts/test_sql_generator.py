@@ -81,3 +81,4 @@ def test_generate_select_sql_honors_default_db_override(monkeypatch):
     sql = generate_select_sql("查詢採購單前 20 筆", sample_bundle())
     assert sql.startswith("SELECT TOP 20")
     assert "FROM [CHD].[dbo].[PURTA]" in sql
+

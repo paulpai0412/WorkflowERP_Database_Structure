@@ -3,12 +3,7 @@
 import re
 import json
 import pymssql
-
-# mssql parameters
-SERVER_IP = 'your_server_ip'
-DATABASE = 'DSCSYS'
-USERNAME = 'your_username'
-PASSWORD = 'password'
+from schema_db_config import SchemaDbConfig
 
 Get_MoudleNameSQL = '''SELECT ADMMA.MA001 as ModuleID, ADMMA.MA002 as ModuleName 
  ,case ADMMA.MA001 
@@ -98,7 +93,15 @@ class BytesEncoder(json.JSONEncoder):
 def Table(SQLString, Columns):
     try:
         # -- 建立 MSSQL 連線
-        conn = pymssql.connect(server=SERVER_IP, user=USERNAME, password=PASSWORD, database=DATABASE)
+        config = SchemaDbConfig.from_env()
+        conn = pymssql.connect(
+            server=config.host,
+            port=config.port,
+            user=config.username,
+            password=config.password,
+            database=config.database,
+            charset="utf8",
+        )
         cursor = conn.cursor()
         cursor.execute(SQLString)
 

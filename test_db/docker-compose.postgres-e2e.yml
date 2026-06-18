@@ -1,0 +1,17 @@
+services:
+  wferp-postgres-e2e:
+    image: postgres:16
+    container_name: wferp-postgres-e2e
+    environment:
+      POSTGRES_DB: wferp_e2e
+      POSTGRES_USER: wferp
+      POSTGRES_PASSWORD: wferp_pass
+    ports:
+      - "55432:5432"
+    volumes:
+      - ./postgres_e2e:/init:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wferp -d wferp_e2e"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
