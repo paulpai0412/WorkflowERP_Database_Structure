@@ -6,25 +6,37 @@ This runbook covers the day-to-day workflows for regenerating documentation, bui
 
 ## 1) Legacy schema regeneration
 
+Export the schema database connection environment variables before rebuilding metadata.
+
+Required:
+
+```bash
+export WFERP_SCHEMA_DB_HOST="your-sql-server-host"
+export WFERP_SCHEMA_DB_USERNAME="your-username"
+export WFERP_SCHEMA_DB_PASSWORD="your-password"
+```
+
+Optional defaults:
+
+```bash
+export WFERP_SCHEMA_DB_PORT="1433"
+export WFERP_SCHEMA_DB_DATABASE="DSCSYS"
+```
+
 Run these commands from `schema/_Source/` because the scripts use relative paths:
 
 ```bash
 python3 1_mssql_to_json.py
 python3 2_FieldNameConvert2utf8.py
-python3 3_CreateIndexHtml.py
-python3 4_CreateTableStructureHtml.py
-# optional
-python3 5_CreateTableStructureSQL.py
 ```
-
-Before step 1, update `SERVER_IP`, `USERNAME`, `PASSWORD`, and `DATABASE` inside `1_mssql_to_json.py`.
 
 ### Verification
 
-1. open `schema/index.html` in a browser;
-2. click several modules;
-3. confirm iframe pages under `HTML/` load;
-4. if SQL artifacts were regenerated, inspect the `SQL/` output as well.
+1. confirm `_Source/MoudleName.json`, `_Source/TableName.json`, and
+   `_Source/TableStructure.json` were regenerated;
+2. run `python3 -m skill_scripts.cli_generate_select --build-artifacts` from
+   repo root;
+3. run `pytest tests/skill_scripts/test_schema_loader.py -v`.
 
 ## 2) Build SQL-tooling artifacts
 
@@ -109,7 +121,52 @@ pytest tests/skill_scripts/test_schema_loader.py -v
 
 Use focused tests while iterating and the full suite before finalizing tooling changes.
 
-## 6) Operational decision guide
+## 6) Report harness workflow
+
+Create a report run from a prompt:
+
+```bash
+python3 -m skill_scripts.cli_report_harness --prompt "請產出費用分析" --run-dir wferp-report-runs/demo
+```
+
+Parse a real Excel requirement workbook and write the Excel confirmation checkpoint:
+
+```bash
+python3 -m skill_scripts.cli_report_harness --prompt "請產出費用分析" --input-file /path/to/需求.xlsx --run-dir wferp-report-runs/demo --checkpoint excel
+```
+
+Create the SQL review checkpoint without executing the database:
+
+```bash
+python3 -m skill_scripts.cli_report_harness --prompt "查詢採購單前 20 筆" --run-dir wferp-report-runs/demo --checkpoint sql --mode rule
+```
+
+Execution validation remains gated. `--validate-execution` does not execute without `--confirm-sql`, and non-test DB environments require `--allow-non-test-db-execution`.
+
+## 7) Run the expense-analysis E2E
+
+Run the deterministic expense-analysis path. The runner validates SQLite first,
+then uses Docker PostgreSQL as the local simulation of the formal MSSQL DB:
+
+```bash
+bash scripts/run_expense_analysis_postgres_e2e.sh
+```
+
+The runner:
+
+1. runs `bash scripts/run_expense_analysis_sqlite_e2e.sh`;
+2. creates a real local SQLite DB in pytest and validates row counts, columns,
+   totals, exclusions, and percentages;
+3. starts `wferp-postgres-e2e`;
+4. recreates and seeds `dbo."ACPTA"` and `dbo."ACPTB"`;
+5. prints fixture counts, included totals, excluded control totals, and generated SQL;
+6. runs `pytest tests/skill_scripts/test_expense_analysis_postgres_e2e.py -v`.
+
+The SQLite pytest file is skipped unless `WFERP_RUN_SQLITE_E2E=1` is set. The
+PostgreSQL pytest file is skipped unless `WFERP_RUN_POSTGRES_E2E=1` is set. The
+runner sets both flags.
+
+## 8) Operational decision guide
 
 | Task | Work area |
 | --- | --- |
@@ -118,7 +175,7 @@ Use focused tests while iterating and the full suite before finalizing tooling c
 | Query execution validation changed | `skill_scripts/` + `test_db/` |
 | Agent usage guidance changed | `skills/workflow-erp-sql-generator/` |
 
-## 7) Common failure cases
+## 9) Common failure cases
 
 ### Generated SQL looks valid but fails task intent
 
@@ -136,7 +193,7 @@ Run execution validation with required columns or aggregate checks. Do not accep
 - verify generated links still keep the expected Windows-style `HTML\\...` format;
 - rerun the pipeline in sequence instead of skipping intermediate steps.
 
-## 8) Related references
+## 10) Related references
 
 - `AGENTS.md`
 - `INSTALLATION.md`

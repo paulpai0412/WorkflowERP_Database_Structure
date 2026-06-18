@@ -1,0 +1,139 @@
+from __future__ import annotations
+
+import argparse
+from dataclasses import asdict
+import json
+import os
+from pathlib import Path
+import sys
+from typing import Any
+
+from skill_scripts.excel_intake import build_excel_confirmation_payload, parse_excel_requirement
+from skill_scripts.report_catalog import build_report_selection_payload
+from skill_scripts.report_harness import ReportHarness
+from skill_scripts.report_harness_state import load_run_state
+from skill_scripts.schema_loader import load_schema_bundle
+from skill_scripts.sql_generator import generate_select_sql
+
+
+def _write_stdout_json(data: dict[str, Any]) -> None:
+    print(json.dumps(data, ensure_ascii=False, indent=2))
+
+
+def _ensure_harness(args: argparse.Namespace) -> ReportHarness:
+    run_dir = Path(args.run_dir)
+    if (run_dir / "state.json").exists():
+        return ReportHarness(run_dir)
+
+    if not args.prompt:
+        raise SystemExit("--prompt is required when creating a new report run")
+    run_id = run_dir.name
+    run_root = run_dir.parent if str(run_dir.parent) else Path(".")
+    return ReportHarness.create(
+        run_root,
+        run_id=run_id,
+        prompt=args.prompt,
+        input_files=[str(path) for path in args.input_file],
+    )
+
+
+def _parse_excel_inputs(harness: ReportHarness, input_files: list[Path]) -> dict[str, Any] | None:
+    excel_files = [path for path in input_files if path.suffix.lower() == ".xlsx"]
+    if not excel_files:
+        return None
+    requirement = parse_excel_requirement(excel_files[0])
+    payload = build_excel_confirmation_payload(requirement)
+    harness.update_state(excel_requirement=requirement.to_dict())
+    return payload
+
+
+def _build_sql(prompt: str, mode: str) -> str:
+    if mode != "rule":
+        # The harness must remain deterministic until LLM orchestration has a user-visible review gate.
+        mode = "rule"
+    bundle = load_schema_bundle("_Source")
+    return generate_select_sql(prompt, bundle)
+
+
+def _guard_execution(args: argparse.Namespace, harness: ReportHarness) -> bool:
+    if not args.validate_execution:
+        return False
+    if not args.confirm_sql:
+        print("SQL 尚未確認，未執行資料庫查詢。")
+        return False
+    db_env = str(args.db_env or os.getenv("DB_ENV", "")).strip().lower()
+    if db_env != "test" and not args.allow_non_test_db_execution:
+        print(
+            "ERROR: non-test DB execution requires --allow-non-test-db-execution",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    state = harness.state()
+    if not state.get("sql_candidate") or "sql_review" not in {
+        item["checkpoint"] for item in state.get("checkpoints", [])
+    }:
+        print("ERROR: --confirm-sql requires an existing reviewed SQL checkpoint", file=sys.stderr)
+        raise SystemExit(2)
+    harness.confirm("sql_review", "同意查詢")
+    harness.update_state(
+        execution_result_summary={
+            "status": "not_executed_by_harness",
+            "reason": "DB execution is delegated to the governed SQL validation path.",
+        }
+    )
+    print("SQL 已確認；資料庫執行需由 governed validation path 產生 evidence。")
+    return True
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Create and advance WFERP report harness runs.")
+    parser.add_argument("--prompt", default="")
+    parser.add_argument("--input-file", action="append", type=Path, default=[])
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--mode", choices=["rule", "shadow", "llm-first"], default="rule")
+    parser.add_argument("--checkpoint", choices=["excel", "sql", "report-selection"], default="")
+    parser.add_argument("--confirm-sql", action="store_true")
+    parser.add_argument("--validate-execution", action="store_true")
+    parser.add_argument("--allow-non-test-db-execution", action="store_true")
+    parser.add_argument("--db-env", default=None)
+    parser.add_argument("--report-type", default="")
+    parser.add_argument("--report-design", default="")
+    parser.add_argument("--include-chart", action="store_true")
+    parser.add_argument("--include-table", action="store_true")
+    parser.add_argument("--include-analysis", action="store_true")
+    parser.add_argument("--include-recommendations", action="store_true")
+    args = parser.parse_args(argv)
+
+    harness = _ensure_harness(args)
+    state = harness.state()
+    prompt = args.prompt or state.get("prompt", "")
+
+    excel_payload = _parse_excel_inputs(harness, args.input_file)
+    if excel_payload is not None and args.checkpoint in {"", "excel"}:
+        harness.write_excel_confirmation(excel_payload)
+
+    if args.checkpoint == "sql":
+        sql = _build_sql(prompt, args.mode)
+        harness.write_sql_review(sql, {"status": "pending_user_confirmation"})
+
+    if args.checkpoint == "report-selection" or args.report_type or args.report_design:
+        payload = build_report_selection_payload()
+        if args.report_type:
+            payload["selected_report_type"] = args.report_type
+        if args.report_design:
+            payload["selected_report_design"] = args.report_design
+        payload["selected_options"] = {
+            "include_chart": args.include_chart,
+            "include_table": args.include_table,
+            "include_analysis": args.include_analysis,
+            "include_recommendations": args.include_recommendations,
+        }
+        harness.write_report_selection(payload)
+
+    _guard_execution(args, harness)
+    _write_stdout_json({"run_dir": str(harness.run_dir), "state": load_run_state(harness.run_dir)})
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
