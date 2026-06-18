@@ -383,8 +383,8 @@ def _write_data_preview(argv: list[str]) -> int:
     try:
         harness = _open_harness(args.run_dir)
         payload = _load_json_arg(args.payload)
-        _write_run_json(harness.run_dir, "data/execution-result.json", payload)
         checkpoint = harness.write_data_preview(payload)
+        _write_run_json(harness.run_dir, "data/execution-result.json", payload)
     except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
         return _json_error("data_preview_error", str(exc))
     _write_stdout_json(checkpoint)
@@ -421,6 +421,23 @@ def _write_report_selection(argv: list[str]) -> int:
         checkpoint = harness.write_report_selection(payload)
     except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
         return _json_error("report_selection_error", str(exc))
+    _write_stdout_json(checkpoint)
+    return 0
+
+
+def _write_report_draft(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Write the report draft checkpoint after report selection.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--payload", required=True)
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        payload = _load_json_arg(args.payload)
+        checkpoint = harness.write_report_draft(payload)
+        _write_run_json(harness.run_dir, "reports/report-draft.json", payload)
+    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("report_draft_error", str(exc))
     _write_stdout_json(checkpoint)
     return 0
 
@@ -464,6 +481,7 @@ COMMANDS = {
     "write-data-preview": _write_data_preview,
     "write-report-selection": _write_report_selection,
     "scaffold-report": _scaffold_report,
+    "write-report-draft": _write_report_draft,
     "write-final-review": _write_final_review,
     "can-deliver": _can_deliver,
     "serve-checkpoint": _serve_checkpoint,

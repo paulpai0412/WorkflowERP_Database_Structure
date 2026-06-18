@@ -25,8 +25,10 @@ Typical command sequence:
 6. `write-report-selection`
 7. `confirm --checkpoint report_selection --action 產生報告`
 8. `scaffold-report`
-9. `write-final-review`
-10. `can-deliver`
+9. `write-report-draft`
+10. `confirm --checkpoint report_draft --action 接受`
+11. `write-final-review`
+12. `can-deliver`
 
 `serve-checkpoint` starts the local companion server for user confirmations. The
 browser never connects to the database, executes SQL, or stores credentials.
