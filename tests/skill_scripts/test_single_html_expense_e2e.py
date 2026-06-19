@@ -62,6 +62,9 @@ def test_single_html_expense_analysis_e2e(tmp_path: Path):
     assert Path(result["html_path"]).exists()
     html = Path(result["html_path"]).read_text(encoding="utf-8")
     assert "__WFERP_REPORT_PACKAGE__" in html
+    assert "費用分析管理報表" in html
+    assert "圖表證明" in html
+    assert "<table" in html
     assert "https://" not in html
     assert expense["row_count"] == 6
     assert expense["columns"] == EXPECTED_COLUMNS

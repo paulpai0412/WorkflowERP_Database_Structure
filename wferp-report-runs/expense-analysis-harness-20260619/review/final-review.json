@@ -1,0 +1,125 @@
+{
+  "validator_results": [
+    {
+      "role": "source_requirement_reviewer",
+      "status": "pass",
+      "evidence": [
+        {
+          "artifact": "expense-analysis-harness",
+          "status": "pass"
+        }
+      ],
+      "findings": [],
+      "requiredFixes": [],
+      "residualRisks": []
+    },
+    {
+      "role": "excel_formula_reviewer",
+      "status": "pass",
+      "evidence": [
+        {
+          "artifact": "expense-analysis-harness",
+          "status": "pass"
+        }
+      ],
+      "findings": [],
+      "requiredFixes": [],
+      "residualRisks": []
+    },
+    {
+      "role": "sql_safety_reviewer",
+      "status": "pass",
+      "evidence": [
+        {
+          "artifact": "expense-analysis-harness",
+          "status": "pass"
+        }
+      ],
+      "findings": [],
+      "requiredFixes": [],
+      "residualRisks": []
+    },
+    {
+      "role": "schema_relationship_reviewer",
+      "status": "pass",
+      "evidence": [
+        {
+          "artifact": "expense-analysis-harness",
+          "status": "pass"
+        }
+      ],
+      "findings": [],
+      "requiredFixes": [],
+      "residualRisks": []
+    },
+    {
+      "role": "data_preview_reviewer",
+      "status": "pass",
+      "evidence": [
+        {
+          "artifact": "expense-analysis-harness",
+          "status": "pass",
+          "metrics": {
+            "row_count": 6,
+            "column_count": 7
+          }
+        }
+      ],
+      "findings": [],
+      "requiredFixes": [],
+      "residualRisks": []
+    },
+    {
+      "role": "report_content_reviewer",
+      "status": "pass",
+      "evidence": [
+        {
+          "artifact": "expense-analysis-harness",
+          "status": "pass"
+        }
+      ],
+      "findings": [],
+      "requiredFixes": [],
+      "residualRisks": []
+    },
+    {
+      "role": "visual_taste_reviewer",
+      "status": "pass",
+      "evidence": [
+        {
+          "artifact": "expense-analysis-harness",
+          "status": "pass"
+        }
+      ],
+      "findings": [],
+      "requiredFixes": [],
+      "residualRisks": []
+    },
+    {
+      "role": "data_visualization_reviewer",
+      "status": "pass",
+      "evidence": [
+        {
+          "artifact": "expense-analysis-harness",
+          "status": "pass"
+        }
+      ],
+      "findings": [],
+      "requiredFixes": [],
+      "residualRisks": []
+    },
+    {
+      "role": "react_technical_reviewer",
+      "status": "pass",
+      "evidence": [
+        {
+          "artifact": "expense-analysis-harness",
+          "status": "pass"
+        }
+      ],
+      "findings": [],
+      "requiredFixes": [],
+      "residualRisks": []
+    }
+  ]
+}

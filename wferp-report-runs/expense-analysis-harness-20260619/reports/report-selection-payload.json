@@ -1,0 +1,132 @@
+{
+  "kind": "checkpoint",
+  "checkpointId": "expense-analysis-harness-20260619-report-selection",
+  "title": "費用分析報表格式選擇",
+  "step": "report_selection",
+  "requirementSummary": "選擇 financial-control 報告格式，包含圖表、表格、分析與建議。",
+  "dataPreview": {
+    "rowCount": 6,
+    "columns": [
+      "department_code",
+      "department_name",
+      "expense_subject",
+      "amount",
+      "budget_amount",
+      "variance_amount",
+      "expense_ratio"
+    ],
+    "rows": [
+      {
+        "department_code": "ADM",
+        "department_name": "行政部",
+        "expense_subject": "文具",
+        "amount": 10000,
+        "budget_amount": 8000,
+        "variance_amount": 2000,
+        "expense_ratio": 0.1
+      },
+      {
+        "department_code": "ADM",
+        "department_name": "行政部",
+        "expense_subject": "旅費",
+        "amount": 35000,
+        "budget_amount": 30000,
+        "variance_amount": 5000,
+        "expense_ratio": 0.35
+      },
+      {
+        "department_code": "RND",
+        "department_name": "研發部",
+        "expense_subject": "軟體訂閱",
+        "amount": 25000,
+        "budget_amount": 22000,
+        "variance_amount": 3000,
+        "expense_ratio": 0.25
+      },
+      {
+        "department_code": "RND",
+        "department_name": "研發部",
+        "expense_subject": "雲端服務",
+        "amount": 30000,
+        "budget_amount": 25000,
+        "variance_amount": 5000,
+        "expense_ratio": 0.3
+      },
+      {
+        "department_code": "SAL",
+        "department_name": "業務部",
+        "expense_subject": "交際費",
+        "amount": 12000,
+        "budget_amount": 10000,
+        "variance_amount": 2000,
+        "expense_ratio": 0.12
+      },
+      {
+        "department_code": "SAL",
+        "department_name": "業務部",
+        "expense_subject": "廣告費",
+        "amount": 8000,
+        "budget_amount": 5000,
+        "variance_amount": 3000,
+        "expense_ratio": 0.08
+      }
+    ]
+  },
+  "aggregateChecks": [
+    {
+      "label": "費用筆數",
+      "expected": 6,
+      "actual": 6,
+      "status": "pass"
+    },
+    {
+      "label": "總金額",
+      "expected": 120000,
+      "actual": 120000,
+      "status": "pass"
+    },
+    {
+      "label": "總預算",
+      "expected": 100000,
+      "actual": 100000,
+      "status": "pass"
+    },
+    {
+      "label": "差異金額",
+      "expected": 20000,
+      "actual": 20000,
+      "status": "pass"
+    }
+  ],
+  "reportTypes": [
+    {
+      "id": "financial-control",
+      "label": "財務控管",
+      "description": "呈現費用、預算差異與例外追蹤。"
+    },
+    {
+      "id": "executive-summary",
+      "label": "主管摘要",
+      "description": "適合高階快速檢視。"
+    },
+    {
+      "id": "trend-briefing",
+      "label": "趨勢簡報",
+      "description": "適合期間比較與趨勢。"
+    }
+  ],
+  "exceptions": [
+    "排除 2025 費用 1 筆；排除 2026 非費用科目 1 筆。"
+  ],
+  "validatorEvidence": [
+    {
+      "validator": "report_content_reviewer",
+      "status": "pass",
+      "message": "報告選型符合費用分析目標。"
+    }
+  ],
+  "actions": [
+    "產生報告",
+    "修改格式"
+  ]
+}

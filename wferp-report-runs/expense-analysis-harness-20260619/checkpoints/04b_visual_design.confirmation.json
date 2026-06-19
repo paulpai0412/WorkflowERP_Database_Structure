@@ -1,0 +1,7 @@
+{
+  "checkpoint": "visual_design",
+  "action": "確認視覺設計",
+  "comment": "視覺 checkpoint 使用真 labels 與 aggregates。",
+  "selectedOptions": {},
+  "created_at": "2026-06-18T23:47:04.984290+00:00"
+}

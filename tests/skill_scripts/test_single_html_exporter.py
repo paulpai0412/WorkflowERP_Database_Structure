@@ -44,6 +44,13 @@ def test_export_single_html_report_writes_delivery_manifest_and_evidence(tmp_pat
     html = html_path.read_text(encoding="utf-8")
     assert html.startswith("<!doctype html>")
     assert "__WFERP_REPORT_PACKAGE__" in html
+    assert "管理摘要" in html
+    assert "管理分析" in html
+    assert "建議事項" in html
+    assert "<table" in html
+    assert "chart-svg" in html
+    assert "department" in html
+    assert "amount" in html
     assert "<script src=" not in html.lower()
     assert "<link rel=" not in html.lower()
     assert "fetch(" not in html

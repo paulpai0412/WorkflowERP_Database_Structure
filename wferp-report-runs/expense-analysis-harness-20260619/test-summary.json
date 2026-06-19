@@ -1,0 +1,27 @@
+{
+  "run_id": "expense-analysis-harness-20260619",
+  "run_dir": "/home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619",
+  "prompt": "費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。",
+  "sqlite_e2e": {
+    "real_sql_execution": true,
+    "row_count": 6,
+    "total_amount": 120000,
+    "total_budget": 100000,
+    "variance_amount": 20000,
+    "max_expense_ratio": 0.35,
+    "excluded_rows": {
+      "non_2026": 1,
+      "non_expense_account": 1
+    }
+  },
+  "single_html_validation": {
+    "valid": true,
+    "errors": [],
+    "network_references": []
+  },
+  "delivery_files": {
+    "single_html": "/home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619/delivery/report.html",
+    "manifest": "/home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619/delivery/delivery-manifest.json",
+    "evidence": "/home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619/delivery/evidence"
+  }
+}

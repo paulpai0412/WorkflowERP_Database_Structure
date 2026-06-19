@@ -1,0 +1,9 @@
+{
+  "catalog_guardrail": "financial-control",
+  "html_path": "/home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619/delivery/report.html",
+  "html_sha256": "9bb4d82b522c691cd4f83f515ae015197dd5328d4dcf381cf7121be3b5d11c65",
+  "package_sha256": "43cbe62382ef32cca00caffdeada43712dba4a28a4ceaf46df68246eb47f856a",
+  "row_count": 6,
+  "style_fingerprint": "4e9b070aadd45a851c859992bb6f17c7379f04dedaf09e16c23f8384e5607af7",
+  "validator_status": "pass"
+}

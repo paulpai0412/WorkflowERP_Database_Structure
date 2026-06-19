@@ -1,0 +1,120 @@
+{
+  "checkpoint": "visual_design",
+  "title": "視覺設計確認",
+  "actions": [
+    "確認視覺設計",
+    "調整視覺設計"
+  ],
+  "payload": {
+    "title": "費用分析視覺設計確認",
+    "catalog_guardrail": "financial-control",
+    "layout": {
+      "mode": "kpi-first-dashboard",
+      "sections": [
+        "executive-summary",
+        "kpi-overview",
+        "expense-trend",
+        "exception-review",
+        "data-table"
+      ],
+      "density": "analysis-first"
+    },
+    "kpis": [
+      {
+        "label": "total_amount",
+        "value": 120000
+      },
+      {
+        "label": "total_budget",
+        "value": 100000
+      },
+      {
+        "label": "variance_amount",
+        "value": 20000
+      },
+      {
+        "label": "max_expense_ratio",
+        "value": 0.35
+      }
+    ],
+    "charts": [
+      {
+        "id": "expense-budget-variance",
+        "type": "combo",
+        "purpose": "Compare actual expense, budget, and variance in one control view."
+      },
+      {
+        "id": "expense-composition",
+        "type": "stacked-bar",
+        "purpose": "Show expense composition across departments or categories."
+      },
+      {
+        "id": "expense-driver-ranking",
+        "type": "bar",
+        "purpose": "Rank the largest expense drivers for exception review."
+      }
+    ],
+    "tables": [
+      {
+        "id": "expense-detail-table",
+        "type": "data-table",
+        "columns": [
+          "department_code",
+          "department_name",
+          "expense_subject",
+          "amount",
+          "budget_amount",
+          "variance_amount",
+          "expense_ratio"
+        ],
+        "features": [
+          "filter",
+          "sort",
+          "drilldown",
+          "column_visibility"
+        ],
+        "row_count": 6
+      }
+    ],
+    "interactions": {
+      "filters": [
+        "department_code",
+        "department_name",
+        "expense_subject",
+        "amount",
+        "budget_amount",
+        "variance_amount",
+        "expense_ratio"
+      ],
+      "drilldowns": [
+        "department",
+        "category",
+        "document"
+      ]
+    },
+    "visual_direction": {
+      "tone": "quiet financial operations dashboard",
+      "emphasis": [
+        "variance",
+        "outliers",
+        "approval-ready summary"
+      ]
+    },
+    "data_profile": {
+      "row_count": 6,
+      "columns": [
+        "department_code",
+        "department_name",
+        "expense_subject",
+        "amount",
+        "budget_amount",
+        "variance_amount",
+        "expense_ratio"
+      ],
+      "embedded_mode": "full_rows",
+      "embedded_rows": 6,
+      "full_rows_in_evidence_packet": false
+    }
+  },
+  "created_at": "2026-06-18T23:47:04.480122+00:00"
+}

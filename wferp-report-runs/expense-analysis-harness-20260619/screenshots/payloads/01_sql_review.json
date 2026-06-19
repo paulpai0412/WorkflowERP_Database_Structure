@@ -1,0 +1,138 @@
+{
+  "kind": "checkpoint",
+  "checkpointId": "expense-analysis-harness-20260619-sql-review",
+  "title": "SQL 查詢確認",
+  "step": "sql_review",
+  "requirementSummary": "確認 2026 年費用分析 SQL，只查 expense account 並排除非 2026 與非費用科目。",
+  "fieldFormulaReview": {
+    "fields": [
+      {
+        "label": "部門代號",
+        "source": "EXPENSE_ANALYSIS_FIXTURE.department_code",
+        "confirmation": "由費用測試資料表輸出。"
+      },
+      {
+        "label": "部門名稱",
+        "source": "EXPENSE_ANALYSIS_FIXTURE.department_name",
+        "confirmation": "用於管理報表分組與圖表標籤。"
+      },
+      {
+        "label": "費用科目",
+        "source": "EXPENSE_ANALYSIS_FIXTURE.expense_subject",
+        "confirmation": "列示費用明細科目。"
+      },
+      {
+        "label": "金額",
+        "source": "EXPENSE_ANALYSIS_FIXTURE.amount",
+        "confirmation": "費用實際發生金額。"
+      },
+      {
+        "label": "預算金額",
+        "source": "EXPENSE_ANALYSIS_FIXTURE.budget_amount",
+        "confirmation": "用於差異分析。"
+      }
+    ],
+    "formulas": [
+      {
+        "label": "差異金額",
+        "expression": "amount - budget_amount",
+        "confirmation": "正數代表超支。"
+      },
+      {
+        "label": "費用占比",
+        "expression": "amount / 2026 expense budget total",
+        "confirmation": "以總預算 100000 作分母，最大占比預期 0.35。"
+      }
+    ]
+  },
+  "sqlReview": {
+    "title": "費用分析 SQL",
+    "sql": "SELECT\n    [department_code] AS department_code,\n    [department_name] AS department_name,\n    [expense_subject] AS expense_subject,\n    [amount] AS amount,\n    [budget_amount] AS budget_amount,\n    [amount] - [budget_amount] AS variance_amount,\n    CAST([amount] AS REAL) / NULLIF((\n        SELECT SUM([budget_amount])\n        FROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\n        WHERE [year] = 2026 AND [account_type] = 'expense'\n    ), 0) AS expense_ratio\nFROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\nWHERE [year] = 2026 AND [account_type] = 'expense'\nORDER BY [department_code], [expense_subject]",
+    "validation": {
+      "readonly": true,
+      "blockedKeywords": [],
+      "executionStatus": "not_executed"
+    },
+    "schemaMapping": [
+      {
+        "field": "department_code",
+        "table": "EXPENSE_ANALYSIS_FIXTURE",
+        "column": "department_code",
+        "note": "SQLite fixture / WFERP-style SQL test column"
+      },
+      {
+        "field": "department_name",
+        "table": "EXPENSE_ANALYSIS_FIXTURE",
+        "column": "department_name",
+        "note": "SQLite fixture / WFERP-style SQL test column"
+      },
+      {
+        "field": "expense_subject",
+        "table": "EXPENSE_ANALYSIS_FIXTURE",
+        "column": "expense_subject",
+        "note": "SQLite fixture / WFERP-style SQL test column"
+      },
+      {
+        "field": "amount",
+        "table": "EXPENSE_ANALYSIS_FIXTURE",
+        "column": "amount",
+        "note": "SQLite fixture / WFERP-style SQL test column"
+      },
+      {
+        "field": "budget_amount",
+        "table": "EXPENSE_ANALYSIS_FIXTURE",
+        "column": "budget_amount",
+        "note": "SQLite fixture / WFERP-style SQL test column"
+      },
+      {
+        "field": "variance_amount",
+        "table": "EXPENSE_ANALYSIS_FIXTURE",
+        "column": "variance_amount",
+        "note": "SQLite fixture / WFERP-style SQL test column"
+      },
+      {
+        "field": "expense_ratio",
+        "table": "EXPENSE_ANALYSIS_FIXTURE",
+        "column": "expense_ratio",
+        "note": "SQLite fixture / WFERP-style SQL test column"
+      }
+    ],
+    "relationshipPath": [
+      "單表費用分析測試資料，無 join；WHERE year=2026 AND account_type=expense"
+    ],
+    "safetyChecks": [
+      "read-only SELECT",
+      "no blocked write keywords",
+      "single statement"
+    ],
+    "executionEnvironment": "DB_ENV=test, SQLite local fixture"
+  },
+  "dataPreview": {
+    "rowCount": 0,
+    "columns": [
+      "department_code",
+      "department_name",
+      "expense_subject",
+      "amount",
+      "budget_amount",
+      "variance_amount",
+      "expense_ratio"
+    ],
+    "rows": []
+  },
+  "aggregateChecks": [],
+  "exceptions": [
+    "SQL 尚未執行，需確認後才查 DB。"
+  ],
+  "validatorEvidence": [
+    {
+      "validator": "sql_safety",
+      "status": "pass",
+      "message": "唯讀 SQL 驗證通過。"
+    }
+  ],
+  "actions": [
+    "同意查詢",
+    "調整需求"
+  ]
+}

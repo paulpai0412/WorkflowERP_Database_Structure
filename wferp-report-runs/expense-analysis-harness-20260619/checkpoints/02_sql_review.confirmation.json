@@ -1,0 +1,7 @@
+{
+  "checkpoint": "sql_review",
+  "action": "同意查詢",
+  "comment": "SQL 安全檢查通過，允許在本地 SQLite 測試 DB 執行。",
+  "selectedOptions": {},
+  "created_at": "2026-06-18T23:47:00.896208+00:00"
+}

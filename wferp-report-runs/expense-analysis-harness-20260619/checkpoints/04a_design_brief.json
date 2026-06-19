@@ -1,0 +1,95 @@
+{
+  "checkpoint": "design_brief",
+  "title": "動態設計確認",
+  "actions": [
+    "確認設計",
+    "調整設計"
+  ],
+  "payload": {
+    "schema_version": "wferp.design-brief.v1",
+    "report_intent": {
+      "prompt": "費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。",
+      "report_type": "financial-control",
+      "primary_goal": "Expose financial-control exceptions and decision-ready expense signals."
+    },
+    "catalog_guardrail": "financial-control",
+    "target_audience": {
+      "role": "finance controller",
+      "needs": [
+        "budget variance review",
+        "expense concentration review",
+        "audit follow-up"
+      ]
+    },
+    "layout_recipe": {
+      "mode": "kpi-first-dashboard",
+      "sections": [
+        "executive-summary",
+        "kpi-overview",
+        "expense-trend",
+        "exception-review",
+        "data-table"
+      ],
+      "density": "analysis-first"
+    },
+    "chart_recipe": [
+      {
+        "id": "expense-budget-variance",
+        "type": "combo",
+        "purpose": "Compare actual expense, budget, and variance in one control view."
+      },
+      {
+        "id": "expense-composition",
+        "type": "stacked-bar",
+        "purpose": "Show expense composition across departments or categories."
+      },
+      {
+        "id": "expense-driver-ranking",
+        "type": "bar",
+        "purpose": "Rank the largest expense drivers for exception review."
+      }
+    ],
+    "table_recipe": [
+      {
+        "id": "expense-detail-table",
+        "type": "data-table",
+        "features": [
+          "filter",
+          "sort",
+          "drilldown",
+          "column_visibility"
+        ],
+        "row_count": 6
+      }
+    ],
+    "interaction_recipe": {
+      "filters": [
+        "department_code",
+        "department_name",
+        "expense_subject",
+        "amount",
+        "budget_amount",
+        "variance_amount",
+        "expense_ratio"
+      ],
+      "drilldowns": [
+        "department",
+        "category",
+        "document"
+      ]
+    },
+    "visual_direction": {
+      "tone": "quiet financial operations dashboard",
+      "emphasis": [
+        "variance",
+        "outliers",
+        "approval-ready summary"
+      ]
+    },
+    "embedded_data_policy": {
+      "mode": "smart-tiered",
+      "summary_threshold_rows": 5000
+    }
+  },
+  "created_at": "2026-06-18T23:47:03.481659+00:00"
+}
