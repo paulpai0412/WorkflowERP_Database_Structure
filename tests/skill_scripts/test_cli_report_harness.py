@@ -42,6 +42,23 @@ def _passing_final_review_payload() -> dict[str, object]:
                     "metrics": {"row_count": 1, "column_count": 2},
                 }
             ]
+        if role == "excel_classification_reviewer":
+            evidence = [
+                {"type": "file", "path": "data/field-classification.json"},
+                {"type": "metric", "name": "classified_columns", "value": 4},
+                {"type": "metric", "name": "db_field_count", "value": 2},
+                {"type": "metric", "name": "formula_field_count", "value": 1},
+                {"type": "metric", "name": "lookup_field_count", "value": 1},
+                {"type": "metric", "name": "manual_only_count", "value": 0},
+                {"type": "inspection", "name": "metadata_readability", "status": "pass"},
+            ]
+        if role == "sqlite_enrichment_reviewer":
+            evidence = [
+                {"type": "file", "path": "sqlite/wferp_run_sqlite_manifest.json"},
+                {"type": "metric", "name": "raw_row_count", "value": 1},
+                {"type": "metric", "name": "enriched_row_count", "value": 1},
+                {"type": "metric", "name": "ignored_lookup_rows", "value": 0},
+            ]
         validator_results.append(
             {
                 "role": role,

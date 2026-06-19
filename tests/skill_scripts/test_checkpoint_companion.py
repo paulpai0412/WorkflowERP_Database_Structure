@@ -22,6 +22,23 @@ def _validator_result(role: str, status: str = "pass") -> dict[str, object]:
                 "metrics": {"row_count": 10, "column_count": 4},
             }
         ]
+    if role == "excel_classification_reviewer":
+        evidence = [
+            {"type": "file", "path": "data/field-classification.json"},
+            {"type": "metric", "name": "classified_columns", "value": 10},
+            {"type": "metric", "name": "db_field_count", "value": 6},
+            {"type": "metric", "name": "formula_field_count", "value": 2},
+            {"type": "metric", "name": "lookup_field_count", "value": 1},
+            {"type": "metric", "name": "manual_only_count", "value": 1},
+            {"type": "inspection", "name": "metadata_readability", "status": "pass"},
+        ]
+    if role == "sqlite_enrichment_reviewer":
+        evidence = [
+            {"type": "file", "path": "sqlite/wferp_run_sqlite_manifest.json"},
+            {"type": "metric", "name": "raw_row_count", "value": 10},
+            {"type": "metric", "name": "enriched_row_count", "value": 10},
+            {"type": "metric", "name": "ignored_lookup_rows", "value": 0},
+        ]
     return {
         "role": role,
         "status": status,
