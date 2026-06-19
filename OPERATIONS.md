@@ -126,22 +126,42 @@ Use focused tests while iterating and the full suite before finalizing tooling c
 Create a report run from a prompt:
 
 ```bash
-python3 -m skill_scripts.cli_report_harness --prompt "請產出費用分析" --run-dir wferp-report-runs/demo
+python3 -m skill_scripts.cli_report_harness create-run \
+  --run-root wferp-report-runs \
+  --run-id demo \
+  --prompt "請產出費用分析"
 ```
 
 Parse a real Excel requirement workbook and write the Excel confirmation checkpoint:
 
 ```bash
-python3 -m skill_scripts.cli_report_harness --prompt "請產出費用分析" --input-file /path/to/需求.xlsx --run-dir wferp-report-runs/demo --checkpoint excel
+python3 -m skill_scripts.cli_report_harness classify-workbook \
+  --run-dir wferp-report-runs/demo \
+  --input-file /path/to/需求.xlsx
+python3 -m skill_scripts.cli_report_harness serve-checkpoint \
+  --run-dir wferp-report-runs/demo \
+  --host 127.0.0.1 \
+  --port 0
+python3 -m skill_scripts.cli_report_harness wait-confirmation \
+  --run-dir wferp-report-runs/demo \
+  --checkpoint field_formula_classification
 ```
 
 Create the SQL review checkpoint without executing the database:
 
 ```bash
-python3 -m skill_scripts.cli_report_harness --prompt "查詢採購單前 20 筆" --run-dir wferp-report-runs/demo --checkpoint sql --mode rule
+python3 -m skill_scripts.cli_generate_select \
+  --prompt "查詢採購單前 20 筆" \
+  --mode llm-first
+python3 -m skill_scripts.cli_report_harness write-sql-review \
+  --run-dir wferp-report-runs/demo \
+  --sql "SELECT ..."
 ```
 
-Execution validation remains gated. `--validate-execution` does not execute without `--confirm-sql`, and non-test DB environments require `--allow-non-test-db-execution`.
+Execution validation remains gated. Do not execute DB queries until `sql_review`
+has user confirmation and required validator evidence. Non-test DB environments
+still require explicit allow evidence such as `--allow-non-test-db-execution`
+where supported.
 
 ## 7) Run the expense-analysis E2E
 

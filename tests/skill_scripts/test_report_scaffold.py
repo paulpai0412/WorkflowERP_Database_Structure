@@ -8,7 +8,11 @@ from pathlib import Path
 
 import pytest
 
-from skill_scripts.report_scaffold import scaffold_report_workspace, validate_report_protocol
+from skill_scripts.report_scaffold import (
+    scaffold_report_workspace,
+    validate_report_protocol,
+    write_generated_report_section,
+)
 
 
 def create_minimal_template(template_dir: Path) -> None:
@@ -243,3 +247,139 @@ def test_cli_scaffold_report_returns_json_error_for_expected_scaffold_errors(tmp
     assert error["status"] == "error"
     assert error["code"] == "scaffold_error"
     assert "template" in error["message"].lower()
+
+
+def test_write_generated_report_section_replaces_single_section_and_preserves_protocol(tmp_path: Path):
+    run_dir = tmp_path / "run-generated-section"
+    template_dir = tmp_path / "template"
+    create_minimal_template(template_dir)
+    scaffold_report_workspace(
+        run_dir=run_dir,
+        template_dir=template_dir,
+        sections=["executive-summary", "data-table"],
+        payload={"approved_query_result": {"rows": [{"amount": 1200}]}},
+    )
+    code = """
+import React from "react";
+
+export function ExecutiveSummary01Section() {
+  const dataRefs = ["approved-query-result.rows.amount"];
+  return (
+    <section data-section="executive-summary" data-refs={dataRefs.join(",")}>
+      <h2>費用摘要</h2>
+      <p>本段由 LLM 依已確認資料產生。</p>
+    </section>
+  );
+}
+"""
+
+    result = write_generated_report_section(
+        run_dir=run_dir,
+        section_id="01-executive-summary",
+        component_name="ExecutiveSummary01Section",
+        code=code,
+        mode="repair",
+    )
+
+    section_path = Path(result["path"])
+    assert section_path.name == "01-executive-summary.tsx"
+    assert "本段由 LLM" in section_path.read_text(encoding="utf-8")
+    assert result["status"] == "section_written"
+    validate_report_protocol(run_dir)
+
+
+def test_write_generated_report_section_rejects_network_env_and_missing_data_refs(tmp_path: Path):
+    run_dir = tmp_path / "run-unsafe-section"
+    template_dir = tmp_path / "template"
+    create_minimal_template(template_dir)
+    scaffold_report_workspace(
+        run_dir=run_dir,
+        template_dir=template_dir,
+        sections=["executive-summary"],
+        payload={"approved_query_result": {"rows": []}},
+    )
+    unsafe_code = """
+import React from "react";
+
+export function ExecutiveSummary01Section() {
+  fetch("https://example.com/report");
+  return <section data-section="executive-summary"><h2>Bad</h2></section>;
+}
+"""
+
+    with pytest.raises(ValueError, match="network"):
+        write_generated_report_section(
+            run_dir=run_dir,
+            section_id="01-executive-summary",
+            component_name="ExecutiveSummary01Section",
+            code=unsafe_code,
+            mode="repair",
+        )
+
+
+def test_cli_generate_and_validate_report_section(tmp_path: Path):
+    run_dir = tmp_path / "run-cli-generated-section"
+    template_dir = tmp_path / "template"
+    create_minimal_template(template_dir)
+    scaffold_report_workspace(
+        run_dir=run_dir,
+        template_dir=template_dir,
+        sections=["executive-summary"],
+        payload={"approved_query_result": {"rows": [{"amount": 1200}]}},
+    )
+    code_file = tmp_path / "section.tsx"
+    code_file.write_text(
+        """
+import React from "react";
+
+export function ExecutiveSummary01Section() {
+  const dataRefs = ["approved-query-result.rows.amount"];
+  return <section data-section="executive-summary" data-refs={dataRefs.join(",")}><h2>費用摘要</h2></section>;
+}
+""",
+        encoding="utf-8",
+    )
+
+    generated = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "skill_scripts.cli_report_harness",
+            "generate-report-section",
+            "--run-dir",
+            str(run_dir),
+            "--section-id",
+            "01-executive-summary",
+            "--component-name",
+            "ExecutiveSummary01Section",
+            "--code-file",
+            str(code_file),
+        ],
+        cwd=Path.cwd(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert generated.returncode == 0, generated.stderr
+    assert json.loads(generated.stdout)["status"] == "section_written"
+
+    validated = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "skill_scripts.cli_report_harness",
+            "validate-report-section",
+            "--run-dir",
+            str(run_dir),
+            "--section-id",
+            "01-executive-summary",
+        ],
+        cwd=Path.cwd(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert validated.returncode == 0, validated.stderr
+    assert json.loads(validated.stdout)["status"] == "section_valid"

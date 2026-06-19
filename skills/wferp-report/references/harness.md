@@ -30,7 +30,7 @@
 | 6 | Data Preview Checkpoint | `data/enriched-preview.json`、`checkpoints/03_data_preview.json` | 必須 user confirmation |
 | 7 | Report Selection Checkpoint | `plan/selected-report-design.json`、`checkpoints/04_report_selection.json` | 必須 user confirmation |
 | 8 | Final Report Scaffold | `report/payload/report-payload.json`、`report/scaffold/` | payload/schema gate |
-| 9 | Section Build | report sections、chart/table/component payload | section validator gate |
+| 9 | Section Build | LLM-generated `report/sections/*.tsx`、chart/table/component payload | section validator gate |
 | 10 | Final Review | `review/final-review.json`、validators | validators pass / accepted warning |
 | 11 | Repair | `review/repair-log.md` | 重跑受影響 validators |
 | 12 | Delivery | `report/delivery/report.html`、delivery manifest | final user confirmation |
@@ -100,6 +100,16 @@ python3 -m skill_scripts.cli_report_harness write-report-selection \
 python3 -m skill_scripts.cli_report_harness scaffold-report \
   --run-dir wferp-report-runs/run-001
 
+python3 -m skill_scripts.cli_report_harness generate-report-section \
+  --run-dir wferp-report-runs/run-001 \
+  --section-id 01-executive-summary \
+  --component-name ExecutiveSummary01Section \
+  --code-file /tmp/section.tsx
+
+python3 -m skill_scripts.cli_report_harness validate-report-section \
+  --run-dir wferp-report-runs/run-001 \
+  --section-id 01-executive-summary
+
 python3 -m skill_scripts.cli_report_harness write-report-draft \
   --run-dir wferp-report-runs/run-001 \
   --payload report-draft.json
@@ -135,6 +145,8 @@ python3 -m skill_scripts.cli_report_harness wait-confirmation \
 - `write-enriched-preview` 必須呈現 enrichment 後欄位、formula status、lookup hit/miss、row count 與 aggregate checks。
 - `write-report-selection` 之前必須有 `db_execution_reviewer`、`data_preview_reviewer` 與必要的 `sqlite_enrichment_reviewer` evidence。
 - `scaffold-report` 必須在 Report Selection Checkpoint 已確認後執行。
+- `generate-report-section` / `repair-report-section` 只允許寫入單一 run-scoped `report/sections/*.tsx`，不得寫其他 repo 或系統檔案。
+- `validate-report-section` 必須在每個 LLM-generated section 寫入或修復後執行，並確認 section export、data refs、safe imports、無 network/env/DB/SQL side effect、與 `Report.tsx` linkage。
 - `write-report-draft` 必須使用確認後的 report design、chart plan、layout plan 與 data package。
 - `write-final-review` 必須在 draft 可開啟後執行，且 `report_content_reviewer`、`visual_taste_reviewer`、`react_technical_reviewer`、`delivery_reviewer` 都已輸出 evidence。
 - `can-deliver` 只有在 required validators 都 pass，或 final checkpoint 明確接受相符 residual risks 時才允許 delivery。
@@ -148,4 +160,3 @@ python3 -m skill_scripts.cli_report_harness wait-confirmation \
 - 任一 reviewer `fail` 或 `blocked`：停止該硬 gate，主 agent 依 `requiredFixes` 做最小 repair slice，修復後只重跑該 reviewer 與受影響下游 reviewer。
 - 任一 reviewer `warning`：可進入可逆下游工作，但 final delivery 前必須在 final checkpoint 由使用者接受 role-prefixed residual risk。
 - 可並行工作可先做，但不能越過依賴 gate。例如 SQL reviewer 執行中可準備 report plan 摘要，但不可執行 DB query。
-

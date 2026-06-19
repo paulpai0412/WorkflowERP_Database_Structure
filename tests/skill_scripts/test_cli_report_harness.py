@@ -221,6 +221,15 @@ def test_cli_report_harness_help_is_available():
 
     assert result.returncode == 0
     assert "Create and advance WFERP report harness runs" in result.stdout
+    assert "Primary subcommands:" in result.stdout
+    assert "create-run" in result.stdout
+    assert "classify-workbook" in result.stdout
+    assert "generate-report-section" in result.stdout
+    assert "repair-report-section" in result.stdout
+    assert "validate-report-section" in result.stdout
+    assert "wait-confirmation" in result.stdout
+    assert "export-single-html" in result.stdout
+    assert "Legacy compatibility options" in result.stdout
 
 
 def test_cli_export_single_html_writes_delivery_output(tmp_path: Path):

@@ -83,13 +83,25 @@ python3 -m skill_scripts.cli_generate_select --prompt "查詢採購單前 20 筆
 Create a report harness run from a prompt:
 
 ```bash
-python3 -m skill_scripts.cli_report_harness --prompt "請產出費用分析" --run-dir wferp-report-runs/demo
+python3 -m skill_scripts.cli_report_harness create-run \
+  --run-root wferp-report-runs \
+  --run-id demo \
+  --prompt "請產出費用分析"
 ```
 
 Create an Excel confirmation checkpoint from a real workbook:
 
 ```bash
-python3 -m skill_scripts.cli_report_harness --prompt "請產出費用分析" --input-file /path/to/需求.xlsx --run-dir wferp-report-runs/demo --checkpoint excel
+python3 -m skill_scripts.cli_report_harness classify-workbook \
+  --run-dir wferp-report-runs/demo \
+  --input-file /path/to/需求.xlsx
+python3 -m skill_scripts.cli_report_harness serve-checkpoint \
+  --run-dir wferp-report-runs/demo \
+  --host 127.0.0.1 \
+  --port 0
+python3 -m skill_scripts.cli_report_harness wait-confirmation \
+  --run-dir wferp-report-runs/demo \
+  --checkpoint field_formula_classification
 ```
 
 ## 6) Expense-analysis E2E fixtures
