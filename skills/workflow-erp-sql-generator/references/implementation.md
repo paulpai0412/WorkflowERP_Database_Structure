@@ -35,7 +35,7 @@ Current recorded baseline from conversation:
 Primary arguments:
 
 - `--prompt`, `--source`, `--mode`
-- `--llm-provider` (`opencode`, `mock`, `openai-compatible`, `none`)
+- `--llm-provider` (`codex` default, `mock`, `openai-compatible`, `opencode`, `none`)
 - `--llm-model`, `--llm-timeout-sec`, `--llm-min-confidence`, `--llm-repair-attempts`
 - `--validate-execution`, `--required-columns`, `--min-rows`, `--max-rows`, `--aggregate-checks`
 - `--allow-non-test-db-execution` (unsafe override)

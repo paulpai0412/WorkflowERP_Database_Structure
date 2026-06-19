@@ -1,0 +1,18 @@
+{
+  "checkpoint_id": "phase_4_sql_review_example",
+  "phase": "phase_4_sql_review",
+  "version": 1,
+  "title": "SQL 審查 checkpoint",
+  "summary": "此查詢讀取 2026 年費用資料，彙總部門、科目與預算差異。",
+  "sql": "SELECT TOP 20 MK001, MK002, MK006 FROM WFERP_EXPENSE WHERE MK002 >= '20260101' ORDER BY MK002",
+  "requires_user_confirmation": true,
+  "confirmation_prompt": "請確認是否允許執行此唯讀 SELECT 查詢。",
+  "validator_evidence": [
+    {
+      "validator": "SQL 安全 validator",
+      "status": "pass",
+      "evidence_path": "evidence/sql-safety.json"
+    }
+  ],
+  "residual_risks": []
+}

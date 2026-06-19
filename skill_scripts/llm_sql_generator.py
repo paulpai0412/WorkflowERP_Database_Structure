@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import tempfile
 from typing import Any
 from urllib import error, request
 
@@ -133,6 +134,53 @@ def _call_opencode_local(model: str, prompt_text: str, timeout_sec: float) -> st
     return last_text
 
 
+def _call_codex_oauth_local(model: str, prompt_text: str, timeout_sec: float) -> str:
+    with tempfile.TemporaryDirectory(prefix="wferp-codex-llm-") as temp_dir:
+        output_path = os.path.join(temp_dir, "last-message.txt")
+        command = [
+            "codex",
+            "exec",
+            "--ephemeral",
+            "--sandbox",
+            "read-only",
+            "--ignore-rules",
+            "--output-last-message",
+            output_path,
+        ]
+        model_name = str(model or "").strip()
+        if model_name and model_name.lower() not in {"none", "default", "auto"}:
+            command.extend(["--model", model_name])
+        command.append(prompt_text)
+
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=timeout_sec,
+            )
+        except FileNotFoundError as exc:
+            raise RuntimeError("CODEX_CLI_NOT_INSTALLED") from exc
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError("LLM_TIMEOUT") from exc
+
+        if result.returncode != 0:
+            raise RuntimeError("LLM_PROVIDER_ERROR")
+
+        try:
+            last_message = open(output_path, encoding="utf-8").read().strip()
+        except OSError as exc:
+            raise RuntimeError("LLM_BAD_RESPONSE") from exc
+
+        if not last_message:
+            fallback = str(result.stdout or "").strip()
+            if fallback:
+                return fallback
+            raise RuntimeError("LLM_BAD_RESPONSE")
+        return last_message
+
+
 def call_llm(provider: str, model: str, prompt_text: str, timeout_sec: float = 30.0) -> str:
     provider_name = str(provider or "none").strip().lower()
 
@@ -158,5 +206,8 @@ def call_llm(provider: str, model: str, prompt_text: str, timeout_sec: float = 3
 
     if provider_name in {"opencode", "open-code", "local-opencode", "native"}:
         return _call_opencode_local(model=model, prompt_text=prompt_text, timeout_sec=timeout_sec)
+
+    if provider_name in {"codex", "codex-oauth", "codex_oauth", "local-codex"}:
+        return _call_codex_oauth_local(model=model, prompt_text=prompt_text, timeout_sec=timeout_sec)
 
     raise RuntimeError("LLM_PROVIDER_UNSUPPORTED")

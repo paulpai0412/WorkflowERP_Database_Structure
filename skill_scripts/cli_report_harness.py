@@ -14,6 +14,7 @@ from skill_scripts.dynamic_design_brief import build_design_brief
 from skill_scripts.dynamic_design_brief import validate_design_brief
 from skill_scripts.excel_intake import build_excel_confirmation_payload, parse_excel_requirement
 from skill_scripts.html_self_validator import validate_single_html_static
+from skill_scripts.llm_workbook_classifier import classify_workbook_with_llm
 from skill_scripts.sqlite_enrichment import run_enrichment
 from skill_scripts.sqlite_workspace import SQLiteRunWorkspace
 from skill_scripts.report_catalog import build_report_selection_payload
@@ -27,11 +28,10 @@ from skill_scripts.report_harness_state import write_confirmation
 from skill_scripts.report_scaffold import scaffold_report_workspace
 from skill_scripts.schema_loader import load_schema_bundle
 from skill_scripts.single_html_exporter import export_single_html_report
-from skill_scripts.sql_generator import generate_select_sql
+from skill_scripts.sql_router import RoutingOptions, route_generate_sql
 from skill_scripts.style_replay import detect_replay_adjustments
 from skill_scripts.visual_checkpoint import build_visual_checkpoint_payload
 from skill_scripts.visual_checkpoint import render_visual_checkpoint_html
-from skill_scripts.workbook_classifier import classify_workbook
 from skill_scripts.workbook_lookup_importer import import_lookup_sheet
 
 DEFAULT_REPORT_SECTIONS = [
@@ -364,12 +364,29 @@ def _parse_excel_inputs(harness: ReportHarness, input_files: list[Path]) -> dict
     return payload
 
 
-def _build_sql(prompt: str, mode: str) -> str:
-    if mode != "rule":
-        # The harness must remain deterministic until LLM orchestration has a user-visible review gate.
-        mode = "rule"
-    bundle = load_schema_bundle("_Source")
-    return generate_select_sql(prompt, bundle)
+def _build_prompt_sql(
+    prompt: str,
+    *,
+    source_dir: str | Path = "_Source",
+    llm_provider: str = "codex",
+    llm_model: str = "none",
+    llm_timeout_seconds: float = 30.0,
+    llm_min_confidence: float = 0.6,
+    llm_repair_attempts: int = 2,
+) -> tuple[str, dict[str, Any]]:
+    bundle = load_schema_bundle(str(source_dir))
+    return route_generate_sql(
+        prompt,
+        bundle,
+        RoutingOptions(
+            mode="llm-first",
+            llm_provider=llm_provider,
+            llm_model=llm_model,
+            llm_timeout_sec=llm_timeout_seconds,
+            min_confidence=llm_min_confidence,
+            llm_repair_attempts=llm_repair_attempts,
+        ),
+    )
 
 
 def _guard_execution(args: argparse.Namespace, harness: ReportHarness) -> bool:
@@ -450,20 +467,45 @@ def _write_sql_review(argv: list[str]) -> int:
     parser.add_argument("--run-dir", required=True)
     parser.add_argument("--sql", default="")
     parser.add_argument("--prompt", default="")
-    parser.add_argument("--mode", choices=["rule", "shadow", "llm-first"], default="rule")
     parser.add_argument("--validation", default="")
+    parser.add_argument("--source-dir", default="_Source")
+    parser.add_argument("--llm-provider", default=os.getenv("LLM_PROVIDER", "codex"))
+    parser.add_argument("--llm-model", default=os.getenv("LLM_MODEL", "none"))
+    parser.add_argument("--llm-timeout-seconds", type=float, default=30.0)
+    parser.add_argument("--llm-min-confidence", type=float, default=0.6)
+    parser.add_argument("--llm-repair-attempts", type=int, default=2)
     args = parser.parse_args(argv)
 
     try:
         harness = _open_harness(args.run_dir)
         state = harness.state()
         prompt = args.prompt or state.get("prompt", "")
-        sql = args.sql or _build_sql(prompt, args.mode)
-        validation = _load_json_arg_or_empty(args.validation) or {"status": "pending_user_confirmation"}
+        route_meta: dict[str, Any] = {"route": "manual_sql", "reason": "USER_PROVIDED_SQL"}
+        if args.sql:
+            sql = args.sql
+        else:
+            sql, route_meta = _build_prompt_sql(
+                prompt,
+                source_dir=args.source_dir,
+                llm_provider=args.llm_provider,
+                llm_model=args.llm_model,
+                llm_timeout_seconds=args.llm_timeout_seconds,
+                llm_min_confidence=args.llm_min_confidence,
+                llm_repair_attempts=args.llm_repair_attempts,
+            )
+        validation = _load_json_arg_or_empty(args.validation) or {
+            "status": "pending_user_confirmation",
+            "route": route_meta.get("route", ""),
+            "reason": route_meta.get("reason", ""),
+            "llm_provider": args.llm_provider if not args.sql else "",
+            "llm_model": args.llm_model if not args.sql else "",
+        }
+        if not args.sql and "candidate_sql" in route_meta:
+            validation["candidate_sql"] = route_meta["candidate_sql"]
         _write_run_json(harness.run_dir, "sql/query.sql.json", {"sql": sql, "validation": validation})
         (harness.run_dir / "sql" / "query.sql").write_text(sql + "\n", encoding="utf-8")
         checkpoint = harness.write_sql_review(sql, validation)
-    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
+    except (FileNotFoundError, ReportHarnessError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
         return _json_error("sql_review_error", str(exc))
     _write_stdout_json(checkpoint)
     return 0
@@ -563,18 +605,25 @@ def _classify_workbook(argv: list[str]) -> int:
     parser.add_argument("--input-file", required=True, type=Path)
     parser.add_argument("--primary-sheet", default="")
     parser.add_argument("--source-dir", default="_Source")
+    parser.add_argument("--llm-provider", default=os.getenv("LLM_PROVIDER", "codex"))
+    parser.add_argument("--llm-model", default=os.getenv("LLM_MODEL", "default"))
+    parser.add_argument("--llm-timeout-seconds", type=float, default=60.0)
     args = parser.parse_args(argv)
 
     try:
         harness = _open_harness(args.run_dir)
-        payload = classify_workbook(
+        payload = classify_workbook_with_llm(
             args.input_file,
             source_dir=args.source_dir,
             primary_sheet=args.primary_sheet,
+            user_prompt=str(harness.state().get("prompt") or ""),
+            llm_provider=args.llm_provider,
+            llm_model=args.llm_model,
+            timeout_sec=args.llm_timeout_seconds,
         )
         _write_run_json(harness.run_dir, "data/column-classification.json", payload)
         checkpoint = harness.write_field_formula_classification(payload)
-    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
+    except (FileNotFoundError, ReportHarnessError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
         return _json_error("classification_error", str(exc))
     _write_stdout_json(checkpoint)
     return 0
@@ -983,7 +1032,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--prompt", default="")
     parser.add_argument("--input-file", action="append", type=Path, default=[])
     parser.add_argument("--run-dir", required=True)
-    parser.add_argument("--mode", choices=["rule", "shadow", "llm-first"], default="rule")
+    parser.add_argument("--source-dir", default="_Source")
+    parser.add_argument("--llm-provider", default=os.getenv("LLM_PROVIDER", "codex"))
+    parser.add_argument("--llm-model", default=os.getenv("LLM_MODEL", "none"))
+    parser.add_argument("--llm-timeout-seconds", type=float, default=30.0)
+    parser.add_argument("--llm-min-confidence", type=float, default=0.6)
+    parser.add_argument("--llm-repair-attempts", type=int, default=2)
     parser.add_argument("--checkpoint", choices=["excel", "sql", "report-selection"], default="")
     parser.add_argument("--confirm-sql", action="store_true")
     parser.add_argument("--validate-execution", action="store_true")
@@ -1006,8 +1060,29 @@ def main(argv: list[str] | None = None) -> int:
         harness.write_excel_confirmation(excel_payload)
 
     if args.checkpoint == "sql":
-        sql = _build_sql(prompt, args.mode)
-        harness.write_sql_review(sql, {"status": "pending_user_confirmation"})
+        try:
+            sql, route_meta = _build_prompt_sql(
+                prompt,
+                source_dir=args.source_dir,
+                llm_provider=args.llm_provider,
+                llm_model=args.llm_model,
+                llm_timeout_seconds=args.llm_timeout_seconds,
+                llm_min_confidence=args.llm_min_confidence,
+                llm_repair_attempts=args.llm_repair_attempts,
+            )
+        except (RuntimeError, ValueError) as exc:
+            _write_stderr_json({"status": "error", "code": "sql_review_error", "message": str(exc)})
+            return 2
+        harness.write_sql_review(
+            sql,
+            {
+                "status": "pending_user_confirmation",
+                "route": route_meta.get("route", ""),
+                "reason": route_meta.get("reason", ""),
+                "llm_provider": args.llm_provider,
+                "llm_model": args.llm_model,
+            },
+        )
 
     if args.checkpoint == "report-selection" or args.report_type or args.report_design:
         payload = build_report_selection_payload()

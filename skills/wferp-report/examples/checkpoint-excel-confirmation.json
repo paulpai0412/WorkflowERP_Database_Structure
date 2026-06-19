@@ -1,0 +1,65 @@
+{
+  "checkpointId": "excel_confirmation",
+  "title": "確認欄位與公式",
+  "actions": [
+    "確認欄位與公式",
+    "要求修正"
+  ],
+  "payload": {
+    "source_type": "excel",
+    "db_fields": [
+      {
+        "label": "部門代號",
+        "required": true,
+        "matched_schema_field": null
+      },
+      {
+        "label": "部門名稱",
+        "required": true,
+        "matched_schema_field": null
+      },
+      {
+        "label": "費用科目",
+        "required": true,
+        "matched_schema_field": null
+      },
+      {
+        "label": "金額",
+        "required": true,
+        "matched_schema_field": null
+      }
+    ],
+    "formula_fields": [
+      {
+        "name": "費用占比",
+        "formula": "=金額/總金額",
+        "dependencies": [
+          "金額",
+          "總金額"
+        ],
+        "requires_user_confirmation": true
+      },
+      {
+        "name": "異常旗標",
+        "formula": "=IF(金額>預算,\"超支\",\"正常\")",
+        "dependencies": [
+          "金額",
+          "預算"
+        ],
+        "requires_user_confirmation": true
+      }
+    ],
+    "report_outputs": [
+      {
+        "sheet": "管理報表",
+        "cells": [
+          {
+            "address": "B6",
+            "formula": "=SUM(明細!D:D)"
+          }
+        ]
+      }
+    ],
+    "warnings": []
+  }
+}

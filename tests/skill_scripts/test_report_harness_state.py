@@ -143,13 +143,17 @@ def test_records_visual_design_checkpoint(tmp_path: Path):
 def test_all_checkpoint_payloads_have_chinese_titles_and_actions():
     expected_actions = {
         "excel_confirmation": ["確認欄位與公式", "要求修正"],
+        "field_formula_classification": ["確認欄位分類", "要求修正"],
         "sql_review": ["同意查詢", "調整需求"],
         "data_preview": ["資料正確", "確認資料", "重新查詢"],
+        "raw_data_preview": ["原始資料正確", "重新查詢"],
+        "enriched_data_preview": ["補欄資料正確", "修正補欄規則"],
         "report_selection": ["產生報告", "修改格式"],
         "design_brief": ["確認設計", "調整設計"],
         "visual_design": ["確認視覺設計", "調整視覺設計"],
         "report_draft": ["接受", "修正報告"],
         "final_review": ["完成", "回到初稿"],
+        "sqlite_retention": ["保留本地資料", "刪除本次資料", "匯出封存後刪除"],
     }
 
     assert set(CHECKPOINT_DEFINITIONS) == set(expected_actions)

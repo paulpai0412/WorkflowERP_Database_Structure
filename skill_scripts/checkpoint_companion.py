@@ -20,7 +20,7 @@ from skill_scripts.report_harness_state import (
 
 
 MAX_REQUEST_BYTES = 65536
-MAX_TABLE_ROWS = 25
+MAX_TABLE_ROWS = 100
 CHART_TYPE_OPTIONS = [
     ("combo", "Combo：實際 / 預算 / 差異"),
     ("bar", "Bar：排行與比較"),
