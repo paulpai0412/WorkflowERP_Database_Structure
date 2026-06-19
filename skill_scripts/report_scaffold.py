@@ -150,6 +150,111 @@ def _section_export(section_path: Path) -> str:
     return exports[0]
 
 
+def _section_path(run_dir: Path, section_id: str) -> Path:
+    if not re.fullmatch(r"\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*", section_id):
+        raise ValueError("section_id must look like NN-slug, for example 01-executive-summary")
+    return run_dir / "report" / "sections" / f"{section_id}.tsx"
+
+
+def _validate_component_name(component_name: str) -> None:
+    if not re.fullmatch(r"[A-Z][A-Za-z0-9]*", component_name):
+        raise ValueError("component_name must be a PascalCase React component identifier")
+
+
+def _validate_section_code_safety(code: str, *, component_name: str, section_id: str) -> None:
+    _validate_component_name(component_name)
+    if not code.strip():
+        raise ValueError("Section code is empty")
+
+    export_pattern = rf"export\s+function\s+{re.escape(component_name)}\s*\("
+    if not re.search(export_pattern, code):
+        raise ValueError(f"Section must export function {component_name}")
+
+    exports = re.findall(r"export\s+function\s+([A-Za-z][A-Za-z0-9]*)\s*\(", code)
+    if exports != [component_name]:
+        raise ValueError("Section must export exactly the requested component")
+
+    import_sources = re.findall(r"import\s+(?:[^;]*?\s+from\s+)?[\"']([^\"']+)[\"']", code)
+    for source in import_sources:
+        if source == "react" or source.startswith("."):
+            continue
+        raise ValueError(f"Section import is not allowed: {source}")
+
+    banned_patterns = [
+        (r"\bfetch\s*\(", "network access is not allowed"),
+        (r"\bXMLHttpRequest\b", "network access is not allowed"),
+        (r"\bWebSocket\b", "network access is not allowed"),
+        (r"\bEventSource\b", "network access is not allowed"),
+        (r"\baxios\b", "network access is not allowed"),
+        (r"\bprocess\s*\.\s*env\b", "environment access is not allowed"),
+        (r"\bimport\s*\(", "dynamic import is not allowed"),
+        (r"\brequire\s*\(", "CommonJS require is not allowed"),
+        (r"\beval\s*\(", "dynamic code execution is not allowed"),
+        (r"\bFunction\s*\(", "dynamic code execution is not allowed"),
+        (r"\bdocument\s*\.\s*cookie\b", "credential access is not allowed"),
+        (r"\blocalStorage\b", "browser storage side effects are not allowed"),
+        (r"\bsessionStorage\b", "browser storage side effects are not allowed"),
+        (r"\bindexedDB\b", "browser storage side effects are not allowed"),
+        (r"https?://", "external URL is not allowed"),
+    ]
+    for pattern, message in banned_patterns:
+        if re.search(pattern, code):
+            raise ValueError(f"Unsafe report section: {message}")
+
+    if "data-refs" not in code and "dataRefs" not in code:
+        raise ValueError("Section must declare data_refs using data-refs or dataRefs")
+
+    slug = section_id[3:]
+    if f'data-section="{slug}"' not in code and f"data-section='{slug}'" not in code:
+        raise ValueError(f'Section must render data-section="{slug}"')
+
+
+def write_generated_report_section(
+    *,
+    run_dir: Path,
+    section_id: str,
+    component_name: str,
+    code: str,
+    mode: str = "generate",
+) -> dict[str, Any]:
+    if mode not in {"generate", "repair"}:
+        raise ValueError("mode must be generate or repair")
+    section_path = _section_path(run_dir, section_id)
+    if not section_path.exists():
+        raise ValueError(f"Section does not exist in scaffold: {section_path}")
+    _validate_section_code_safety(code, component_name=component_name, section_id=section_id)
+    section_path.write_text(code.strip() + "\n", encoding="utf-8")
+    validate_report_protocol(run_dir)
+    return {
+        "status": "section_written",
+        "mode": mode,
+        "section_id": section_id,
+        "component_name": component_name,
+        "path": str(section_path),
+    }
+
+
+def validate_generated_report_section(
+    *,
+    run_dir: Path,
+    section_id: str,
+    component_name: str | None = None,
+) -> dict[str, Any]:
+    section_path = _section_path(run_dir, section_id)
+    if not section_path.exists():
+        raise ValueError(f"Section does not exist in scaffold: {section_path}")
+    code = section_path.read_text(encoding="utf-8")
+    component = component_name or _section_export(section_path)
+    _validate_section_code_safety(code, component_name=component, section_id=section_id)
+    validate_report_protocol(run_dir)
+    return {
+        "status": "section_valid",
+        "section_id": section_id,
+        "component_name": component,
+        "path": str(section_path),
+    }
+
+
 def _report_section_imports(report_text: str) -> dict[str, str]:
     imports: dict[str, str] = {}
     pattern = re.compile(

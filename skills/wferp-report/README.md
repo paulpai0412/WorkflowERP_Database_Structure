@@ -54,6 +54,8 @@ python3 -m skill_scripts.cli_report_harness run-sqlite-enrichment --run-dir wfer
 python3 -m skill_scripts.cli_report_harness write-enriched-preview --run-dir wferp-report-runs/run-001
 python3 -m skill_scripts.cli_report_harness write-report-selection --run-dir wferp-report-runs/run-001 --report-design financial-control --include-chart --include-table --include-analysis
 python3 -m skill_scripts.cli_report_harness scaffold-report --run-dir wferp-report-runs/run-001
+python3 -m skill_scripts.cli_report_harness generate-report-section --run-dir wferp-report-runs/run-001 --section-id 01-executive-summary --component-name ExecutiveSummary01Section --code-file /tmp/section.tsx
+python3 -m skill_scripts.cli_report_harness validate-report-section --run-dir wferp-report-runs/run-001 --section-id 01-executive-summary
 python3 -m skill_scripts.cli_report_harness write-report-draft --run-dir wferp-report-runs/run-001 --payload report-draft.json
 python3 -m skill_scripts.cli_report_harness write-final-review --run-dir wferp-report-runs/run-001 --payload final-review.json
 python3 -m skill_scripts.cli_report_harness can-deliver --run-dir wferp-report-runs/run-001
@@ -61,9 +63,10 @@ python3 -m skill_scripts.cli_report_harness can-deliver --run-dir wferp-report-r
 
 `confirm` 可保存 `selectedOptions`。final review 若有 residual risks，必須用 `--accepted-residual-risk "validator_role: risk text"` 明確接受，否則 `can-deliver` 會阻擋交付。
 
+複雜報表允許 LLM 依需求產生 section TSX，但必須經由 `generate-report-section` 或 `repair-report-section` 寫入單一 run-scoped section，並在每次寫入後執行 `validate-report-section`。Section 只能讀 embedded payload，不得連 DB、不得執行 SQL、不得發 network request、不得讀 credentials。
+
 ## 驗證
 
 ```bash
 bash /home/timmypai/.codex/skills/wferp-report/scripts/validate-skill.sh
 ```
-

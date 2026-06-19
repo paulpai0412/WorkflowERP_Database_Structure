@@ -77,7 +77,7 @@ wferp-report 的 validator gate 必須併入 subagent review。每個 validator 
 
 `visual_taste_reviewer`：確認排版、層級、留白、可讀性、中文文案、視覺美化、行動/桌面版面與使用者選擇的 design profile 一致。
 
-`react_technical_reviewer`：確認 React scaffold 可 build、payload schema 正確、固定元件使用合規、無 unsafe RawBlock、無外部 network requests、不得連 DB、不得執行 SQL。
+`react_technical_reviewer`：確認 React scaffold 可 build、payload schema 正確、固定元件使用合規、LLM-generated section code 已通過 `validate-report-section`、section export 與 `Report.tsx` linkage 正確、data refs 存在、無 unsafe RawBlock、無外部 network requests、不得連 DB、不得執行 SQL。
 
 `delivery_reviewer`：確認 single-file HTML、payload、SQL、raw/enriched data、Normalized Report Plan、final review、validator evidence 與 SQLite retention evidence 齊全。
 
@@ -137,4 +137,3 @@ files_to_review:
 - 缺少任一必備 validator 時不可交付，不能用使用者確認覆蓋。
 
 交付訊息必須列出 `blocking_validators` 與 `accepted_residual_risks`，讓使用者知道是通過、被擋下，或是帶風險接受。
-

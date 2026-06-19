@@ -26,6 +26,7 @@ from skill_scripts.report_harness_state import load_run_state
 from skill_scripts.report_harness_state import CHECKPOINT_DEFINITIONS
 from skill_scripts.report_harness_state import write_confirmation
 from skill_scripts.report_scaffold import scaffold_report_workspace
+from skill_scripts.report_scaffold import validate_generated_report_section
 from skill_scripts.schema_loader import load_schema_bundle
 from skill_scripts.single_html_exporter import export_single_html_report
 from skill_scripts.sql_router import RoutingOptions, route_generate_sql
@@ -33,6 +34,7 @@ from skill_scripts.style_replay import detect_replay_adjustments
 from skill_scripts.visual_checkpoint import build_visual_checkpoint_payload
 from skill_scripts.visual_checkpoint import render_visual_checkpoint_html
 from skill_scripts.workbook_lookup_importer import import_lookup_sheet
+from skill_scripts.report_scaffold import write_generated_report_section
 
 DEFAULT_REPORT_SECTIONS = [
     "executive-summary",
@@ -88,6 +90,14 @@ def _load_json_list_arg(value: str) -> list[dict[str, Any]]:
 
 def _load_json_arg_or_empty(value: str | None) -> dict[str, Any]:
     return _load_json_arg(value) if value else {}
+
+
+def _load_text_arg(*, inline: str | None, file_path: str | None) -> str:
+    if bool(inline) == bool(file_path):
+        raise ValueError("Provide exactly one of --code or --code-file")
+    if file_path:
+        return Path(file_path).read_text(encoding="utf-8")
+    return inline or ""
 
 
 def _write_run_json(run_dir: Path, relative_path: str, payload: dict[str, Any]) -> None:
@@ -962,6 +972,73 @@ def _write_report_draft(argv: list[str]) -> int:
     return 0
 
 
+def _generate_report_section(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Write LLM-generated TSX for one report section.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--section-id", required=True)
+    parser.add_argument("--component-name", required=True)
+    parser.add_argument("--code", default=None)
+    parser.add_argument("--code-file", default=None)
+    args = parser.parse_args(argv)
+
+    try:
+        code = _load_text_arg(inline=args.code, file_path=args.code_file)
+        result = write_generated_report_section(
+            run_dir=Path(args.run_dir),
+            section_id=args.section_id,
+            component_name=args.component_name,
+            code=code,
+            mode="generate",
+        )
+    except (FileNotFoundError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("report_section_error", str(exc))
+    _write_stdout_json(result)
+    return 0
+
+
+def _repair_report_section(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Repair one generated report section with replacement TSX.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--section-id", required=True)
+    parser.add_argument("--component-name", required=True)
+    parser.add_argument("--code", default=None)
+    parser.add_argument("--code-file", default=None)
+    args = parser.parse_args(argv)
+
+    try:
+        code = _load_text_arg(inline=args.code, file_path=args.code_file)
+        result = write_generated_report_section(
+            run_dir=Path(args.run_dir),
+            section_id=args.section_id,
+            component_name=args.component_name,
+            code=code,
+            mode="repair",
+        )
+    except (FileNotFoundError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("report_section_error", str(exc))
+    _write_stdout_json(result)
+    return 0
+
+
+def _validate_report_section(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Validate one generated report section and scaffold linkage.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--section-id", required=True)
+    parser.add_argument("--component-name", default=None)
+    args = parser.parse_args(argv)
+
+    try:
+        result = validate_generated_report_section(
+            run_dir=Path(args.run_dir),
+            section_id=args.section_id,
+            component_name=args.component_name,
+        )
+    except (FileNotFoundError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("report_section_validation_error", str(exc))
+    _write_stdout_json(result)
+    return 0
+
+
 def _write_final_review(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Write the final review checkpoint with validator evidence.")
     parser.add_argument("--run-dir", required=True)
@@ -1015,6 +1092,9 @@ COMMANDS = {
     "validate-single-html": _validate_single_html,
     "inspect-style-replay": _inspect_style_replay,
     "scaffold-report": _scaffold_report,
+    "generate-report-section": _generate_report_section,
+    "repair-report-section": _repair_report_section,
+    "validate-report-section": _validate_report_section,
     "write-report-draft": _write_report_draft,
     "write-final-review": _write_final_review,
     "can-deliver": _can_deliver,
@@ -1023,8 +1103,27 @@ COMMANDS = {
 }
 
 
+def _print_main_help() -> None:
+    command_lines = "\n".join(f"  {name}" for name in sorted(COMMANDS))
+    print(
+        "usage: python3 -m skill_scripts.cli_report_harness <command> [options]\n"
+        "       python3 -m skill_scripts.cli_report_harness --run-dir RUN_DIR [legacy options]\n\n"
+        "Create and advance WFERP report harness runs.\n\n"
+        "Primary subcommands:\n"
+        f"{command_lines}\n\n"
+        "Use '<command> --help' for command-specific options.\n\n"
+        "Legacy compatibility options are still accepted for older scripts, but the\n"
+        "wferp-report skill flow should use subcommands such as create-run,\n"
+        "classify-workbook, write-sql-review, serve-checkpoint, wait-confirmation,\n"
+        "write-raw-preview, write-enriched-preview, and export-single-html.\n"
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(argv if argv is not None else sys.argv[1:])
+    if argv in (["--help"], ["-h"]):
+        _print_main_help()
+        return 0
     if argv and argv[0] in COMMANDS:
         return COMMANDS[argv[0]](argv[1:])
 

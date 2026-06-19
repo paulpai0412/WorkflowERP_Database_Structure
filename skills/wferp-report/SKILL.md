@@ -437,23 +437,23 @@ validator：`react_technical_reviewer` 可先做 scaffold-level review。
 
 ## Phase 9 —— Section Build
 
-目標：逐段生成報告內容、chart/table/component payload、Excel-like view 與 management narrative。
+目標：逐段生成報告內容、chart/table/component payload、Excel-like view、management narrative，必要時允許 LLM 依需求產生單一 React section 程式碼。
 
 輸入：`report/payload/report-payload.json`、selected design、chart/table/layout plan、data preview。
 
 必讀 references：`references/section-build.md`、`references/component-policy.md`、`references/rawblock-policy.md`、`references/style-replay.md`。
 
-執行步驟：生成 executive summary、KPI cards、chart sections、data tables、Excel-like summary/template view、analysis/findings、recommendations、appendix evidence；使用 semantic components 與受控 Raw layer；所有數字必須能追到 SQL / raw data / enriched data / formula semantics。
+執行步驟：生成 executive summary、KPI cards、chart sections、data tables、Excel-like summary/template view、analysis/findings、recommendations、appendix evidence；使用 semantic components 與受控 Raw layer；若固定元件不足，主 agent / LLM 可產生單一 section TSX，但必須用 `generate-report-section` 寫入、用 `validate-report-section` 驗證；修復時必須用 `repair-report-section`；所有數字必須能追到 SQL / raw data / enriched data / formula semantics。
 
-產物：`report/payload/report-payload.json` 更新版、`report/scaffold/src` 或等價 component files、`report/section-build-log.json`。
+產物：`report/payload/report-payload.json` 更新版、`report/sections/*.tsx`、`report/scaffold/src` 或等價 component files、`report/section-build-log.json`。
 
-停止條件：section 數字無 lineage；chart/table 與 confirmed design 不一致；Raw layer 破壞安全或可攜性；內容遺漏 validation targets。
+停止條件：section 數字無 lineage；chart/table 與 confirmed design 不一致；section code 未通過 harness safety validation；Raw layer 破壞安全或可攜性；內容遺漏 validation targets。
 
 使用者 checkpoint：不單獨停止；Phase 12 final HTML 給使用者確認。
 
-validator：`report_content_reviewer` 可在重要 section 完成後並行檢查。
+validator：`report_content_reviewer` 可在重要 section 完成後並行檢查；有 LLM-generated TSX 時，`react_technical_reviewer` 必須檢查 section export、data refs、safe imports、無 network/env/DB/SQL side effect、與 `Report.tsx` linkage。
 
-失敗時 repair slice：只修 failing section、chart/table binding、narrative 或 evidence reference。
+失敗時 repair slice：只修 failing section、chart/table binding、narrative 或 evidence reference；section 程式碼修復只能替換單一 `report/sections/*.tsx`。
 
 ---
 
@@ -553,6 +553,7 @@ Repair 必須是最小垂直切片，不得大範圍重做。
 - Excel 中 manual/helper/format-only 欄位預設簡化或移除，但需在 Phase 3 顯示原因。
 - SQL 預設 raw-source-first；只有可證明等價且有 schema evidence 的公式才下推 SQL。
 - DB execution 預設只允許 test DB；production 需明確 allow evidence。
+- 複雜報表可使用 LLM-generated section TSX，但只能經 `generate-report-section` / `repair-report-section` 寫入 run-scoped section，且每次都要跑 `validate-report-section`。
 
 ---
 
@@ -565,6 +566,7 @@ Repair 必須是最小垂直切片，不得大範圍重做。
 - Excel formula/report logic 有 semantic lineage。
 - Chart/layout 在報告生成前已由使用者確認。
 - React renderer 產出的 HTML report 可離線開啟。
+- LLM-generated section code 已通過 section validation、React technical review 與 report content review。
 - Excel-like view 能對照報表邏輯與資料結果。
 - Required validator evidence 全部 pass；warning/residual risks 已由使用者接受。
 - 所有重要數字能追溯到 SQL raw data、SQLite enrichment 或 formula semantics。
