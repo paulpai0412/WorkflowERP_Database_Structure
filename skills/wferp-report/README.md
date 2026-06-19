@@ -70,3 +70,7 @@ python3 -m skill_scripts.cli_report_harness can-deliver --run-dir wferp-report-r
 ```bash
 bash /home/timmypai/.codex/skills/wferp-report/scripts/validate-skill.sh
 ```
+
+## Windows
+
+若在 Windows 看到中文亂碼，請先看 `WINDOWS_ENCODING.md`。本 skill 固定使用 UTF-8；`SKILL.md` 與 JSON 不可轉成 UTF-8 BOM、Big5、CP950、ANSI 或 UTF-16。
