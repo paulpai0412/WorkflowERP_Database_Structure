@@ -182,6 +182,223 @@ def test_current_checkpoint_page_returns_html_with_confirm_url(tmp_path: Path):
     assert content_type == "text/html; charset=utf-8"
     assert "SQL 查詢確認" in html
     assert "/api/runs/run-001/checkpoints/sql_review/confirm" in html
+    assert "SELECT department, amount FROM expenses" in html
+    assert "status" in html
+    assert "fetch(confirmUrl" in html
+    assert "data-action=\"同意查詢\"" in html
+
+
+def test_current_checkpoint_page_renders_data_preview_payload(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
+    harness.write_sql_review("SELECT department, amount FROM expenses", {"status": "pass"})
+    harness.confirm("sql_review", "同意查詢")
+    harness.write_data_preview(
+        {
+            "columns": ["expense_account_name", "actual_amount", "budget_amount"],
+            "row_count": 2,
+            "rows": [
+                {"expense_account_name": "旅費", "actual_amount": 50000, "budget_amount": 40000},
+                {"expense_account_name": "文具", "actual_amount": 12000, "budget_amount": 15000},
+            ],
+            "aggregates": {"actual_amount_sum": 62000, "budget_amount_sum": 55000},
+            "acceptance_checks": {"min_rows_1": True, "asset_account_excluded": True},
+        }
+    )
+
+    with CheckpointCompanionServer.serve(tmp_path / "run-001") as server:
+        with urlopen(f"{server.base_url}/runs/run-001/checkpoints/current", timeout=5) as response:
+            html = response.read().decode("utf-8")
+
+    assert "資料預覽確認" in html
+    assert "旅費" in html
+    assert "actual_amount_sum" in html
+    assert "asset_account_excluded" in html
+    assert "<table" in html
+
+
+def test_excel_confirmation_page_renders_fields_and_formulas_as_tables(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="費用分析")
+    harness.write_excel_confirmation(
+        {
+            "summary": "確認欄位與公式",
+            "technical_details": {
+                "database_fields": [
+                    {
+                        "semantic_name": "費用科目",
+                        "candidate_columns": ["ACTMA.MA001", "ACTMA.MA003"],
+                        "status": "mapped",
+                    }
+                ],
+                "derived_formula_fields": [
+                    {"field": "預算差異", "formula": "實際費用合計 - 預算合計"}
+                ],
+                "recommended_defaults": {"budget_basis": "ACTMK.MK006"},
+            },
+        }
+    )
+
+    with CheckpointCompanionServer.serve(tmp_path / "run-001") as server:
+        with urlopen(
+            f"{server.base_url}/runs/run-001/checkpoints/excel_confirmation",
+            timeout=5,
+        ) as response:
+            html = response.read().decode("utf-8")
+
+    assert "資料庫欄位來源驗證" in html
+    assert "Excel / 報表公式驗證" in html
+    assert "ACTMA.MA001, ACTMA.MA003" in html
+    assert "實際費用合計 - 預算合計" in html
+    assert html.count("<table") >= 2
+
+
+def test_visual_design_page_renders_html_component_preview(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
+    harness.write_report_selection(
+        {"selected_report_type": "管理摘要", "selected_report_design": "financial-control"}
+    )
+    harness.confirm("report_selection", "產生報告")
+    _confirm_design_brief(harness)
+    package = {
+        "catalog_guardrail": "financial-control",
+        "data_profile": {"columns": ["department", "amount"], "row_count": 2},
+        "datasets": {"columns": ["department", "amount"]},
+        "aggregates": {"amount_sum": 3500},
+    }
+    payload = build_visual_checkpoint_payload(harness.state()["report_design_brief"], package)
+    harness.write_visual_design(payload)
+
+    with CheckpointCompanionServer.serve(tmp_path / "run-001") as server:
+        with urlopen(f"{server.base_url}/runs/run-001/checkpoints/visual_design", timeout=5) as response:
+            html = response.read().decode("utf-8")
+
+    assert "HTML 版面與元件預覽" in html
+    assert 'class="report-preview"' in html
+    assert "preview-chart" in html
+    assert "preview-table-component" in html
+    assert "expense-detail-table" in html
+    assert "data-layout-mode" in html
+    assert "four-chart-grid" in html
+    assert "data-chart-count" in html
+    assert "data-chart-type=\"0\"" in html
+    assert "Combo：實際 / 預算 / 差異" in html
+    assert "Refresh HTML 預覽" in html
+    assert "function refreshPreview" in html
+    assert "visualSelection" in html
+
+
+def test_report_draft_page_renders_report_preview_with_actual_table_data(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
+    harness.write_report_selection(
+        {"selected_report_type": "管理摘要", "selected_report_design": "financial-control"}
+    )
+    harness.confirm("report_selection", "產生報告")
+    _confirm_design_brief(harness)
+    _confirm_visual_design(harness)
+    harness.write_report_draft(
+        {
+            "title": "費用分析財務管控報表",
+            "summary": {
+                "actual_amount_sum": 62000,
+                "budget_amount_sum": 55000,
+                "management_conclusion": "旅費為主要超支科目。",
+            },
+            "charts": [{"id": "expense-driver-ranking", "type": "bar", "x": "expense_account_name", "y": "actual_amount"}],
+            "tables": [
+                {
+                    "id": "expense-detail-table",
+                    "columns": ["expense_account_name", "actual_amount", "budget_amount"],
+                    "features": ["filter", "sort"],
+                    "rows": [
+                        {"expense_account_name": "旅費", "actual_amount": 50000, "budget_amount": 40000},
+                        {"expense_account_name": "文具", "actual_amount": 12000, "budget_amount": 15000},
+                    ],
+                }
+            ],
+            "analysis": ["實際費用合計 62,000。"],
+            "recommendations": ["追蹤旅費超支。"],
+        }
+    )
+
+    with CheckpointCompanionServer.serve(tmp_path / "run-001") as server:
+        with urlopen(f"{server.base_url}/runs/run-001/checkpoints/report_draft", timeout=5) as response:
+            html = response.read().decode("utf-8")
+
+    assert "HTML 報告初稿預覽" in html
+    assert "費用分析財務管控報表" in html
+    assert "preview-chart" in html
+    assert "旅費" in html
+    assert "文具" in html
+    assert "追蹤旅費超支" in html
+    assert "呈現方式：" in html
+    assert "data-refresh-preview" in html
+
+
+def test_current_checkpoint_page_links_to_available_checkpoint_history(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
+    harness.write_sql_review("SELECT department, amount FROM expenses", {"status": "pass"})
+    harness.confirm("sql_review", "同意查詢")
+    harness.write_data_preview(
+        {
+            "columns": ["department", "amount"],
+            "row_count": 1,
+            "rows": [{"department": "管理部", "amount": 1000}],
+        }
+    )
+
+    with CheckpointCompanionServer.serve(tmp_path / "run-001") as server:
+        with urlopen(f"{server.base_url}/runs/run-001/checkpoints/current", timeout=5) as response:
+            html = response.read().decode("utf-8")
+
+    assert 'href="/runs/run-001/checkpoints/sql_review"' in html
+    assert 'href="/runs/run-001/checkpoints/data_preview"' in html
+    assert "資料預覽確認" in html
+
+
+def test_specific_checkpoint_history_page_renders_requested_payload(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
+    harness.write_sql_review("SELECT department, amount FROM expenses", {"status": "pass"})
+    harness.confirm("sql_review", "同意查詢")
+    harness.write_data_preview(
+        {
+            "columns": ["department", "amount"],
+            "row_count": 1,
+            "rows": [{"department": "管理部", "amount": 1000}],
+        }
+    )
+
+    with CheckpointCompanionServer.serve(tmp_path / "run-001") as server:
+        with urlopen(f"{server.base_url}/runs/run-001/checkpoints/sql_review", timeout=5) as response:
+            html = response.read().decode("utf-8")
+
+    assert response.status == 200
+    assert "SQL 查詢確認" in html
+    assert "SELECT department, amount FROM expenses" in html
+    assert "/api/runs/run-001/checkpoints/sql_review/confirm" in html
+    assert "data-action=\"同意查詢\"" in html
+    assert 'class="step current"' in html
+
+
+def test_current_checkpoint_page_click_script_posts_confirmation(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
+    harness.write_sql_review("SELECT department, amount FROM expenses", {"status": "pass"})
+
+    with CheckpointCompanionServer.serve(tmp_path / "run-001") as server:
+        with urlopen(f"{server.base_url}/runs/run-001/checkpoints/current", timeout=5) as response:
+            html = response.read().decode("utf-8")
+        result = post_json(
+            f"{server.base_url}/api/runs/run-001/checkpoints/sql_review/confirm",
+            {
+                "action": "同意查詢",
+                "checkpointId": "sql_review",
+                "comment": "from companion",
+                "selectedOptions": {"source": "visual_companion"},
+            },
+        )
+
+    assert "async function confirmCheckpoint" in html
+    assert "confirmation-status" in html
+    assert result["status"] == "confirmed"
+    assert harness.state()["user_confirmations"]["sql_review"] == "同意查詢"
 
 
 def test_final_review_post_selected_options_allow_matching_residual_risk_delivery(tmp_path: Path):
@@ -224,3 +441,27 @@ def test_final_review_post_selected_options_allow_matching_residual_risk_deliver
         "blocking_validators": [],
         "accepted_residual_risks": ["visual_taste_reviewer: accepted risk for visual_taste_reviewer"],
     }
+
+
+def test_final_review_page_renders_role_prefixed_residual_risk_values(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
+    harness.write_report_selection(
+        {"selected_report_type": "管理摘要", "selected_report_design": "financial-control"}
+    )
+    harness.confirm("report_selection", "產生報告")
+    _confirm_design_brief(harness)
+    _confirm_visual_design(harness)
+    harness.write_report_draft({"sections": ["摘要"]})
+    harness.confirm("report_draft", "接受")
+    harness.write_final_review(
+        {
+            "validator_results": _all_validator_results({"visual_taste_reviewer": "warning"}),
+            "residual_risks": ["accepted risk for visual_taste_reviewer"],
+        }
+    )
+
+    with CheckpointCompanionServer.serve(tmp_path / "run-001") as server:
+        with urlopen(f"{server.base_url}/runs/run-001/checkpoints/current", timeout=5) as response:
+            html = response.read().decode("utf-8")
+
+    assert 'data-risk="visual_taste_reviewer: accepted risk for visual_taste_reviewer"' in html
