@@ -5,19 +5,24 @@ from dataclasses import asdict
 import json
 import os
 from pathlib import Path
+import sqlite3
 import sys
+import time
 from typing import Any
 
 from skill_scripts.dynamic_design_brief import build_design_brief
 from skill_scripts.dynamic_design_brief import validate_design_brief
 from skill_scripts.excel_intake import build_excel_confirmation_payload, parse_excel_requirement
 from skill_scripts.html_self_validator import validate_single_html_static
+from skill_scripts.sqlite_enrichment import run_enrichment
+from skill_scripts.sqlite_workspace import SQLiteRunWorkspace
 from skill_scripts.report_catalog import build_report_selection_payload
 from skill_scripts.report_catalog import get_report_design_defaults
 from skill_scripts.report_catalog import list_report_designs
 from skill_scripts.report_harness import ReportHarness
 from skill_scripts.report_harness import ReportHarnessError
 from skill_scripts.report_harness_state import load_run_state
+from skill_scripts.report_harness_state import CHECKPOINT_DEFINITIONS
 from skill_scripts.report_harness_state import write_confirmation
 from skill_scripts.report_scaffold import scaffold_report_workspace
 from skill_scripts.schema_loader import load_schema_bundle
@@ -26,6 +31,8 @@ from skill_scripts.sql_generator import generate_select_sql
 from skill_scripts.style_replay import detect_replay_adjustments
 from skill_scripts.visual_checkpoint import build_visual_checkpoint_payload
 from skill_scripts.visual_checkpoint import render_visual_checkpoint_html
+from skill_scripts.workbook_classifier import classify_workbook
+from skill_scripts.workbook_lookup_importer import import_lookup_sheet
 
 DEFAULT_REPORT_SECTIONS = [
     "executive-summary",
@@ -65,6 +72,17 @@ def _load_json_arg(value: str) -> dict[str, Any]:
         loaded = json.loads(value)
     if not isinstance(loaded, dict):
         raise ValueError("JSON payload must be an object")
+    return loaded
+
+
+def _load_json_list_arg(value: str) -> list[dict[str, Any]]:
+    path = Path(value)
+    if path.exists():
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    else:
+        loaded = json.loads(value)
+    if not isinstance(loaded, list) or not all(isinstance(item, dict) for item in loaded):
+        raise ValueError("JSON payload must be a list of objects")
     return loaded
 
 
@@ -188,6 +206,77 @@ def _serve_checkpoint(argv: list[str]) -> int:
     return 0
 
 
+def _confirmation_path(run_dir: Path, checkpoint: str) -> Path:
+    definition = CHECKPOINT_DEFINITIONS[checkpoint]
+    filename = definition["file"].replace(".json", ".confirmation.json")
+    return run_dir / "checkpoints" / filename
+
+
+def _read_confirmation_payload(path: Path) -> dict[str, Any]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("Confirmation payload must be an object")
+    return payload
+
+
+def _wait_confirmation(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Wait until a checkpoint confirmation is written.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--checkpoint", required=True)
+    parser.add_argument("--timeout-seconds", type=float, default=300.0)
+    parser.add_argument("--poll-interval-seconds", type=float, default=0.5)
+    parser.add_argument("--allow-existing", action="store_true")
+    args = parser.parse_args(argv)
+
+    run_dir = Path(args.run_dir)
+    if not (run_dir / "state.json").exists():
+        return _json_error("run_not_found", f"Report run does not exist: {run_dir}")
+    if args.checkpoint not in CHECKPOINT_DEFINITIONS:
+        return _json_error("unknown_checkpoint", f"Unknown checkpoint: {args.checkpoint}")
+    if args.timeout_seconds < 0:
+        return _json_error("invalid_timeout", "--timeout-seconds must be >= 0")
+    if args.poll_interval_seconds <= 0:
+        return _json_error("invalid_poll_interval", "--poll-interval-seconds must be > 0")
+
+    path = _confirmation_path(run_dir, args.checkpoint)
+    started_wall_time = time.time()
+    deadline = time.monotonic() + args.timeout_seconds
+
+    while True:
+        if path.exists():
+            stat = path.stat()
+            if args.allow_existing or stat.st_mtime >= started_wall_time:
+                try:
+                    confirmation = _read_confirmation_payload(path)
+                except (json.JSONDecodeError, ValueError) as exc:
+                    return _json_error("confirmation_read_error", str(exc))
+                _write_stdout_json(
+                    {
+                        "status": "confirmed",
+                        "checkpoint": args.checkpoint,
+                        "action": confirmation.get("action", ""),
+                        "comment": confirmation.get("comment", ""),
+                        "selectedOptions": confirmation.get("selectedOptions", {}),
+                        "created_at": confirmation.get("created_at", ""),
+                        "confirmation_file": str(path),
+                    }
+                )
+                return 0
+
+        if time.monotonic() >= deadline:
+            _write_stderr_json(
+                {
+                    "status": "error",
+                    "code": "confirmation_timeout",
+                    "message": f"Timed out waiting for checkpoint confirmation: {args.checkpoint}",
+                    "checkpoint": args.checkpoint,
+                    "confirmation_file": str(path),
+                }
+            )
+            return 2
+        time.sleep(min(args.poll_interval_seconds, max(0.0, deadline - time.monotonic())))
+
+
 def _ensure_harness(args: argparse.Namespace) -> ReportHarness:
     run_dir = Path(args.run_dir)
     if (run_dir / "state.json").exists():
@@ -210,6 +299,54 @@ def _open_harness(run_dir: str | Path) -> ReportHarness:
     if not (path / "state.json").exists():
         raise ReportHarnessError(f"Report run does not exist: {path}")
     return ReportHarness(path)
+
+
+def _quote_sqlite_identifier(identifier: str) -> str:
+    return '"' + identifier.replace('"', '""') + '"'
+
+
+def _workspace_from_manifest(run_dir: Path, manifest_path: str | Path) -> SQLiteRunWorkspace:
+    path = Path(manifest_path)
+    if not path.exists():
+        raise FileNotFoundError(f"SQLite manifest does not exist: {path}")
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    return SQLiteRunWorkspace(
+        run_dir=run_dir,
+        sqlite_db_path=Path(manifest["sqlite_db_path"]),
+        run_prefix=str(manifest["run_prefix"]),
+        raw_table=str(manifest["raw_table"]),
+        enriched_table=str(manifest["enriched_table"]),
+        manifest_path=path,
+    )
+
+
+def _workspace_from_state(harness: ReportHarness) -> SQLiteRunWorkspace:
+    manifest_path = harness.state().get("sqlite_manifest_path")
+    if not manifest_path:
+        raise ReportHarnessError("SQLite workspace has not been initialized")
+    return _workspace_from_manifest(harness.run_dir, manifest_path)
+
+
+def _sqlite_table_preview(workspace: SQLiteRunWorkspace, table_name: str, *, limit: int = 25) -> dict[str, Any]:
+    quoted_table = _quote_sqlite_identifier(table_name)
+    with sqlite3.connect(workspace.sqlite_db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        columns = [row[1] for row in conn.execute(f"PRAGMA table_info({quoted_table})")]
+        row_count = conn.execute(f"SELECT COUNT(*) FROM {quoted_table}").fetchone()[0]
+        rows = [
+            dict(row)
+            for row in conn.execute(
+                f"SELECT * FROM {quoted_table} LIMIT ?",
+                (limit,),
+            ).fetchall()
+        ]
+    return {
+        "sqlite_db_path": str(workspace.sqlite_db_path),
+        "table_name": table_name,
+        "row_count": row_count,
+        "columns": columns,
+        "sample_rows": rows,
+    }
 
 
 def _parse_excel_inputs(harness: ReportHarness, input_files: list[Path]) -> dict[str, Any] | None:
@@ -346,6 +483,22 @@ def _parse_selected_option_values(values: list[str]) -> dict[str, Any]:
     return selected
 
 
+def _parse_value_columns(values: list[str]) -> dict[str, str]:
+    columns: dict[str, str] = {}
+    for value in values:
+        if "=" not in value:
+            raise ValueError(f"value column must use output_name=ExcelColumn: {value}")
+        name, column = value.split("=", 1)
+        name = name.strip()
+        column = column.strip()
+        if not name or not column:
+            raise ValueError(f"value column must include both name and column: {value}")
+        columns[name] = column
+    if not columns:
+        raise ValueError("At least one --value-column is required")
+    return columns
+
+
 def _confirm(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Confirm a checkpoint and persist selected options.")
     parser.add_argument("--run-dir", required=True)
@@ -401,6 +554,216 @@ def _write_data_preview(argv: list[str]) -> int:
     except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
         return _json_error("data_preview_error", str(exc))
     _write_stdout_json(checkpoint)
+    return 0
+
+
+def _classify_workbook(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Classify workbook fields for DB SQL and SQLite enrichment.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--input-file", required=True, type=Path)
+    parser.add_argument("--primary-sheet", default="")
+    parser.add_argument("--source-dir", default="_Source")
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        payload = classify_workbook(
+            args.input_file,
+            source_dir=args.source_dir,
+            primary_sheet=args.primary_sheet,
+        )
+        _write_run_json(harness.run_dir, "data/column-classification.json", payload)
+        checkpoint = harness.write_field_formula_classification(payload)
+    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("classification_error", str(exc))
+    _write_stdout_json(checkpoint)
+    return 0
+
+
+def _init_sqlite_workspace(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Initialize a run-scoped SQLite workspace.")
+    parser.add_argument("--run-dir", required=True)
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        state = harness.state()
+        workspace = SQLiteRunWorkspace.create(harness.run_dir, run_id=str(state["run_id"]))
+        manifest = workspace.manifest()
+        harness.update_state(sqlite_manifest=manifest, sqlite_manifest_path=str(workspace.manifest_path))
+    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("sqlite_workspace_error", str(exc))
+    _write_stdout_json(
+        {
+            "status": "initialized",
+            "sqlite_manifest_path": str(workspace.manifest_path),
+            "manifest": manifest,
+        }
+    )
+    return 0
+
+
+def _import_lookups(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Import a workbook lookup sheet into the run SQLite workspace.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--input-file", required=True, type=Path)
+    parser.add_argument("--sheet-name", required=True)
+    parser.add_argument("--logical-name", required=True)
+    parser.add_argument("--key-column", required=True)
+    parser.add_argument("--value-column", action="append", default=[])
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        workspace = _workspace_from_state(harness)
+        result = import_lookup_sheet(
+            args.input_file,
+            workspace,
+            sheet_name=args.sheet_name,
+            logical_name=args.logical_name,
+            key_column=args.key_column,
+            value_columns=_parse_value_columns(args.value_column),
+        )
+        manifest = workspace.manifest()
+        harness.update_state(sqlite_manifest=manifest, sqlite_manifest_path=str(workspace.manifest_path))
+    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("lookup_import_error", str(exc))
+    _write_stdout_json({**result, "manifest": manifest})
+    return 0
+
+
+def _write_raw_table(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Write formal DB raw rows into the SQLite raw table.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--rows", required=True)
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        workspace = _workspace_from_state(harness)
+        rows = _load_json_list_arg(args.rows)
+        workspace.write_raw_rows(rows)
+        manifest = workspace.manifest()
+        harness.update_state(sqlite_manifest=manifest, sqlite_manifest_path=str(workspace.manifest_path))
+    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("raw_table_error", str(exc))
+    _write_stdout_json(
+        {
+            "status": "written",
+            "table_name": workspace.raw_table,
+            "row_count": manifest["raw_row_count"],
+            "manifest": manifest,
+        }
+    )
+    return 0
+
+
+def _write_raw_preview(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Write a checkpoint preview of the SQLite raw table.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--limit", type=int, default=25)
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        workspace = _workspace_from_state(harness)
+        payload = _sqlite_table_preview(workspace, workspace.raw_table, limit=args.limit)
+        checkpoint = harness.write_raw_data_preview(payload)
+    except (FileNotFoundError, ReportHarnessError, ValueError, sqlite3.Error, json.JSONDecodeError) as exc:
+        return _json_error("raw_preview_error", str(exc))
+    _write_stdout_json(checkpoint)
+    return 0
+
+
+def _run_sqlite_enrichment(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Run SQLite enrichment from JSON column payloads.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--computed-columns", default="[]")
+    parser.add_argument("--lookup-columns", default="[]")
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        workspace = _workspace_from_state(harness)
+        result = run_enrichment(
+            workspace,
+            computed_columns=_load_json_list_arg(args.computed_columns),
+            lookup_columns=_load_json_list_arg(args.lookup_columns),
+        )
+        manifest = workspace.manifest()
+        harness.update_state(sqlite_manifest=manifest, sqlite_manifest_path=str(workspace.manifest_path))
+    except (FileNotFoundError, ReportHarnessError, ValueError, sqlite3.Error, json.JSONDecodeError) as exc:
+        return _json_error("sqlite_enrichment_error", str(exc))
+    _write_stdout_json({"status": "enriched", "result": result, "manifest": manifest})
+    return 0
+
+
+def _write_enriched_preview(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Write a checkpoint preview of the enriched SQLite table.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--limit", type=int, default=25)
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        workspace = _workspace_from_state(harness)
+        payload = _sqlite_table_preview(workspace, workspace.enriched_table, limit=args.limit)
+        checkpoint = harness.write_enriched_data_preview(payload)
+    except (FileNotFoundError, ReportHarnessError, ValueError, sqlite3.Error, json.JSONDecodeError) as exc:
+        return _json_error("enriched_preview_error", str(exc))
+    _write_stdout_json(checkpoint)
+    return 0
+
+
+def _write_sqlite_retention(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Write SQLite retention checkpoint payload.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--decision", default="keep", choices=["keep", "delete", "export_then_delete"])
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        workspace = _workspace_from_state(harness)
+        manifest = workspace.manifest()
+        lookup_counts = manifest.get("lookup_row_counts", {})
+        tables = [
+            {"table_name": manifest["raw_table"], "row_count": manifest.get("raw_row_count", 0)},
+            {"table_name": manifest["enriched_table"], "row_count": manifest.get("enriched_row_count", 0)},
+        ]
+        if isinstance(lookup_counts, dict):
+            tables.extend(
+                {"table_name": str(table), "row_count": count}
+                for table, count in lookup_counts.items()
+            )
+        payload = {
+            "manifest_path": str(workspace.manifest_path),
+            "sqlite_db_path": str(workspace.sqlite_db_path),
+            "tables": tables,
+            "default_action": "保留本地資料",
+            "retention_decision": args.decision,
+            "cleanup_status": manifest.get("cleanup_status", "active"),
+        }
+        checkpoint = harness.write_sqlite_retention(payload)
+    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("sqlite_retention_error", str(exc))
+    _write_stdout_json(checkpoint)
+    return 0
+
+
+def _cleanup_sqlite_run(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Drop only SQLite tables listed in the run manifest.")
+    parser.add_argument("--run-dir", required=True)
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        workspace = _workspace_from_state(harness)
+        workspace.cleanup_run_tables()
+        manifest = workspace.manifest()
+        harness.update_state(sqlite_manifest=manifest, sqlite_manifest_path=str(workspace.manifest_path))
+    except (FileNotFoundError, ReportHarnessError, ValueError, sqlite3.Error, json.JSONDecodeError) as exc:
+        return _json_error("sqlite_cleanup_error", str(exc))
+    _write_stdout_json({"status": "cleaned", "manifest": manifest})
     return 0
 
 
@@ -585,6 +948,15 @@ COMMANDS = {
     "create-run": _create_run,
     "write-excel-confirmation": _write_excel_confirmation,
     "write-sql-review": _write_sql_review,
+    "classify-workbook": _classify_workbook,
+    "init-sqlite-workspace": _init_sqlite_workspace,
+    "import-lookups": _import_lookups,
+    "write-raw-table": _write_raw_table,
+    "write-raw-preview": _write_raw_preview,
+    "run-sqlite-enrichment": _run_sqlite_enrichment,
+    "write-enriched-preview": _write_enriched_preview,
+    "write-sqlite-retention": _write_sqlite_retention,
+    "cleanup-sqlite-run": _cleanup_sqlite_run,
     "confirm": _confirm,
     "write-data-preview": _write_data_preview,
     "write-report-selection": _write_report_selection,
@@ -598,6 +970,7 @@ COMMANDS = {
     "write-final-review": _write_final_review,
     "can-deliver": _can_deliver,
     "serve-checkpoint": _serve_checkpoint,
+    "wait-confirmation": _wait_confirmation,
 }
 
 

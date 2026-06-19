@@ -93,7 +93,20 @@ class ReportHarness:
 
     def write_sql_review(self, sql: str, validation: dict[str, Any] | None = None) -> dict[str, Any]:
         self.clear_downstream(
-            ["data_preview", "report_selection", "design_brief", "visual_design", "report_draft", "final_review"],
+            [
+                "data_preview",
+                "raw_data_preview",
+                "enriched_data_preview",
+                "sqlite_retention",
+                "report_selection",
+                "design_brief",
+                "visual_design",
+                "report_draft",
+                "final_review",
+            ],
+            raw_data_preview=None,
+            enriched_data_preview=None,
+            sqlite_retention=None,
             execution_result_summary=None,
             report_type=None,
             report_design=None,
@@ -105,6 +118,16 @@ class ReportHarness:
         self.invalidate_confirmations("sql_review")
         self.update_state(sql_candidate=sql, sql_validation=validation or {"status": "pending_user_confirmation"})
         return record_checkpoint(self.run_dir, "sql_review", {"sql": sql, "validation": validation or {}})
+
+    def write_field_formula_classification(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.update_state(column_classification=payload)
+        self.invalidate_confirmations(
+            "sql_review",
+            "raw_data_preview",
+            "enriched_data_preview",
+            "report_selection",
+        )
+        return record_checkpoint(self.run_dir, "field_formula_classification", payload)
 
     def write_data_preview(self, payload: dict[str, Any]) -> dict[str, Any]:
         if self.state().get("user_confirmations", {}).get("sql_review") != "同意查詢":
@@ -120,6 +143,55 @@ class ReportHarness:
         )
         self.update_state(execution_result_summary=payload)
         return record_checkpoint(self.run_dir, "data_preview", payload)
+
+    def write_raw_data_preview(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.clear_downstream(
+            [
+                "enriched_data_preview",
+                "sqlite_retention",
+                "report_selection",
+                "design_brief",
+                "visual_design",
+                "report_draft",
+                "final_review",
+            ],
+            enriched_data_preview=None,
+            sqlite_retention=None,
+            execution_result_summary=None,
+            report_type=None,
+            report_design=None,
+            report_design_brief=None,
+            visual_design_checkpoint=None,
+            report_options={},
+            validator_results=[],
+        )
+        self.update_state(raw_data_preview=payload)
+        return record_checkpoint(self.run_dir, "raw_data_preview", payload)
+
+    def write_enriched_data_preview(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.clear_downstream(
+            [
+                "sqlite_retention",
+                "report_selection",
+                "design_brief",
+                "visual_design",
+                "report_draft",
+                "final_review",
+            ],
+            sqlite_retention=None,
+            report_type=None,
+            report_design=None,
+            report_design_brief=None,
+            visual_design_checkpoint=None,
+            report_options={},
+            validator_results=[],
+        )
+        self.update_state(enriched_data_preview=payload, execution_result_summary=payload)
+        return record_checkpoint(self.run_dir, "enriched_data_preview", payload)
+
+    def write_sqlite_retention(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.update_state(sqlite_retention=payload)
+        return record_checkpoint(self.run_dir, "sqlite_retention", payload)
 
     def write_report_selection(self, payload: dict[str, Any]) -> dict[str, Any]:
         self.clear_downstream(

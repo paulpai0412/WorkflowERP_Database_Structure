@@ -4,8 +4,11 @@ import json
 import os
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
+from xml.sax.saxutils import escape
 
+from skill_scripts.report_harness import ReportHarness
 from skill_scripts.report_package import build_report_package
 from skill_scripts.style_replay import build_style_capsule
 from skill_scripts.validator_contracts import REQUIRED_VALIDATORS
@@ -77,6 +80,110 @@ def _style_capsule() -> dict[str, object]:
             "embedded_data_policy": {"mode": "smart-tiered"},
         }
     )
+
+
+def _column_name(index: int) -> str:
+    name = ""
+    while index:
+        index, remainder = divmod(index - 1, 26)
+        name = chr(65 + remainder) + name
+    return name
+
+
+def _sheet_xml(rows: list[list[str | int | tuple[str, str] | None]]) -> str:
+    rendered_rows = []
+    for row_index, row in enumerate(rows, start=1):
+        cells = []
+        for column_index, value in enumerate(row, start=1):
+            cell_ref = f"{_column_name(column_index)}{row_index}"
+            if isinstance(value, tuple) and value[0] == "formula":
+                formula = value[1].lstrip("=")
+                cells.append(f'<c r="{cell_ref}"><f>{escape(formula)}</f><v></v></c>')
+            elif value is None:
+                cells.append(f'<c r="{cell_ref}" t="inlineStr"><is><t></t></is></c>')
+            else:
+                cells.append(
+                    f'<c r="{cell_ref}" t="inlineStr"><is><t>{escape(str(value))}</t></is></c>'
+                )
+        rendered_rows.append(f'<row r="{row_index}">{"".join(cells)}</row>')
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        f'<sheetData>{"".join(rendered_rows)}</sheetData>'
+        "</worksheet>"
+    )
+
+
+def _classification_workbook(path: Path) -> None:
+    sheets = [
+        (
+            "明細帳",
+            [
+                ["科目編號", "傳票日期", "金額-原幣", "BU"],
+                ["6111", "20260101", ("formula", "=C2-D2"), ("formula", "=VLOOKUP(A2,對照表!A:B,2,0)")],
+            ],
+        ),
+        (
+            "對照表",
+            [
+                ["科目編號", "BU", "費用類別"],
+                ["公司別", "AIS", ""],
+                ["科目編號", "BU", "費用類別"],
+                ["6111", "營運管理中心", "8.租金支出"],
+                [None, None, None],
+                ["加總 - 換算台幣", None, None],
+            ],
+        ),
+    ]
+    workbook_sheets = []
+    rels = []
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+            + "".join(
+                f'<Override PartName="/xl/worksheets/sheet{index}.xml" '
+                'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+                for index, _ in enumerate(sheets, start=1)
+            )
+            + "</Types>",
+        )
+        archive.writestr(
+            "_rels/.rels",
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+            "</Relationships>",
+        )
+        for index, (name, rows) in enumerate(sheets, start=1):
+            workbook_sheets.append(
+                f'<sheet name="{escape(name)}" sheetId="{index}" r:id="rId{index}"/>'
+            )
+            rels.append(
+                f'<Relationship Id="rId{index}" '
+                'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+                f'Target="worksheets/sheet{index}.xml"/>'
+            )
+            archive.writestr(f"xl/worksheets/sheet{index}.xml", _sheet_xml(rows))
+        archive.writestr(
+            "xl/workbook.xml",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            f'<sheets>{"".join(workbook_sheets)}</sheets>'
+            "</workbook>",
+        )
+        archive.writestr(
+            "xl/_rels/workbook.xml.rels",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            f'{"".join(rels)}'
+            "</Relationships>",
+        )
 
 
 def test_cli_report_harness_creates_run_from_prompt_only(tmp_path: Path):
@@ -496,6 +603,130 @@ def test_cli_full_flow_blocks_and_advances_by_confirmation(tmp_path: Path):
 
     assert data_preview.returncode == 0, data_preview.stderr
     assert json.loads(data_preview.stdout)["checkpoint"] == "data_preview"
+
+
+def test_cli_wait_confirmation_returns_existing_checkpoint_confirmation(tmp_path: Path):
+    run_root = tmp_path / "runs"
+    run_dir = run_root / "run-wait-existing"
+
+    created = _run_cli(
+        [
+            "create-run",
+            "--run-root",
+            str(run_root),
+            "--run-id",
+            "run-wait-existing",
+            "--prompt",
+            "查詢費用分析",
+        ],
+        cwd=Path.cwd(),
+    )
+    assert created.returncode == 0, created.stderr
+
+    sql_review = _run_cli(
+        [
+            "write-sql-review",
+            "--run-dir",
+            str(run_dir),
+            "--sql",
+            "SELECT department, amount FROM expenses",
+        ],
+        cwd=Path.cwd(),
+    )
+    assert sql_review.returncode == 0, sql_review.stderr
+
+    confirmed = _run_cli(
+        [
+            "confirm",
+            "--run-dir",
+            str(run_dir),
+            "--checkpoint",
+            "sql_review",
+            "--action",
+            "調整需求",
+            "--comment",
+            "請加入期預算比較",
+            "--selected-option",
+            "chart=bar",
+        ],
+        cwd=Path.cwd(),
+    )
+    assert confirmed.returncode == 0, confirmed.stderr
+
+    waited = _run_cli(
+        [
+            "wait-confirmation",
+            "--run-dir",
+            str(run_dir),
+            "--checkpoint",
+            "sql_review",
+            "--allow-existing",
+            "--timeout-seconds",
+            "0.1",
+            "--poll-interval-seconds",
+            "0.01",
+        ],
+        cwd=Path.cwd(),
+    )
+
+    assert waited.returncode == 0, waited.stderr
+    payload = json.loads(waited.stdout)
+    assert payload["status"] == "confirmed"
+    assert payload["checkpoint"] == "sql_review"
+    assert payload["action"] == "調整需求"
+    assert payload["comment"] == "請加入期預算比較"
+    assert payload["selectedOptions"] == {"chart": "bar"}
+
+
+def test_cli_wait_confirmation_times_out_when_user_has_not_confirmed(tmp_path: Path):
+    run_root = tmp_path / "runs"
+    run_dir = run_root / "run-wait-timeout"
+
+    created = _run_cli(
+        [
+            "create-run",
+            "--run-root",
+            str(run_root),
+            "--run-id",
+            "run-wait-timeout",
+            "--prompt",
+            "查詢費用分析",
+        ],
+        cwd=Path.cwd(),
+    )
+    assert created.returncode == 0, created.stderr
+
+    sql_review = _run_cli(
+        [
+            "write-sql-review",
+            "--run-dir",
+            str(run_dir),
+            "--sql",
+            "SELECT department, amount FROM expenses",
+        ],
+        cwd=Path.cwd(),
+    )
+    assert sql_review.returncode == 0, sql_review.stderr
+
+    waited = _run_cli(
+        [
+            "wait-confirmation",
+            "--run-dir",
+            str(run_dir),
+            "--checkpoint",
+            "sql_review",
+            "--timeout-seconds",
+            "0.05",
+            "--poll-interval-seconds",
+            "0.01",
+        ],
+        cwd=Path.cwd(),
+    )
+
+    assert waited.returncode == 2
+    error = json.loads(waited.stderr)
+    assert error["code"] == "confirmation_timeout"
+    assert error["checkpoint"] == "sql_review"
 
 
 def test_cli_full_flow_writes_draft_final_review_and_delivery_gate(tmp_path: Path):
@@ -1080,3 +1311,165 @@ def test_cli_write_design_brief_rejects_malformed_package_catalog_guardrail(tmp_
     error = json.loads(result.stderr)
     assert error["code"] == "design_brief_invalid"
     assert "catalog_guardrail" in error["message"]
+
+
+def test_cli_sqlite_enrichment_flow_writes_raw_and_enriched_checkpoints(tmp_path: Path):
+    run_root = tmp_path / "runs"
+    run_dir = run_root / "run-sqlite"
+    workbook = tmp_path / "req.xlsx"
+    _classification_workbook(workbook)
+
+    created = _run_cli(
+        [
+            "create-run",
+            "--run-root",
+            str(run_root),
+            "--run-id",
+            "run-sqlite",
+            "--prompt",
+            "費用分析",
+            "--input-file",
+            str(workbook),
+        ],
+        cwd=Path.cwd(),
+    )
+    assert created.returncode == 0, created.stderr
+
+    classified = _run_cli(
+        [
+            "classify-workbook",
+            "--run-dir",
+            str(run_dir),
+            "--input-file",
+            str(workbook),
+            "--primary-sheet",
+            "明細帳",
+        ],
+        cwd=Path.cwd(),
+    )
+    assert classified.returncode == 0, classified.stderr
+    assert json.loads(classified.stdout)["checkpoint"] == "field_formula_classification"
+
+    initialized = _run_cli(["init-sqlite-workspace", "--run-dir", str(run_dir)], cwd=Path.cwd())
+    assert initialized.returncode == 0, initialized.stderr
+    state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+    assert Path(state["sqlite_manifest_path"]).exists()
+
+    imported = _run_cli(
+        [
+            "import-lookups",
+            "--run-dir",
+            str(run_dir),
+            "--input-file",
+            str(workbook),
+            "--sheet-name",
+            "對照表",
+            "--logical-name",
+            "lookup_account_category",
+            "--key-column",
+            "A",
+            "--value-column",
+            "bu=B",
+            "--value-column",
+            "expense_category=C",
+        ],
+        cwd=Path.cwd(),
+    )
+    assert imported.returncode == 0, imported.stderr
+    imported_payload = json.loads(imported.stdout)
+    assert imported_payload["imported_row_count"] == 1
+    assert imported_payload["ignored_row_count"] == 5
+    lookup_table = imported_payload["table_name"]
+    state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+    assert state["sqlite_manifest"]["lookup_row_counts"] == {lookup_table: 1}
+    assert state["sqlite_manifest"]["ignored_lookup_rows"][lookup_table][0]["reason"] == "header_or_metadata"
+
+    raw_rows = tmp_path / "raw-rows.json"
+    raw_rows.write_text('[{"account_code":"6111","amount":100}]', encoding="utf-8")
+    raw = _run_cli(["write-raw-table", "--run-dir", str(run_dir), "--rows", str(raw_rows)], cwd=Path.cwd())
+    assert raw.returncode == 0, raw.stderr
+
+    raw_preview = _run_cli(["write-raw-preview", "--run-dir", str(run_dir)], cwd=Path.cwd())
+    assert raw_preview.returncode == 0, raw_preview.stderr
+    raw_payload = json.loads(raw_preview.stdout)
+    assert raw_payload["checkpoint"] == "raw_data_preview"
+    assert raw_payload["payload"]["row_count"] == 1
+    assert raw_payload["payload"]["columns"] == ["account_code", "amount"]
+
+    enriched = _run_cli(
+        [
+            "run-sqlite-enrichment",
+            "--run-dir",
+            str(run_dir),
+            "--computed-columns",
+            '[{"name":"amount_twice","expression":"raw.\\"amount\\" * 2"}]',
+            "--lookup-columns",
+            (
+                '[{"name":"expense_category","lookup_table":"'
+                + lookup_table
+                + '","raw_key":"account_code","lookup_key":"account_code","lookup_value":"expense_category"}]'
+            ),
+        ],
+        cwd=Path.cwd(),
+    )
+    assert enriched.returncode == 0, enriched.stderr
+
+    enriched_preview = _run_cli(["write-enriched-preview", "--run-dir", str(run_dir)], cwd=Path.cwd())
+    assert enriched_preview.returncode == 0, enriched_preview.stderr
+    enriched_payload = json.loads(enriched_preview.stdout)
+    assert enriched_payload["checkpoint"] == "enriched_data_preview"
+    assert enriched_payload["payload"]["sample_rows"] == [
+        {
+            "account_code": "6111",
+            "amount": 100,
+            "expense_category": "8.租金支出",
+            "amount_twice": 200,
+        }
+    ]
+
+    retention = _run_cli(["write-sqlite-retention", "--run-dir", str(run_dir)], cwd=Path.cwd())
+    assert retention.returncode == 0, retention.stderr
+    retention_payload = json.loads(retention.stdout)
+    assert retention_payload["checkpoint"] == "sqlite_retention"
+    table_names = {item["table_name"] for item in retention_payload["payload"]["tables"]}
+    assert lookup_table in table_names
+
+
+def test_harness_sql_review_clears_sqlite_preview_checkpoints(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-state", prompt="費用分析")
+    harness.write_sql_review("SELECT old", {"status": "pending_user_confirmation"})
+    harness.write_raw_data_preview({"row_count": 1, "columns": ["account_code"], "sample_rows": []})
+    harness.write_enriched_data_preview({"row_count": 1, "columns": ["account_code"], "sample_rows": []})
+    harness.write_sqlite_retention({"manifest_path": "/tmp/manifest.json", "tables": []})
+
+    harness.write_sql_review("SELECT new", {"status": "pending_user_confirmation"})
+    state = harness.state()
+    checkpoints = {item["checkpoint"] for item in state["checkpoints"]}
+
+    assert "raw_data_preview" not in checkpoints
+    assert "enriched_data_preview" not in checkpoints
+    assert "sqlite_retention" not in checkpoints
+    assert state["raw_data_preview"] is None
+    assert state["enriched_data_preview"] is None
+    assert state["sqlite_retention"] is None
+
+
+def test_harness_raw_preview_clears_enriched_and_report_downstream(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-state", prompt="費用分析")
+    harness.write_raw_data_preview({"row_count": 1, "columns": ["account_code"], "sample_rows": []})
+    harness.write_enriched_data_preview({"row_count": 1, "columns": ["account_code"], "sample_rows": []})
+    harness.write_sqlite_retention({"manifest_path": "/tmp/manifest.json", "tables": []})
+    harness.write_report_selection({"selected_report_type": "expense-analysis", "selected_options": {}})
+    harness.confirm("report_selection", "產生報告")
+
+    harness.write_raw_data_preview({"row_count": 2, "columns": ["account_code"], "sample_rows": []})
+    state = harness.state()
+    checkpoints = {item["checkpoint"] for item in state["checkpoints"]}
+
+    assert "enriched_data_preview" not in checkpoints
+    assert "sqlite_retention" not in checkpoints
+    assert "report_selection" not in checkpoints
+    assert "report_selection" not in state.get("user_confirmations", {})
+    assert state["enriched_data_preview"] is None
+    assert state["sqlite_retention"] is None
+    assert state["report_options"] == {}
