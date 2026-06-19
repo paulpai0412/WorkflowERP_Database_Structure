@@ -4,11 +4,12 @@ import sqlite3
 import zipfile
 from pathlib import Path
 from xml.sax.saxutils import escape
+import json
 
 from skill_scripts.formula_sqlite_translator import translate_formula
+from skill_scripts.llm_workbook_classifier import classify_workbook_with_llm
 from skill_scripts.sqlite_enrichment import run_enrichment
 from skill_scripts.sqlite_workspace import SQLiteRunWorkspace
-from skill_scripts.workbook_classifier import classify_workbook
 from skill_scripts.workbook_lookup_importer import import_lookup_sheet
 
 
@@ -143,10 +144,92 @@ def _expense_workbook(path: Path) -> None:
         )
 
 
-def test_expense_sqlite_enrichment_e2e_without_fake_or_mock(tmp_path: Path):
+def test_expense_sqlite_enrichment_e2e_with_llm_classification_contract(tmp_path: Path, monkeypatch):
     workbook = tmp_path / "expense.xlsx"
     _expense_workbook(workbook)
-    classification = classify_workbook(workbook, source_dir="_Source", primary_sheet="明細帳")
+    monkeypatch.setenv(
+        "LLM_MOCK_RESPONSE",
+        json.dumps(
+            {
+                "candidate_tables": [
+                    {
+                        "table_id": "ACTML",
+                        "table_name": "分類帳檔",
+                        "reason": "費用明細帳交易列最可能在分類帳檔",
+                        "confidence": 0.9,
+                    }
+                ],
+                "column_mappings": [
+                    {
+                        "excel_column": "A",
+                        "excel_header": "科目編號",
+                        "classification": "db_source_field",
+                        "processing_location": "formal_db_sql",
+                        "source_expression": "ACTML.ML006",
+                        "fields": [{"table_id": "ACTML", "column_id": "ML006", "business_meaning": "明細科目編號"}],
+                        "relationship_path": [],
+                        "lookup_sheet": "",
+                        "confidence": 0.9,
+                        "reason": "LLM selected ACTML before mapping fields.",
+                        "risks": [],
+                    },
+                    {
+                        "excel_column": "C",
+                        "excel_header": "部門代號",
+                        "classification": "db_source_field",
+                        "processing_location": "formal_db_sql",
+                        "source_expression": "ACTML.ML010",
+                        "fields": [{"table_id": "ACTML", "column_id": "ML010", "business_meaning": "部門"}],
+                        "relationship_path": [],
+                        "lookup_sheet": "",
+                        "confidence": 0.9,
+                        "reason": "LLM selected ACTML before mapping fields.",
+                        "risks": [],
+                    },
+                    {
+                        "excel_column": "H",
+                        "excel_header": "金額-本幣",
+                        "classification": "db_derived_field",
+                        "processing_location": "sqlite_enrichment",
+                        "source_expression": "=F2-G2",
+                        "fields": [
+                            {"table_id": "ACTML", "column_id": "ML007", "business_meaning": "借貸別"},
+                            {"table_id": "ACTML", "column_id": "ML008", "business_meaning": "本幣金額"},
+                        ],
+                        "relationship_path": [],
+                        "lookup_sheet": "",
+                        "confidence": 0.86,
+                        "reason": "Excel amount formula must be enriched locally.",
+                        "risks": [],
+                    },
+                    {
+                        "excel_column": "I",
+                        "excel_header": "費用類別",
+                        "classification": "excel_enrichment_field",
+                        "processing_location": "sqlite_enrichment",
+                        "source_expression": "=VLOOKUP(A2,對照表!A:B,2,0)",
+                        "fields": [],
+                        "relationship_path": [],
+                        "lookup_sheet": "對照表",
+                        "confidence": 0.9,
+                        "reason": "Workbook lookup formula.",
+                        "risks": [],
+                    },
+                ],
+                "assumptions": [],
+                "confidence": 0.88,
+            },
+            ensure_ascii=False,
+        ),
+    )
+    classification = classify_workbook_with_llm(
+        workbook,
+        source_dir="_Source",
+        primary_sheet="明細帳",
+        user_prompt="費用分析",
+        llm_provider="mock",
+        llm_model="mock",
+    )
     by_header = {column["excel_header"]: column for column in classification["columns"]}
     assert by_header["科目編號"]["classification"] == "db_source_field"
     assert by_header["部門代號"]["classification"] == "db_source_field"

@@ -4,6 +4,8 @@ import zipfile
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+import pytest
+
 from skill_scripts.workbook_classifier import classify_workbook
 
 
@@ -16,6 +18,8 @@ REQUIRED_COLUMN_KEYS = {
     "lookup_sheet",
     "field_metadata",
     "lineage_inputs",
+    "relationship_path",
+    "schema_candidates",
     "confidence",
     "reason",
     "risks",
@@ -148,79 +152,17 @@ def _classification_workbook(path: Path) -> None:
         )
 
 
-def test_classify_workbook_splits_db_derived_excel_and_unresolved_columns(tmp_path: Path):
+def test_classify_workbook_rule_fallback_is_removed(tmp_path: Path):
     workbook = tmp_path / "req.xlsx"
     _classification_workbook(workbook)
 
-    result = classify_workbook(workbook, source_dir="_Source", primary_sheet="明細帳")
-    by_header = {item["excel_header"]: item for item in result["columns"]}
-
-    assert by_header["科目編號"]["classification"] == "db_source_field"
-    assert by_header["科目編號"]["processing_location"] == "formal_db_sql"
-    assert by_header["科目編號"]["field_metadata"][0]["table_id"] == "ACTML"
-    assert by_header["科目編號"]["field_metadata"][0]["column_id"] == "ML006"
-    assert by_header["科目編號"]["field_metadata"][0]["column_name"] == "明細科目編號"
-    assert by_header["傳票日期"]["classification"] == "db_source_field"
-    assert by_header["金額-原幣"]["classification"] == "db_derived_field"
-    assert by_header["金額-原幣"]["processing_location"] == "sqlite_enrichment"
-    assert by_header["金額-原幣"]["source_expression"] == "=C2-D2"
-    assert [(item["table_id"], item["column_id"]) for item in by_header["金額-原幣"]["lineage_inputs"]] == [
-        ("ACTML", "ML007"),
-        ("ACTML", "ML014"),
-    ]
-    assert [
-        (item["table_id"], item["column_id"], item["column_name"])
-        for item in by_header["本幣借方金額"]["lineage_inputs"]
-    ] == [
-        ("ACTML", "ML007", "借貸別"),
-        ("ACTML", "ML008", "本幣金額"),
-    ]
-    assert [
-        (item["table_id"], item["column_id"], item["column_name"])
-        for item in by_header["本幣貸方金額"]["lineage_inputs"]
-    ] == [
-        ("ACTML", "ML007", "借貸別"),
-        ("ACTML", "ML008", "本幣金額"),
-    ]
-    assert [
-        (item["table_id"], item["column_id"], item["column_name"])
-        for item in by_header["金額-本幣"]["lineage_inputs"]
-    ] == [
-        ("ACTML", "ML007", "借貸別"),
-        ("ACTML", "ML008", "本幣金額"),
-    ]
-    assert [(item["table_id"], item["column_id"]) for item in by_header["年月"]["lineage_inputs"]] == [
-        ("ACTML", "ML002"),
-    ]
-    assert by_header["BU"]["classification"] == "excel_enrichment_field"
-    assert by_header["BU"]["processing_location"] == "sqlite_enrichment"
-    assert by_header["BU"]["lookup_sheet"] == "對照表"
-    assert [(item["table_id"], item["column_id"]) for item in by_header["BU"]["lineage_inputs"]] == [
-        ("ACTML", "ML006"),
-    ]
-    assert by_header["人工調整"]["classification"] == "unresolved_field"
-    assert by_header["人工調整"]["processing_location"] == "excluded_pending_rule"
-    assert by_header["人工調整"]["risks"]
-    assert by_header["原幣餘額"]["classification"] == "unresolved_field"
-    assert by_header["原幣餘額"]["processing_location"] == "excluded_pending_rule"
-    assert by_header["原幣餘額"]["risks"]
-    assert result["lookup_sheet_inventory"] == [{"sheet_name": "對照表", "role": "lookup_sheet"}]
+    with pytest.raises(RuntimeError, match="RULE_FALLBACK_REMOVED"):
+        classify_workbook(workbook, source_dir="_Source", primary_sheet="明細帳")
 
 
 def test_every_column_has_confidence_reason_and_processing_location(tmp_path: Path):
     workbook = tmp_path / "req.xlsx"
     _classification_workbook(workbook)
 
-    result = classify_workbook(workbook, source_dir="_Source", primary_sheet="明細帳")
-
-    assert result["workbook_path"] == str(workbook)
-    assert result["primary_sheet"] == "明細帳"
-    for column in result["columns"]:
-        assert set(column) == REQUIRED_COLUMN_KEYS
-        assert column["confidence"] in {"high", "medium", "low"}
-        assert column["reason"]
-        assert column["processing_location"] in {
-            "formal_db_sql",
-            "sqlite_enrichment",
-            "excluded_pending_rule",
-        }
+    with pytest.raises(RuntimeError, match="RULE_FALLBACK_REMOVED"):
+        classify_workbook(workbook, source_dir="_Source", primary_sheet="明細帳")

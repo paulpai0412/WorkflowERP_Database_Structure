@@ -402,19 +402,28 @@ def test_cli_report_harness_builds_excel_checkpoint(tmp_path: Path):
 
 def test_cli_report_harness_builds_sql_checkpoint(tmp_path: Path):
     run_dir = tmp_path / "runs" / "sql-checkpoint"
+    llm_payload = {
+        "sql": "SELECT TOP 50 [ML006], [ML008] FROM [VPIC1].[dbo].[ACTML]",
+        "used_tables": ["ACTML"],
+        "assumptions": ["依 prompt 判斷為費用明細查詢，先取費用科目與金額欄位。"],
+        "confidence": 0.95,
+    }
 
     result = _run_cli(
         [
             "--prompt",
-            "查詢採購單前 20 筆",
+            "我要看這個月的費用資料",
             "--run-dir",
             str(run_dir),
             "--checkpoint",
             "sql",
-            "--mode",
-            "rule",
+            "--llm-provider",
+            "mock",
+            "--llm-model",
+            "mock",
         ],
         cwd=Path.cwd(),
+        env={"LLM_MOCK_RESPONSE": json.dumps(llm_payload, ensure_ascii=False)},
     )
 
     assert result.returncode == 0, result.stderr
@@ -425,19 +434,29 @@ def test_cli_report_harness_builds_sql_checkpoint(tmp_path: Path):
 
 def test_cli_report_harness_does_not_execute_db_without_confirmation_flag(tmp_path: Path):
     run_dir = tmp_path / "runs" / "no-execution"
+    llm_payload = {
+        "sql": "SELECT TOP 50 [ML006], [ML008] FROM [VPIC1].[dbo].[ACTML]",
+        "used_tables": ["ACTML"],
+        "assumptions": ["依 prompt 判斷為費用明細查詢，先取費用科目與金額欄位。"],
+        "confidence": 0.95,
+    }
 
     result = _run_cli(
         [
             "--prompt",
-            "查詢採購單前 20 筆",
+            "我要看這個月的費用資料",
             "--run-dir",
             str(run_dir),
             "--checkpoint",
             "sql",
             "--validate-execution",
+            "--llm-provider",
+            "mock",
+            "--llm-model",
+            "mock",
         ],
         cwd=Path.cwd(),
-        env={"DB_ENV": "test"},
+        env={"DB_ENV": "test", "LLM_MOCK_RESPONSE": json.dumps(llm_payload, ensure_ascii=False)},
     )
 
     assert result.returncode == 0, result.stderr
@@ -620,6 +639,90 @@ def test_cli_full_flow_blocks_and_advances_by_confirmation(tmp_path: Path):
 
     assert data_preview.returncode == 0, data_preview.stderr
     assert json.loads(data_preview.stdout)["checkpoint"] == "data_preview"
+
+
+def test_cli_write_sql_review_prompt_only_requires_llm_provider(tmp_path: Path):
+    run_root = tmp_path / "runs"
+    run_dir = run_root / "run-prompt-only-no-provider"
+
+    created = _run_cli(
+        [
+            "create-run",
+            "--run-root",
+            str(run_root),
+            "--run-id",
+            "run-prompt-only-no-provider",
+            "--prompt",
+            "我要看這個月的費用資料",
+        ],
+        cwd=Path.cwd(),
+    )
+    assert created.returncode == 0, created.stderr
+
+    result = _run_cli(
+        [
+            "write-sql-review",
+            "--run-dir",
+            str(run_dir),
+        ],
+        cwd=Path.cwd(),
+    )
+
+    assert result.returncode == 2
+    error = json.loads(result.stderr)
+    assert error["code"] == "sql_review_error"
+    assert error["message"] == "LLM_PROVIDER_NOT_CONFIGURED"
+    assert not (run_dir / "sql" / "query.sql").exists()
+
+
+def test_cli_write_sql_review_prompt_only_uses_llm_first_without_rule_fallback(
+    tmp_path: Path,
+):
+    run_root = tmp_path / "runs"
+    run_dir = run_root / "run-prompt-only-llm"
+    llm_payload = {
+        "sql": "SELECT TOP 50 [ML006], [ML008] FROM [VPIC1].[dbo].[ACTML]",
+        "used_tables": ["ACTML"],
+        "assumptions": ["依 prompt 判斷為費用明細查詢，先取費用科目與金額欄位。"],
+        "confidence": 0.95,
+    }
+
+    created = _run_cli(
+        [
+            "create-run",
+            "--run-root",
+            str(run_root),
+            "--run-id",
+            "run-prompt-only-llm",
+            "--prompt",
+            "我要看這個月的費用資料",
+        ],
+        cwd=Path.cwd(),
+    )
+    assert created.returncode == 0, created.stderr
+
+    result = _run_cli(
+        [
+            "write-sql-review",
+            "--run-dir",
+            str(run_dir),
+            "--llm-provider",
+            "mock",
+            "--llm-model",
+            "mock",
+        ],
+        cwd=Path.cwd(),
+        env={"LLM_MOCK_RESPONSE": json.dumps(llm_payload, ensure_ascii=False)},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["checkpoint"] == "sql_review"
+    query_payload = json.loads((run_dir / "sql" / "query.sql.json").read_text(encoding="utf-8"))
+    assert query_payload["sql"] == llm_payload["sql"]
+    assert query_payload["validation"]["route"] == "llm"
+    assert query_payload["validation"]["reason"] == "OK"
+    assert query_payload["validation"]["llm_provider"] == "mock"
+    assert (run_dir / "sql" / "query.sql").read_text(encoding="utf-8").strip() == llm_payload["sql"]
 
 
 def test_cli_wait_confirmation_returns_existing_checkpoint_confirmation(tmp_path: Path):
@@ -1335,6 +1438,71 @@ def test_cli_sqlite_enrichment_flow_writes_raw_and_enriched_checkpoints(tmp_path
     run_dir = run_root / "run-sqlite"
     workbook = tmp_path / "req.xlsx"
     _classification_workbook(workbook)
+    classification_llm_payload = {
+        "candidate_tables": [
+            {
+                "table_id": "ACTML",
+                "table_name": "分類帳檔",
+                "reason": "費用明細帳交易資料最可能存在於會計分類帳檔。",
+                "confidence": 0.9,
+            }
+        ],
+        "column_mappings": [
+            {
+                "excel_column": "A",
+                "excel_header": "科目編號",
+                "classification": "db_source_field",
+                "processing_location": "formal_db_sql",
+                "source_expression": "ACTML.ML006",
+                "fields": [{"table_id": "ACTML", "column_id": "ML006", "business_meaning": "明細科目編號"}],
+                "relationship_path": [],
+                "lookup_sheet": "",
+                "confidence": 0.9,
+                "reason": "LLM 先選 ACTML，再映射科目欄位。",
+                "risks": [],
+            },
+            {
+                "excel_column": "B",
+                "excel_header": "傳票日期",
+                "classification": "db_source_field",
+                "processing_location": "formal_db_sql",
+                "source_expression": "ACTML.ML002",
+                "fields": [{"table_id": "ACTML", "column_id": "ML002", "business_meaning": "傳票日期"}],
+                "relationship_path": [],
+                "lookup_sheet": "",
+                "confidence": 0.86,
+                "reason": "LLM 先選 ACTML，再映射日期欄位。",
+                "risks": [],
+            },
+            {
+                "excel_column": "C",
+                "excel_header": "金額-原幣",
+                "classification": "db_source_field",
+                "processing_location": "formal_db_sql",
+                "source_expression": "ACTML.ML014",
+                "fields": [{"table_id": "ACTML", "column_id": "ML014", "business_meaning": "原幣金額"}],
+                "relationship_path": [],
+                "lookup_sheet": "",
+                "confidence": 0.86,
+                "reason": "LLM 先選 ACTML，再映射金額欄位。",
+                "risks": [],
+            },
+            {
+                "excel_column": "D",
+                "excel_header": "BU",
+                "classification": "excel_enrichment_field",
+                "processing_location": "sqlite_enrichment",
+                "source_expression": "=VLOOKUP(A2,對照表!A:B,2,0)",
+                "fields": [],
+                "relationship_path": [],
+                "lookup_sheet": "對照表",
+                "confidence": 0.9,
+                "reason": "BU 由 Excel lookup 對照表取得，應於 SQLite enrichment 補齊。",
+                "risks": [],
+            },
+        ],
+        "assumptions": ["公式欄位不送正式 DB，先查 raw DB 欄位後於 SQLite enrichment 補齊。"],
+    }
 
     created = _run_cli(
         [
@@ -1361,8 +1529,13 @@ def test_cli_sqlite_enrichment_flow_writes_raw_and_enriched_checkpoints(tmp_path
             str(workbook),
             "--primary-sheet",
             "明細帳",
+            "--llm-provider",
+            "mock",
+            "--llm-model",
+            "mock",
         ],
         cwd=Path.cwd(),
+        env={"LLM_MOCK_RESPONSE": json.dumps(classification_llm_payload, ensure_ascii=False)},
     )
     assert classified.returncode == 0, classified.stderr
     assert json.loads(classified.stdout)["checkpoint"] == "field_formula_classification"
