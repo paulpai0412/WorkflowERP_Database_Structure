@@ -1,0 +1,73 @@
+{
+  "catalog_guardrail": "financial-control",
+  "layout_recipe": {
+    "mode": "kpi-first-dashboard",
+    "sections": [
+      "executive-summary",
+      "kpi-overview",
+      "expense-trend",
+      "exception-review",
+      "data-table"
+    ],
+    "density": "analysis-first"
+  },
+  "chart_recipe": [
+    {
+      "id": "expense-budget-variance",
+      "type": "combo",
+      "purpose": "Compare actual expense, budget, and variance in one control view."
+    },
+    {
+      "id": "expense-composition",
+      "type": "stacked-bar",
+      "purpose": "Show expense composition across departments or categories."
+    },
+    {
+      "id": "expense-driver-ranking",
+      "type": "bar",
+      "purpose": "Rank the largest expense drivers for exception review."
+    }
+  ],
+  "table_recipe": [
+    {
+      "id": "expense-detail-table",
+      "type": "data-table",
+      "features": [
+        "filter",
+        "sort",
+        "drilldown",
+        "column_visibility"
+      ]
+    }
+  ],
+  "interaction_recipe": {
+    "filters": [
+      "department_code",
+      "department_name",
+      "expense_subject",
+      "amount",
+      "budget_amount",
+      "variance_amount",
+      "expense_ratio"
+    ],
+    "drilldowns": [
+      "department",
+      "category",
+      "document"
+    ]
+  },
+  "visual_direction": {
+    "tone": "quiet financial operations dashboard",
+    "emphasis": [
+      "variance",
+      "outliers",
+      "approval-ready summary"
+    ]
+  },
+  "embedded_data_policy": {
+    "mode": "smart-tiered",
+    "summary_threshold_rows": 5000
+  },
+  "style_version": "wferp.style-capsule.v1",
+  "style_fingerprint": "4e9b070aadd45a851c859992bb6f17c7379f04dedaf09e16c23f8384e5607af7"
+}

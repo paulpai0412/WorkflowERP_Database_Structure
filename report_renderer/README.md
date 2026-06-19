@@ -33,6 +33,23 @@ Typical command sequence:
 `serve-checkpoint` starts the local companion server for user confirmations. The
 browser never connects to the database, executes SQL, or stores credentials.
 
+## Single HTML export
+
+Final delivery can be exported as a self-contained offline HTML file:
+
+```bash
+python3 -m skill_scripts.cli_report_harness export-single-html \
+  --run-dir /path/to/run \
+  --package /path/to/report-package.json \
+  --brief /path/to/report-design-brief.json
+```
+
+The command writes `delivery/report.html`, `delivery/delivery-manifest.json`, and
+an evidence packet under `delivery/evidence/` containing `report-package.json`,
+`report-design-brief.json`, and `query.sql`. The HTML file embeds the compressed
+report package and design brief inline and does not load external scripts,
+stylesheets, or fetch resources.
+
 ## Component layer note
 
 The beautiful-article/reacticle package is not used in this project because it is not available as an installed local dependency for this worktree. The renderer implements a compatible internal semantic component layer using React sections, panels, status rows, option controls, data tables, and report blocks with restrained business-report styling.

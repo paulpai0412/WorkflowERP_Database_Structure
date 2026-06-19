@@ -8,7 +8,10 @@ from pathlib import Path
 import sys
 from typing import Any
 
+from skill_scripts.dynamic_design_brief import build_design_brief
+from skill_scripts.dynamic_design_brief import validate_design_brief
 from skill_scripts.excel_intake import build_excel_confirmation_payload, parse_excel_requirement
+from skill_scripts.html_self_validator import validate_single_html_static
 from skill_scripts.report_catalog import build_report_selection_payload
 from skill_scripts.report_catalog import get_report_design_defaults
 from skill_scripts.report_catalog import list_report_designs
@@ -18,7 +21,11 @@ from skill_scripts.report_harness_state import load_run_state
 from skill_scripts.report_harness_state import write_confirmation
 from skill_scripts.report_scaffold import scaffold_report_workspace
 from skill_scripts.schema_loader import load_schema_bundle
+from skill_scripts.single_html_exporter import export_single_html_report
 from skill_scripts.sql_generator import generate_select_sql
+from skill_scripts.style_replay import detect_replay_adjustments
+from skill_scripts.visual_checkpoint import build_visual_checkpoint_payload
+from skill_scripts.visual_checkpoint import render_visual_checkpoint_html
 
 DEFAULT_REPORT_SECTIONS = [
     "executive-summary",
@@ -69,6 +76,12 @@ def _write_run_json(run_dir: Path, relative_path: str, payload: dict[str, Any]) 
     path = run_dir / relative_path
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _write_run_text(run_dir: Path, relative_path: str, text: str) -> None:
+    path = run_dir / relative_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
 
 
 def _slugify_section(value: str) -> str:
@@ -425,6 +438,101 @@ def _write_report_selection(argv: list[str]) -> int:
     return 0
 
 
+def _write_design_brief(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Write the dynamic design brief checkpoint.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--package", required=True)
+    parser.add_argument("--overrides", default="")
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        package = _load_json_arg(args.package)
+        overrides = _load_json_arg_or_empty(args.overrides)
+        brief = build_design_brief(package, user_overrides=overrides)
+        result = validate_design_brief(brief)
+        if not result["valid"]:
+            return _json_error("design_brief_invalid", ", ".join(result["errors"]))
+        checkpoint = harness.write_design_brief(brief)
+    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("design_brief_error", str(exc))
+    _write_stdout_json(checkpoint)
+    return 0
+
+
+def _write_visual_checkpoint(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Write the semi-real visual design checkpoint.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--brief", required=True)
+    parser.add_argument("--package", required=True)
+    args = parser.parse_args(argv)
+
+    try:
+        harness = _open_harness(args.run_dir)
+        brief = _load_json_arg(args.brief)
+        package = _load_json_arg(args.package)
+        payload = build_visual_checkpoint_payload(brief, package)
+        html_text = render_visual_checkpoint_html(payload)
+        checkpoint = harness.write_visual_design(payload)
+        _write_run_text(harness.run_dir, "visual/visual-checkpoint.html", html_text)
+    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("visual_checkpoint_error", str(exc))
+    _write_stdout_json(checkpoint)
+    return 0
+
+
+def _export_single_html(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Export a self-contained WFERP single HTML report.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--package", required=True)
+    parser.add_argument("--brief", required=True)
+    parser.add_argument("--output-root", default="")
+    args = parser.parse_args(argv)
+
+    try:
+        package = _load_json_arg(args.package)
+        brief = _load_json_arg(args.brief)
+        output_root = Path(args.output_root) if args.output_root else Path(args.run_dir)
+        result = export_single_html_report(output_root, package, brief)
+    except (ValueError, json.JSONDecodeError, OSError) as exc:
+        return _json_error("single_html_export_error", str(exc))
+    if result.get("status") == "error":
+        errors = result.get("errors", [])
+        message = ", ".join(str(error) for error in errors)
+        return _json_error("single_html_export_error", message)
+    _write_stdout_json(result)
+    return 0
+
+
+def _validate_single_html(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Validate exported single HTML report.")
+    parser.add_argument("--html", required=True)
+    args = parser.parse_args(argv)
+
+    try:
+        result = validate_single_html_static(args.html)
+    except OSError as exc:
+        return _json_error("single_html_validation_error", str(exc))
+    _write_stdout_json({"status": "validated", **result})
+    return 0 if result["valid"] else 2
+
+
+def _inspect_style_replay(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Inspect whether a style capsule can replay against new columns.")
+    parser.add_argument("--capsule", required=True)
+    parser.add_argument("--columns", required=True)
+    args = parser.parse_args(argv)
+
+    try:
+        capsule = _load_json_arg(args.capsule)
+    except (ValueError, json.JSONDecodeError, OSError) as exc:
+        return _json_error("style_replay_error", str(exc))
+    columns = [part.strip() for part in args.columns.split(",") if part.strip()]
+    result = detect_replay_adjustments(capsule, new_columns=columns)
+    _write_stdout_json({"status": "checked", **result})
+    return 2 if result["requires_checkpoint"] else 0
+
+
 def _write_report_draft(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Write the report draft checkpoint after report selection.")
     parser.add_argument("--run-dir", required=True)
@@ -480,6 +588,11 @@ COMMANDS = {
     "confirm": _confirm,
     "write-data-preview": _write_data_preview,
     "write-report-selection": _write_report_selection,
+    "write-design-brief": _write_design_brief,
+    "write-visual-checkpoint": _write_visual_checkpoint,
+    "export-single-html": _export_single_html,
+    "validate-single-html": _validate_single_html,
+    "inspect-style-replay": _inspect_style_replay,
     "scaffold-report": _scaffold_report,
     "write-report-draft": _write_report_draft,
     "write-final-review": _write_final_review,

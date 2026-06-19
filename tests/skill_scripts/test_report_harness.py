@@ -4,9 +4,11 @@ from pathlib import Path
 
 import pytest
 
+from skill_scripts.dynamic_design_brief import build_design_brief, validate_design_brief
 from skill_scripts.report_harness import ReportHarness, ReportHarnessError
 from skill_scripts.report_harness_state import write_confirmation
 from skill_scripts.validator_contracts import REQUIRED_VALIDATORS
+from skill_scripts.visual_checkpoint import build_visual_checkpoint_payload
 
 
 def _validator_result(role: str, status: str = "pass") -> dict[str, object]:
@@ -32,6 +34,46 @@ def _validator_result(role: str, status: str = "pass") -> dict[str, object]:
 def _all_validator_results(status_overrides: dict[str, str] | None = None) -> list[dict[str, object]]:
     overrides = status_overrides or {}
     return [_validator_result(role, overrides.get(role, "pass")) for role in REQUIRED_VALIDATORS]
+
+
+def _valid_design_brief(harness: ReportHarness) -> dict[str, object]:
+    brief = build_design_brief(
+        {
+            "catalog_guardrail": "financial-control",
+            "prompt": harness.state().get("prompt"),
+            "report_type": harness.state().get("report_type"),
+            "data_profile": {"columns": ["department", "amount"], "row_count": 1},
+            "datasets": {"columns": ["department", "amount"]},
+        }
+    )
+    assert validate_design_brief(brief)["valid"] is True
+    return brief
+
+
+def _confirm_design_brief(harness: ReportHarness) -> None:
+    brief = _valid_design_brief(harness)
+    harness.write_design_brief(brief)
+    harness.confirm("design_brief", "確認設計")
+
+
+def _confirm_visual_design(harness: ReportHarness) -> None:
+    package = {
+        "catalog_guardrail": "financial-control",
+        "prompt": harness.state().get("prompt"),
+        "report_type": harness.state().get("report_type"),
+        "data_profile": {"columns": ["department", "amount"], "row_count": 2},
+        "datasets": {
+            "columns": ["department", "amount"],
+            "embedded_rows": [
+                {"department": "管理部", "amount": 1000},
+                {"department": "研發部", "amount": 2500},
+            ],
+        },
+        "aggregates": {"amount_sum": 3500, "amount_avg": 1750},
+    }
+    payload = build_visual_checkpoint_payload(harness.state()["report_design_brief"], package)
+    harness.write_visual_design(payload)
+    harness.confirm("visual_design", "確認視覺設計")
 
 
 def test_rejects_state_transition_without_required_confirmation(tmp_path: Path):
@@ -135,6 +177,8 @@ def test_final_review_requires_draft_acceptance(tmp_path: Path):
     harness = ReportHarness.create(tmp_path, run_id="demo-run", prompt="請查詢費用")
     harness.write_report_selection({"report_types": ["管理摘要"]})
     harness.confirm("report_selection", "產生報告")
+    _confirm_design_brief(harness)
+    _confirm_visual_design(harness)
     harness.write_report_draft({"sections": ["摘要"]})
 
     with pytest.raises(ReportHarnessError, match="Draft must be accepted"):
@@ -147,6 +191,8 @@ def test_success_is_blocked_when_any_validator_fails(tmp_path: Path):
         {"selected_report_type": "管理摘要", "selected_report_design": "financial-control"}
     )
     harness.confirm("report_selection", "產生報告")
+    _confirm_design_brief(harness)
+    _confirm_visual_design(harness)
     harness.write_report_draft({"sections": ["摘要"]})
     harness.confirm("report_draft", "接受")
     harness.write_final_review(
@@ -168,6 +214,8 @@ def test_delivery_allows_explicitly_accepted_residual_risk_at_final_checkpoint(t
         {"selected_report_type": "管理摘要", "selected_report_design": "financial-control"}
     )
     harness.confirm("report_selection", "產生報告")
+    _confirm_design_brief(harness)
+    _confirm_visual_design(harness)
     harness.write_report_draft({"sections": ["摘要"]})
     harness.confirm("report_draft", "接受")
     harness.write_final_review(
@@ -199,6 +247,8 @@ def test_final_review_payload_string_residual_risks_do_not_allow_delivery(tmp_pa
         {"selected_report_type": "管理摘要", "selected_report_design": "financial-control"}
     )
     harness.confirm("report_selection", "產生報告")
+    _confirm_design_brief(harness)
+    _confirm_visual_design(harness)
     harness.write_report_draft({"sections": ["摘要"]})
     harness.confirm("report_draft", "接受")
     harness.write_final_review(
@@ -222,6 +272,8 @@ def test_non_pass_validator_delivers_only_with_matching_user_accepted_risk(tmp_p
         {"selected_report_type": "管理摘要", "selected_report_design": "financial-control"}
     )
     harness.confirm("report_selection", "產生報告")
+    _confirm_design_brief(harness)
+    _confirm_visual_design(harness)
     harness.write_report_draft({"sections": ["摘要"]})
     harness.confirm("report_draft", "接受")
     harness.write_final_review(
@@ -251,6 +303,8 @@ def test_partial_residual_risk_acceptance_still_blocks_other_non_pass_validators
         {"selected_report_type": "管理摘要", "selected_report_design": "financial-control"}
     )
     harness.confirm("report_selection", "產生報告")
+    _confirm_design_brief(harness)
+    _confirm_visual_design(harness)
     harness.write_report_draft({"sections": ["摘要"]})
     harness.confirm("report_draft", "接受")
     harness.write_final_review(
@@ -285,6 +339,8 @@ def test_can_deliver_reads_final_confirmation_file_when_state_options_are_empty(
         {"selected_report_type": "管理摘要", "selected_report_design": "financial-control"}
     )
     harness.confirm("report_selection", "產生報告")
+    _confirm_design_brief(harness)
+    _confirm_visual_design(harness)
     harness.write_report_draft({"sections": ["摘要"]})
     harness.confirm("report_draft", "接受")
     harness.write_final_review(
@@ -335,3 +391,107 @@ def test_append_repair_log_writes_minimal_vertical_slice_entry(tmp_path: Path):
     assert "Files changed:\n- sql/query.sql\n- skill_scripts/report_harness.py" in content
     assert "Validation rerun:\npytest tests/skill_scripts/test_report_harness.py -v" in content
     assert "Residual risk:\nNone" in content
+
+
+def test_write_design_brief_records_checkpoint_and_clears_downstream_state(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
+    harness.write_report_selection(
+        {"selected_report_type": "管理摘要", "selected_report_design": "financial-control"}
+    )
+    harness.confirm("report_selection", "產生報告")
+    _confirm_design_brief(harness)
+    _confirm_visual_design(harness)
+    harness.write_report_draft({"sections": ["摘要"]})
+    harness.update_state(
+        validator_results=[{"role": "visual_taste_reviewer", "status": "pass"}],
+        visual_design_checkpoint={"status": "ready"},
+    )
+
+    brief = _valid_design_brief(harness)
+    brief["chart_recipe"][0]["purpose"] = "比較部門"
+    assert validate_design_brief(brief)["valid"] is True
+
+    checkpoint = harness.write_design_brief(brief)
+
+    state = harness.state()
+    assert checkpoint["checkpoint"] == "design_brief"
+    assert checkpoint["title"] == "動態設計確認"
+    assert state["report_design_brief"] == brief
+    assert state["visual_design_checkpoint"] is None
+    assert state["validator_results"] == []
+    assert "design_brief" not in state["user_confirmations"]
+    assert "report_draft" not in {item["checkpoint"] for item in state["checkpoints"]}
+    assert not (harness.run_dir / "checkpoints" / "05_report_draft.json").exists()
+
+
+def test_write_visual_design_requires_confirmed_design_brief(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
+    payload = {"title": "費用分析視覺設計確認"}
+
+    with pytest.raises(
+        ReportHarnessError,
+        match="Design brief must be confirmed before visual checkpoint",
+    ):
+        harness.write_visual_design(payload)
+
+
+def test_write_visual_design_records_checkpoint_and_clears_downstream_state(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
+    harness.write_report_selection(
+        {"selected_report_type": "管理摘要", "selected_report_design": "financial-control"}
+    )
+    harness.confirm("report_selection", "產生報告")
+    _confirm_design_brief(harness)
+    _confirm_visual_design(harness)
+    harness.write_report_draft({"sections": ["摘要"]})
+    harness.confirm("report_draft", "接受")
+    harness.write_final_review({"validator_results": _all_validator_results()})
+
+    payload = {"title": "費用分析視覺設計確認", "kpis": [{"label": "amount_sum", "value": 3500}]}
+    checkpoint = harness.write_visual_design(payload)
+
+    state = harness.state()
+    assert checkpoint["checkpoint"] == "visual_design"
+    assert checkpoint["title"] == "視覺設計確認"
+    assert state["visual_design_checkpoint"] == payload
+    assert state["validator_results"] == []
+    assert "visual_design" not in state["user_confirmations"]
+    assert "report_draft" not in {item["checkpoint"] for item in state["checkpoints"]}
+    assert "final_review" not in {item["checkpoint"] for item in state["checkpoints"]}
+    assert not (harness.run_dir / "checkpoints" / "05_report_draft.json").exists()
+    assert not (harness.run_dir / "checkpoints" / "06_final_review.json").exists()
+
+
+def test_report_draft_requires_confirmed_design_brief_after_report_selection(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="demo-run", prompt="請查詢費用")
+    harness.write_report_selection({"report_types": ["管理摘要"]})
+    harness.confirm("report_selection", "產生報告")
+    harness.write_design_brief(_valid_design_brief(harness))
+
+    with pytest.raises(ReportHarnessError, match="Design brief must be confirmed before writing draft"):
+        harness.write_report_draft({"sections": []})
+
+
+def test_changed_report_selection_clears_design_brief_and_future_checkpoints(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
+    harness.write_report_selection(
+        {"selected_report_type": "管理摘要", "selected_report_design": "financial-control"}
+    )
+    harness.confirm("report_selection", "產生報告")
+    _confirm_design_brief(harness)
+    harness.update_state(
+        visual_design_checkpoint={"status": "ready"},
+        validator_results=[{"role": "visual_taste_reviewer", "status": "pass"}],
+    )
+
+    harness.write_report_selection(
+        {"selected_report_type": "明細表", "selected_report_design": "financial-control"}
+    )
+
+    state = harness.state()
+    assert state["report_design_brief"] is None
+    assert state["visual_design_checkpoint"] is None
+    assert state["validator_results"] == []
+    assert "design_brief" not in state["user_confirmations"]
+    assert "design_brief" not in {item["checkpoint"] for item in state["checkpoints"]}
+    assert not (harness.run_dir / "checkpoints" / "04a_design_brief.json").exists()

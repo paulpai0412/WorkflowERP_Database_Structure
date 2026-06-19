@@ -1,0 +1,83 @@
+{
+  "row_count": 6,
+  "columns": [
+    "department_code",
+    "department_name",
+    "expense_subject",
+    "amount",
+    "budget_amount",
+    "variance_amount",
+    "expense_ratio"
+  ],
+  "rows": [
+    {
+      "department_code": "ADM",
+      "department_name": "行政部",
+      "expense_subject": "文具",
+      "amount": 10000,
+      "budget_amount": 8000,
+      "variance_amount": 2000,
+      "expense_ratio": 0.1
+    },
+    {
+      "department_code": "ADM",
+      "department_name": "行政部",
+      "expense_subject": "旅費",
+      "amount": 35000,
+      "budget_amount": 30000,
+      "variance_amount": 5000,
+      "expense_ratio": 0.35
+    },
+    {
+      "department_code": "RND",
+      "department_name": "研發部",
+      "expense_subject": "軟體訂閱",
+      "amount": 25000,
+      "budget_amount": 22000,
+      "variance_amount": 3000,
+      "expense_ratio": 0.25
+    },
+    {
+      "department_code": "RND",
+      "department_name": "研發部",
+      "expense_subject": "雲端服務",
+      "amount": 30000,
+      "budget_amount": 25000,
+      "variance_amount": 5000,
+      "expense_ratio": 0.3
+    },
+    {
+      "department_code": "SAL",
+      "department_name": "業務部",
+      "expense_subject": "交際費",
+      "amount": 12000,
+      "budget_amount": 10000,
+      "variance_amount": 2000,
+      "expense_ratio": 0.12
+    },
+    {
+      "department_code": "SAL",
+      "department_name": "業務部",
+      "expense_subject": "廣告費",
+      "amount": 8000,
+      "budget_amount": 5000,
+      "variance_amount": 3000,
+      "expense_ratio": 0.08
+    }
+  ],
+  "aggregates": {
+    "total_amount": 120000,
+    "total_budget": 100000,
+    "variance_amount": 20000,
+    "max_expense_ratio": 0.35
+  },
+  "excluded_rows": {
+    "non_2026": 1,
+    "non_expense_account": 1
+  },
+  "execution": {
+    "engine": "SQLite",
+    "db_env": "test",
+    "real_sql_execution": true
+  }
+}

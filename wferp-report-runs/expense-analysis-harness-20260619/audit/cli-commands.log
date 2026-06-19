@@ -1,0 +1,2828 @@
+$ python3 -m skill_scripts.cli_report_harness create-run --run-root /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs --run-id expense-analysis-harness-20260619 --prompt 費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。
+exit=0
+stdout:
+{
+  "status": "created",
+  "run_dir": "/home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619",
+  "state": {
+    "run_id": "expense-analysis-harness-20260619",
+    "prompt": "費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。",
+    "input_files": [],
+    "schema_snapshot": null,
+    "excel_requirement": null,
+    "sql_candidate": null,
+    "sql_validation": null,
+    "execution_result_summary": null,
+    "report_type": null,
+    "report_design": null,
+    "report_design_brief": null,
+    "visual_design_checkpoint": null,
+    "report_options": {},
+    "validator_results": [],
+    "user_confirmations": {},
+    "checkpoints": [],
+    "created_at": "2026-06-18T23:46:58.810320+00:00",
+    "updated_at": "2026-06-18T23:46:58.810532+00:00"
+  }
+}
+
+$ python3 -m skill_scripts.cli_report_harness write-excel-confirmation --run-dir /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619 --payload /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619/inputs/field-formula-payload.json
+exit=0
+stdout:
+{
+  "checkpoint": "excel_confirmation",
+  "title": "確認欄位與公式",
+  "actions": [
+    "確認欄位與公式",
+    "要求修正"
+  ],
+  "payload": {
+    "kind": "checkpoint",
+    "checkpointId": "expense-analysis-harness-20260619-field-formula",
+    "title": "費用分析欄位與公式確認",
+    "step": "excel_confirmation",
+    "requirementSummary": "以本地 SQLite 測試資料模擬費用分析需求，欄位包含部門、科目、金額、預算、差異與費用占比。",
+    "fieldFormulaReview": {
+      "fields": [
+        {
+          "label": "部門代號",
+          "source": "EXPENSE_ANALYSIS_FIXTURE.department_code",
+          "confirmation": "由費用測試資料表輸出。"
+        },
+        {
+          "label": "部門名稱",
+          "source": "EXPENSE_ANALYSIS_FIXTURE.department_name",
+          "confirmation": "用於管理報表分組與圖表標籤。"
+        },
+        {
+          "label": "費用科目",
+          "source": "EXPENSE_ANALYSIS_FIXTURE.expense_subject",
+          "confirmation": "列示費用明細科目。"
+        },
+        {
+          "label": "金額",
+          "source": "EXPENSE_ANALYSIS_FIXTURE.amount",
+          "confirmation": "費用實際發生金額。"
+        },
+        {
+          "label": "預算金額",
+          "source": "EXPENSE_ANALYSIS_FIXTURE.budget_amount",
+          "confirmation": "用於差異分析。"
+        }
+      ],
+      "formulas": [
+        {
+          "label": "差異金額",
+          "expression": "amount - budget_amount",
+          "confirmation": "正數代表超支。"
+        },
+        {
+          "label": "費用占比",
+          "expression": "amount / 2026 expense budget total",
+          "confirmation": "以總預算 100000 作分母，最大占比預期 0.35。"
+        }
+      ]
+    },
+    "dataPreview": {
+      "rowCount": 0,
+      "columns": [
+        "department_code",
+        "department_name",
+        "expense_subject",
+        "amount",
+        "budget_amount",
+        "variance_amount",
+        "expense_ratio"
+      ],
+      "rows": []
+    },
+    "aggregateChecks": [],
+    "exceptions": [
+      "本案例使用 SQLite 本地 DB 測試資料，不連線正式 DB。"
+    ],
+    "validatorEvidence": [
+      {
+        "validator": "source_requirement_reviewer",
+        "status": "pass",
+        "message": "來源、欄位與公式已確認為測試案例範圍。"
+      },
+      {
+        "validator": "excel_formula_reviewer",
+        "status": "pass",
+        "message": "衍生公式可由 SQL 欄位計算。"
+      }
+    ],
+    "actions": [
+      "確認欄位與公式",
+      "要求修正"
+    ]
+  },
+  "created_at": "2026-06-18T23:46:59.396754+00:00"
+}
+
+$ python3 -m skill_scripts.cli_report_harness confirm --run-dir /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619 --checkpoint excel_confirmation --action 確認欄位與公式 --comment 測試案例自動確認欄位與公式。
+exit=0
+stdout:
+{
+  "status": "confirmed",
+  "checkpoint": "excel_confirmation",
+  "action": "確認欄位與公式",
+  "selectedOptions": {},
+  "state": {
+    "run_id": "expense-analysis-harness-20260619",
+    "prompt": "費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。",
+    "input_files": [],
+    "schema_snapshot": null,
+    "excel_requirement": null,
+    "sql_candidate": null,
+    "sql_validation": null,
+    "execution_result_summary": null,
+    "report_type": null,
+    "report_design": null,
+    "report_design_brief": null,
+    "visual_design_checkpoint": null,
+    "report_options": {},
+    "validator_results": [],
+    "user_confirmations": {
+      "excel_confirmation": "確認欄位與公式"
+    },
+    "checkpoints": [
+      {
+        "checkpoint": "excel_confirmation",
+        "file": "checkpoints/01_excel_confirmation.json",
+        "created_at": "2026-06-18T23:46:59.396754+00:00"
+      }
+    ],
+    "created_at": "2026-06-18T23:46:58.810320+00:00",
+    "updated_at": "2026-06-18T23:46:59.877878+00:00",
+    "user_confirmation_options": {
+      "excel_confirmation": {}
+    }
+  }
+}
+
+$ python3 -m skill_scripts.cli_report_harness write-sql-review --run-dir /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619 --sql SELECT
+    [department_code] AS department_code,
+    [department_name] AS department_name,
+    [expense_subject] AS expense_subject,
+    [amount] AS amount,
+    [budget_amount] AS budget_amount,
+    [amount] - [budget_amount] AS variance_amount,
+    CAST([amount] AS REAL) / NULLIF((
+        SELECT SUM([budget_amount])
+        FROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]
+        WHERE [year] = 2026 AND [account_type] = 'expense'
+    ), 0) AS expense_ratio
+FROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]
+WHERE [year] = 2026 AND [account_type] = 'expense'
+ORDER BY [department_code], [expense_subject] --validation {"readonly": true, "blockedKeywords": [], "executionStatus": "not_executed", "readonly_reason": "SQL starts with SELECT and contains no blocked write keywords or multi statements."}
+exit=0
+stdout:
+{
+  "checkpoint": "sql_review",
+  "title": "SQL 查詢確認",
+  "actions": [
+    "同意查詢",
+    "調整需求"
+  ],
+  "payload": {
+    "sql": "SELECT\n    [department_code] AS department_code,\n    [department_name] AS department_name,\n    [expense_subject] AS expense_subject,\n    [amount] AS amount,\n    [budget_amount] AS budget_amount,\n    [amount] - [budget_amount] AS variance_amount,\n    CAST([amount] AS REAL) / NULLIF((\n        SELECT SUM([budget_amount])\n        FROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\n        WHERE [year] = 2026 AND [account_type] = 'expense'\n    ), 0) AS expense_ratio\nFROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\nWHERE [year] = 2026 AND [account_type] = 'expense'\nORDER BY [department_code], [expense_subject]",
+    "validation": {
+      "readonly": true,
+      "blockedKeywords": [],
+      "executionStatus": "not_executed",
+      "readonly_reason": "SQL starts with SELECT and contains no blocked write keywords or multi statements."
+    }
+  },
+  "created_at": "2026-06-18T23:47:00.383655+00:00"
+}
+
+$ python3 -m skill_scripts.cli_report_harness confirm --run-dir /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619 --checkpoint sql_review --action 同意查詢 --comment SQL 安全檢查通過，允許在本地 SQLite 測試 DB 執行。
+exit=0
+stdout:
+{
+  "status": "confirmed",
+  "checkpoint": "sql_review",
+  "action": "同意查詢",
+  "selectedOptions": {},
+  "state": {
+    "run_id": "expense-analysis-harness-20260619",
+    "prompt": "費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。",
+    "input_files": [],
+    "schema_snapshot": null,
+    "excel_requirement": null,
+    "sql_candidate": "SELECT\n    [department_code] AS department_code,\n    [department_name] AS department_name,\n    [expense_subject] AS expense_subject,\n    [amount] AS amount,\n    [budget_amount] AS budget_amount,\n    [amount] - [budget_amount] AS variance_amount,\n    CAST([amount] AS REAL) / NULLIF((\n        SELECT SUM([budget_amount])\n        FROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\n        WHERE [year] = 2026 AND [account_type] = 'expense'\n    ), 0) AS expense_ratio\nFROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\nWHERE [year] = 2026 AND [account_type] = 'expense'\nORDER BY [department_code], [expense_subject]",
+    "sql_validation": {
+      "readonly": true,
+      "blockedKeywords": [],
+      "executionStatus": "not_executed",
+      "readonly_reason": "SQL starts with SELECT and contains no blocked write keywords or multi statements."
+    },
+    "execution_result_summary": null,
+    "report_type": null,
+    "report_design": null,
+    "report_design_brief": null,
+    "visual_design_checkpoint": null,
+    "report_options": {},
+    "validator_results": [],
+    "user_confirmations": {
+      "excel_confirmation": "確認欄位與公式",
+      "sql_review": "同意查詢"
+    },
+    "checkpoints": [
+      {
+        "checkpoint": "excel_confirmation",
+        "file": "checkpoints/01_excel_confirmation.json",
+        "created_at": "2026-06-18T23:46:59.396754+00:00"
+      },
+      {
+        "checkpoint": "sql_review",
+        "file": "checkpoints/02_sql_review.json",
+        "created_at": "2026-06-18T23:47:00.383655+00:00"
+      }
+    ],
+    "created_at": "2026-06-18T23:46:58.810320+00:00",
+    "updated_at": "2026-06-18T23:47:00.894565+00:00",
+    "user_confirmation_options": {
+      "excel_confirmation": {},
+      "sql_review": {}
+    }
+  }
+}
+
+$ python3 -m skill_scripts.cli_report_harness write-data-preview --run-dir /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619 --payload /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619/data/data-preview-payload.json
+exit=0
+stdout:
+{
+  "checkpoint": "data_preview",
+  "title": "資料預覽確認",
+  "actions": [
+    "資料正確",
+    "確認資料",
+    "重新查詢"
+  ],
+  "payload": {
+    "row_count": 6,
+    "columns": [
+      "department_code",
+      "department_name",
+      "expense_subject",
+      "amount",
+      "budget_amount",
+      "variance_amount",
+      "expense_ratio"
+    ],
+    "rows": [
+      {
+        "department_code": "ADM",
+        "department_name": "行政部",
+        "expense_subject": "文具",
+        "amount": 10000,
+        "budget_amount": 8000,
+        "variance_amount": 2000,
+        "expense_ratio": 0.1
+      },
+      {
+        "department_code": "ADM",
+        "department_name": "行政部",
+        "expense_subject": "旅費",
+        "amount": 35000,
+        "budget_amount": 30000,
+        "variance_amount": 5000,
+        "expense_ratio": 0.35
+      },
+      {
+        "department_code": "RND",
+        "department_name": "研發部",
+        "expense_subject": "軟體訂閱",
+        "amount": 25000,
+        "budget_amount": 22000,
+        "variance_amount": 3000,
+        "expense_ratio": 0.25
+      },
+      {
+        "department_code": "RND",
+        "department_name": "研發部",
+        "expense_subject": "雲端服務",
+        "amount": 30000,
+        "budget_amount": 25000,
+        "variance_amount": 5000,
+        "expense_ratio": 0.3
+      },
+      {
+        "department_code": "SAL",
+        "department_name": "業務部",
+        "expense_subject": "交際費",
+        "amount": 12000,
+        "budget_amount": 10000,
+        "variance_amount": 2000,
+        "expense_ratio": 0.12
+      },
+      {
+        "department_code": "SAL",
+        "department_name": "業務部",
+        "expense_subject": "廣告費",
+        "amount": 8000,
+        "budget_amount": 5000,
+        "variance_amount": 3000,
+        "expense_ratio": 0.08
+      }
+    ],
+    "aggregates": {
+      "total_amount": 120000,
+      "total_budget": 100000,
+      "variance_amount": 20000,
+      "max_expense_ratio": 0.35
+    },
+    "excluded_rows": {
+      "non_2026": 1,
+      "non_expense_account": 1
+    },
+    "execution": {
+      "engine": "SQLite",
+      "db_env": "test",
+      "real_sql_execution": true
+    }
+  },
+  "created_at": "2026-06-18T23:47:01.410077+00:00"
+}
+
+$ python3 -m skill_scripts.cli_report_harness confirm --run-dir /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619 --checkpoint data_preview --action 資料正確 --comment row_count 與 aggregates 符合測試驗收標準。
+exit=0
+stdout:
+{
+  "status": "confirmed",
+  "checkpoint": "data_preview",
+  "action": "資料正確",
+  "selectedOptions": {},
+  "state": {
+    "run_id": "expense-analysis-harness-20260619",
+    "prompt": "費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。",
+    "input_files": [],
+    "schema_snapshot": null,
+    "excel_requirement": null,
+    "sql_candidate": "SELECT\n    [department_code] AS department_code,\n    [department_name] AS department_name,\n    [expense_subject] AS expense_subject,\n    [amount] AS amount,\n    [budget_amount] AS budget_amount,\n    [amount] - [budget_amount] AS variance_amount,\n    CAST([amount] AS REAL) / NULLIF((\n        SELECT SUM([budget_amount])\n        FROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\n        WHERE [year] = 2026 AND [account_type] = 'expense'\n    ), 0) AS expense_ratio\nFROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\nWHERE [year] = 2026 AND [account_type] = 'expense'\nORDER BY [department_code], [expense_subject]",
+    "sql_validation": {
+      "readonly": true,
+      "blockedKeywords": [],
+      "executionStatus": "not_executed",
+      "readonly_reason": "SQL starts with SELECT and contains no blocked write keywords or multi statements."
+    },
+    "execution_result_summary": {
+      "row_count": 6,
+      "columns": [
+        "department_code",
+        "department_name",
+        "expense_subject",
+        "amount",
+        "budget_amount",
+        "variance_amount",
+        "expense_ratio"
+      ],
+      "rows": [
+        {
+          "department_code": "ADM",
+          "department_name": "行政部",
+          "expense_subject": "文具",
+          "amount": 10000,
+          "budget_amount": 8000,
+          "variance_amount": 2000,
+          "expense_ratio": 0.1
+        },
+        {
+          "department_code": "ADM",
+          "department_name": "行政部",
+          "expense_subject": "旅費",
+          "amount": 35000,
+          "budget_amount": 30000,
+          "variance_amount": 5000,
+          "expense_ratio": 0.35
+        },
+        {
+          "department_code": "RND",
+          "department_name": "研發部",
+          "expense_subject": "軟體訂閱",
+          "amount": 25000,
+          "budget_amount": 22000,
+          "variance_amount": 3000,
+          "expense_ratio": 0.25
+        },
+        {
+          "department_code": "RND",
+          "department_name": "研發部",
+          "expense_subject": "雲端服務",
+          "amount": 30000,
+          "budget_amount": 25000,
+          "variance_amount": 5000,
+          "expense_ratio": 0.3
+        },
+        {
+          "department_code": "SAL",
+          "department_name": "業務部",
+          "expense_subject": "交際費",
+          "amount": 12000,
+          "budget_amount": 10000,
+          "variance_amount": 2000,
+          "expense_ratio": 0.12
+        },
+        {
+          "department_code": "SAL",
+          "department_name": "業務部",
+          "expense_subject": "廣告費",
+          "amount": 8000,
+          "budget_amount": 5000,
+          "variance_amount": 3000,
+          "expense_ratio": 0.08
+        }
+      ],
+      "aggregates": {
+        "total_amount": 120000,
+        "total_budget": 100000,
+        "variance_amount": 20000,
+        "max_expense_ratio": 0.35
+      },
+      "excluded_rows": {
+        "non_2026": 1,
+        "non_expense_account": 1
+      },
+      "execution": {
+        "engine": "SQLite",
+        "db_env": "test",
+        "real_sql_execution": true
+      }
+    },
+    "report_type": null,
+    "report_design": null,
+    "report_design_brief": null,
+    "visual_design_checkpoint": null,
+    "report_options": {},
+    "validator_results": [],
+    "user_confirmations": {
+      "excel_confirmation": "確認欄位與公式",
+      "sql_review": "同意查詢",
+      "data_preview": "資料正確"
+    },
+    "checkpoints": [
+      {
+        "checkpoint": "excel_confirmation",
+        "file": "checkpoints/01_excel_confirmation.json",
+        "created_at": "2026-06-18T23:46:59.396754+00:00"
+      },
+      {
+        "checkpoint": "sql_review",
+        "file": "checkpoints/02_sql_review.json",
+        "created_at": "2026-06-18T23:47:00.383655+00:00"
+      },
+      {
+        "checkpoint": "data_preview",
+        "file": "checkpoints/03_data_preview.json",
+        "created_at": "2026-06-18T23:47:01.410077+00:00"
+      }
+    ],
+    "created_at": "2026-06-18T23:46:58.810320+00:00",
+    "updated_at": "2026-06-18T23:47:01.911960+00:00",
+    "user_confirmation_options": {
+      "excel_confirmation": {},
+      "sql_review": {},
+      "data_preview": {}
+    }
+  }
+}
+
+$ python3 -m skill_scripts.cli_report_harness write-report-selection --run-dir /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619 --payload /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619/reports/report-selection-payload.json --report-type financial-control --report-design financial-control --include-chart --include-table --include-analysis --include-recommendations
+exit=0
+stdout:
+{
+  "checkpoint": "report_selection",
+  "title": "報表格式選擇",
+  "actions": [
+    "產生報告",
+    "修改格式"
+  ],
+  "payload": {
+    "kind": "checkpoint",
+    "checkpointId": "expense-analysis-harness-20260619-report-selection",
+    "title": "費用分析報表格式選擇",
+    "step": "report_selection",
+    "requirementSummary": "選擇 financial-control 報告格式，包含圖表、表格、分析與建議。",
+    "dataPreview": {
+      "rowCount": 6,
+      "columns": [
+        "department_code",
+        "department_name",
+        "expense_subject",
+        "amount",
+        "budget_amount",
+        "variance_amount",
+        "expense_ratio"
+      ],
+      "rows": [
+        {
+          "department_code": "ADM",
+          "department_name": "行政部",
+          "expense_subject": "文具",
+          "amount": 10000,
+          "budget_amount": 8000,
+          "variance_amount": 2000,
+          "expense_ratio": 0.1
+        },
+        {
+          "department_code": "ADM",
+          "department_name": "行政部",
+          "expense_subject": "旅費",
+          "amount": 35000,
+          "budget_amount": 30000,
+          "variance_amount": 5000,
+          "expense_ratio": 0.35
+        },
+        {
+          "department_code": "RND",
+          "department_name": "研發部",
+          "expense_subject": "軟體訂閱",
+          "amount": 25000,
+          "budget_amount": 22000,
+          "variance_amount": 3000,
+          "expense_ratio": 0.25
+        },
+        {
+          "department_code": "RND",
+          "department_name": "研發部",
+          "expense_subject": "雲端服務",
+          "amount": 30000,
+          "budget_amount": 25000,
+          "variance_amount": 5000,
+          "expense_ratio": 0.3
+        },
+        {
+          "department_code": "SAL",
+          "department_name": "業務部",
+          "expense_subject": "交際費",
+          "amount": 12000,
+          "budget_amount": 10000,
+          "variance_amount": 2000,
+          "expense_ratio": 0.12
+        },
+        {
+          "department_code": "SAL",
+          "department_name": "業務部",
+          "expense_subject": "廣告費",
+          "amount": 8000,
+          "budget_amount": 5000,
+          "variance_amount": 3000,
+          "expense_ratio": 0.08
+        }
+      ]
+    },
+    "aggregateChecks": [
+      {
+        "label": "費用筆數",
+        "expected": 6,
+        "actual": 6,
+        "status": "pass"
+      },
+      {
+        "label": "總金額",
+        "expected": 120000,
+        "actual": 120000,
+        "status": "pass"
+      },
+      {
+        "label": "總預算",
+        "expected": 100000,
+        "actual": 100000,
+        "status": "pass"
+      },
+      {
+        "label": "差異金額",
+        "expected": 20000,
+        "actual": 20000,
+        "status": "pass"
+      }
+    ],
+    "reportTypes": [
+      {
+        "id": "financial-control",
+        "label": "財務控管",
+        "description": "呈現費用、預算差異與例外追蹤。"
+      },
+      {
+        "id": "executive-summary",
+        "label": "主管摘要",
+        "description": "適合高階快速檢視。"
+      },
+      {
+        "id": "trend-briefing",
+        "label": "趨勢簡報",
+        "description": "適合期間比較與趨勢。"
+      }
+    ],
+    "exceptions": [
+      "排除 2025 費用 1 筆；排除 2026 非費用科目 1 筆。"
+    ],
+    "validatorEvidence": [
+      {
+        "validator": "report_content_reviewer",
+        "status": "pass",
+        "message": "報告選型符合費用分析目標。"
+      }
+    ],
+    "actions": [
+      "產生報告",
+      "修改格式"
+    ],
+    "selected_report_type": "financial-control",
+    "selected_report_design": "financial-control",
+    "selected_options": {
+      "include_chart": true,
+      "include_table": true,
+      "include_analysis": true,
+      "include_recommendations": true
+    }
+  },
+  "created_at": "2026-06-18T23:47:02.452321+00:00"
+}
+
+$ python3 -m skill_scripts.cli_report_harness confirm --run-dir /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619 --checkpoint report_selection --action 產生報告 --selected-option reportType=financial-control --comment 採 financial-control，含圖表、表格、分析與建議。
+exit=0
+stdout:
+{
+  "status": "confirmed",
+  "checkpoint": "report_selection",
+  "action": "產生報告",
+  "selectedOptions": {
+    "reportType": "financial-control"
+  },
+  "state": {
+    "run_id": "expense-analysis-harness-20260619",
+    "prompt": "費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。",
+    "input_files": [],
+    "schema_snapshot": null,
+    "excel_requirement": null,
+    "sql_candidate": "SELECT\n    [department_code] AS department_code,\n    [department_name] AS department_name,\n    [expense_subject] AS expense_subject,\n    [amount] AS amount,\n    [budget_amount] AS budget_amount,\n    [amount] - [budget_amount] AS variance_amount,\n    CAST([amount] AS REAL) / NULLIF((\n        SELECT SUM([budget_amount])\n        FROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\n        WHERE [year] = 2026 AND [account_type] = 'expense'\n    ), 0) AS expense_ratio\nFROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\nWHERE [year] = 2026 AND [account_type] = 'expense'\nORDER BY [department_code], [expense_subject]",
+    "sql_validation": {
+      "readonly": true,
+      "blockedKeywords": [],
+      "executionStatus": "not_executed",
+      "readonly_reason": "SQL starts with SELECT and contains no blocked write keywords or multi statements."
+    },
+    "execution_result_summary": {
+      "row_count": 6,
+      "columns": [
+        "department_code",
+        "department_name",
+        "expense_subject",
+        "amount",
+        "budget_amount",
+        "variance_amount",
+        "expense_ratio"
+      ],
+      "rows": [
+        {
+          "department_code": "ADM",
+          "department_name": "行政部",
+          "expense_subject": "文具",
+          "amount": 10000,
+          "budget_amount": 8000,
+          "variance_amount": 2000,
+          "expense_ratio": 0.1
+        },
+        {
+          "department_code": "ADM",
+          "department_name": "行政部",
+          "expense_subject": "旅費",
+          "amount": 35000,
+          "budget_amount": 30000,
+          "variance_amount": 5000,
+          "expense_ratio": 0.35
+        },
+        {
+          "department_code": "RND",
+          "department_name": "研發部",
+          "expense_subject": "軟體訂閱",
+          "amount": 25000,
+          "budget_amount": 22000,
+          "variance_amount": 3000,
+          "expense_ratio": 0.25
+        },
+        {
+          "department_code": "RND",
+          "department_name": "研發部",
+          "expense_subject": "雲端服務",
+          "amount": 30000,
+          "budget_amount": 25000,
+          "variance_amount": 5000,
+          "expense_ratio": 0.3
+        },
+        {
+          "department_code": "SAL",
+          "department_name": "業務部",
+          "expense_subject": "交際費",
+          "amount": 12000,
+          "budget_amount": 10000,
+          "variance_amount": 2000,
+          "expense_ratio": 0.12
+        },
+        {
+          "department_code": "SAL",
+          "department_name": "業務部",
+          "expense_subject": "廣告費",
+          "amount": 8000,
+          "budget_amount": 5000,
+          "variance_amount": 3000,
+          "expense_ratio": 0.08
+        }
+      ],
+      "aggregates": {
+        "total_amount": 120000,
+        "total_budget": 100000,
+        "variance_amount": 20000,
+        "max_expense_ratio": 0.35
+      },
+      "excluded_rows": {
+        "non_2026": 1,
+        "non_expense_account": 1
+      },
+      "execution": {
+        "engine": "SQLite",
+        "db_env": "test",
+        "real_sql_execution": true
+      }
+    },
+    "report_type": "financial-control",
+    "report_design": "financial-control",
+    "report_design_brief": null,
+    "visual_design_checkpoint": null,
+    "report_options": {
+      "include_chart": true,
+      "include_table": true,
+      "include_analysis": true,
+      "include_recommendations": true
+    },
+    "validator_results": [],
+    "user_confirmations": {
+      "excel_confirmation": "確認欄位與公式",
+      "sql_review": "同意查詢",
+      "data_preview": "資料正確",
+      "report_selection": "產生報告"
+    },
+    "checkpoints": [
+      {
+        "checkpoint": "excel_confirmation",
+        "file": "checkpoints/01_excel_confirmation.json",
+        "created_at": "2026-06-18T23:46:59.396754+00:00"
+      },
+      {
+        "checkpoint": "sql_review",
+        "file": "checkpoints/02_sql_review.json",
+        "created_at": "2026-06-18T23:47:00.383655+00:00"
+      },
+      {
+        "checkpoint": "data_preview",
+        "file": "checkpoints/03_data_preview.json",
+        "created_at": "2026-06-18T23:47:01.410077+00:00"
+      },
+      {
+        "checkpoint": "report_selection",
+        "file": "checkpoints/04_report_selection.json",
+        "created_at": "2026-06-18T23:47:02.452321+00:00"
+      }
+    ],
+    "created_at": "2026-06-18T23:46:58.810320+00:00",
+    "updated_at": "2026-06-18T23:47:02.943550+00:00",
+    "user_confirmation_options": {
+      "excel_confirmation": {},
+      "sql_review": {},
+      "data_preview": {},
+      "report_selection": {
+        "reportType": "financial-control"
+      }
+    }
+  }
+}
+
+$ python3 -m skill_scripts.cli_report_harness write-design-brief --run-dir /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619 --package /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619/delivery/report-package-for-design.json
+exit=0
+stdout:
+{
+  "checkpoint": "design_brief",
+  "title": "動態設計確認",
+  "actions": [
+    "確認設計",
+    "調整設計"
+  ],
+  "payload": {
+    "schema_version": "wferp.design-brief.v1",
+    "report_intent": {
+      "prompt": "費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。",
+      "report_type": "financial-control",
+      "primary_goal": "Expose financial-control exceptions and decision-ready expense signals."
+    },
+    "catalog_guardrail": "financial-control",
+    "target_audience": {
+      "role": "finance controller",
+      "needs": [
+        "budget variance review",
+        "expense concentration review",
+        "audit follow-up"
+      ]
+    },
+    "layout_recipe": {
+      "mode": "kpi-first-dashboard",
+      "sections": [
+        "executive-summary",
+        "kpi-overview",
+        "expense-trend",
+        "exception-review",
+        "data-table"
+      ],
+      "density": "analysis-first"
+    },
+    "chart_recipe": [
+      {
+        "id": "expense-budget-variance",
+        "type": "combo",
+        "purpose": "Compare actual expense, budget, and variance in one control view."
+      },
+      {
+        "id": "expense-composition",
+        "type": "stacked-bar",
+        "purpose": "Show expense composition across departments or categories."
+      },
+      {
+        "id": "expense-driver-ranking",
+        "type": "bar",
+        "purpose": "Rank the largest expense drivers for exception review."
+      }
+    ],
+    "table_recipe": [
+      {
+        "id": "expense-detail-table",
+        "type": "data-table",
+        "features": [
+          "filter",
+          "sort",
+          "drilldown",
+          "column_visibility"
+        ],
+        "row_count": 6
+      }
+    ],
+    "interaction_recipe": {
+      "filters": [
+        "department_code",
+        "department_name",
+        "expense_subject",
+        "amount",
+        "budget_amount",
+        "variance_amount",
+        "expense_ratio"
+      ],
+      "drilldowns": [
+        "department",
+        "category",
+        "document"
+      ]
+    },
+    "visual_direction": {
+      "tone": "quiet financial operations dashboard",
+      "emphasis": [
+        "variance",
+        "outliers",
+        "approval-ready summary"
+      ]
+    },
+    "embedded_data_policy": {
+      "mode": "smart-tiered",
+      "summary_threshold_rows": 5000
+    }
+  },
+  "created_at": "2026-06-18T23:47:03.481659+00:00"
+}
+
+$ python3 -m skill_scripts.cli_report_harness confirm --run-dir /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619 --checkpoint design_brief --action 確認設計 --comment 確認 kpi-first-dashboard、費用趨勢圖、明細表與 evidence drawer。
+exit=0
+stdout:
+{
+  "status": "confirmed",
+  "checkpoint": "design_brief",
+  "action": "確認設計",
+  "selectedOptions": {},
+  "state": {
+    "run_id": "expense-analysis-harness-20260619",
+    "prompt": "費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。",
+    "input_files": [],
+    "schema_snapshot": null,
+    "excel_requirement": null,
+    "sql_candidate": "SELECT\n    [department_code] AS department_code,\n    [department_name] AS department_name,\n    [expense_subject] AS expense_subject,\n    [amount] AS amount,\n    [budget_amount] AS budget_amount,\n    [amount] - [budget_amount] AS variance_amount,\n    CAST([amount] AS REAL) / NULLIF((\n        SELECT SUM([budget_amount])\n        FROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\n        WHERE [year] = 2026 AND [account_type] = 'expense'\n    ), 0) AS expense_ratio\nFROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\nWHERE [year] = 2026 AND [account_type] = 'expense'\nORDER BY [department_code], [expense_subject]",
+    "sql_validation": {
+      "readonly": true,
+      "blockedKeywords": [],
+      "executionStatus": "not_executed",
+      "readonly_reason": "SQL starts with SELECT and contains no blocked write keywords or multi statements."
+    },
+    "execution_result_summary": {
+      "row_count": 6,
+      "columns": [
+        "department_code",
+        "department_name",
+        "expense_subject",
+        "amount",
+        "budget_amount",
+        "variance_amount",
+        "expense_ratio"
+      ],
+      "rows": [
+        {
+          "department_code": "ADM",
+          "department_name": "行政部",
+          "expense_subject": "文具",
+          "amount": 10000,
+          "budget_amount": 8000,
+          "variance_amount": 2000,
+          "expense_ratio": 0.1
+        },
+        {
+          "department_code": "ADM",
+          "department_name": "行政部",
+          "expense_subject": "旅費",
+          "amount": 35000,
+          "budget_amount": 30000,
+          "variance_amount": 5000,
+          "expense_ratio": 0.35
+        },
+        {
+          "department_code": "RND",
+          "department_name": "研發部",
+          "expense_subject": "軟體訂閱",
+          "amount": 25000,
+          "budget_amount": 22000,
+          "variance_amount": 3000,
+          "expense_ratio": 0.25
+        },
+        {
+          "department_code": "RND",
+          "department_name": "研發部",
+          "expense_subject": "雲端服務",
+          "amount": 30000,
+          "budget_amount": 25000,
+          "variance_amount": 5000,
+          "expense_ratio": 0.3
+        },
+        {
+          "department_code": "SAL",
+          "department_name": "業務部",
+          "expense_subject": "交際費",
+          "amount": 12000,
+          "budget_amount": 10000,
+          "variance_amount": 2000,
+          "expense_ratio": 0.12
+        },
+        {
+          "department_code": "SAL",
+          "department_name": "業務部",
+          "expense_subject": "廣告費",
+          "amount": 8000,
+          "budget_amount": 5000,
+          "variance_amount": 3000,
+          "expense_ratio": 0.08
+        }
+      ],
+      "aggregates": {
+        "total_amount": 120000,
+        "total_budget": 100000,
+        "variance_amount": 20000,
+        "max_expense_ratio": 0.35
+      },
+      "excluded_rows": {
+        "non_2026": 1,
+        "non_expense_account": 1
+      },
+      "execution": {
+        "engine": "SQLite",
+        "db_env": "test",
+        "real_sql_execution": true
+      }
+    },
+    "report_type": "financial-control",
+    "report_design": "financial-control",
+    "report_design_brief": {
+      "schema_version": "wferp.design-brief.v1",
+      "report_intent": {
+        "prompt": "費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。",
+        "report_type": "financial-control",
+        "primary_goal": "Expose financial-control exceptions and decision-ready expense signals."
+      },
+      "catalog_guardrail": "financial-control",
+      "target_audience": {
+        "role": "finance controller",
+        "needs": [
+          "budget variance review",
+          "expense concentration review",
+          "audit follow-up"
+        ]
+      },
+      "layout_recipe": {
+        "mode": "kpi-first-dashboard",
+        "sections": [
+          "executive-summary",
+          "kpi-overview",
+          "expense-trend",
+          "exception-review",
+          "data-table"
+        ],
+        "density": "analysis-first"
+      },
+      "chart_recipe": [
+        {
+          "id": "expense-budget-variance",
+          "type": "combo",
+          "purpose": "Compare actual expense, budget, and variance in one control view."
+        },
+        {
+          "id": "expense-composition",
+          "type": "stacked-bar",
+          "purpose": "Show expense composition across departments or categories."
+        },
+        {
+          "id": "expense-driver-ranking",
+          "type": "bar",
+          "purpose": "Rank the largest expense drivers for exception review."
+        }
+      ],
+      "table_recipe": [
+        {
+          "id": "expense-detail-table",
+          "type": "data-table",
+          "features": [
+            "filter",
+            "sort",
+            "drilldown",
+            "column_visibility"
+          ],
+          "row_count": 6
+        }
+      ],
+      "interaction_recipe": {
+        "filters": [
+          "department_code",
+          "department_name",
+          "expense_subject",
+          "amount",
+          "budget_amount",
+          "variance_amount",
+          "expense_ratio"
+        ],
+        "drilldowns": [
+          "department",
+          "category",
+          "document"
+        ]
+      },
+      "visual_direction": {
+        "tone": "quiet financial operations dashboard",
+        "emphasis": [
+          "variance",
+          "outliers",
+          "approval-ready summary"
+        ]
+      },
+      "embedded_data_policy": {
+        "mode": "smart-tiered",
+        "summary_threshold_rows": 5000
+      }
+    },
+    "visual_design_checkpoint": null,
+    "report_options": {
+      "include_chart": true,
+      "include_table": true,
+      "include_analysis": true,
+      "include_recommendations": true
+    },
+    "validator_results": [],
+    "user_confirmations": {
+      "excel_confirmation": "確認欄位與公式",
+      "sql_review": "同意查詢",
+      "data_preview": "資料正確",
+      "report_selection": "產生報告",
+      "design_brief": "確認設計"
+    },
+    "checkpoints": [
+      {
+        "checkpoint": "excel_confirmation",
+        "file": "checkpoints/01_excel_confirmation.json",
+        "created_at": "2026-06-18T23:46:59.396754+00:00"
+      },
+      {
+        "checkpoint": "sql_review",
+        "file": "checkpoints/02_sql_review.json",
+        "created_at": "2026-06-18T23:47:00.383655+00:00"
+      },
+      {
+        "checkpoint": "data_preview",
+        "file": "checkpoints/03_data_preview.json",
+        "created_at": "2026-06-18T23:47:01.410077+00:00"
+      },
+      {
+        "checkpoint": "report_selection",
+        "file": "checkpoints/04_report_selection.json",
+        "created_at": "2026-06-18T23:47:02.452321+00:00"
+      },
+      {
+        "checkpoint": "design_brief",
+        "file": "checkpoints/04a_design_brief.json",
+        "created_at": "2026-06-18T23:47:03.481659+00:00"
+      }
+    ],
+    "created_at": "2026-06-18T23:46:58.810320+00:00",
+    "updated_at": "2026-06-18T23:47:03.964317+00:00",
+    "user_confirmation_options": {
+      "excel_confirmation": {},
+      "sql_review": {},
+      "data_preview": {},
+      "report_selection": {
+        "reportType": "financial-control"
+      },
+      "design_brief": {}
+    }
+  }
+}
+
+$ python3 -m skill_scripts.cli_report_harness write-visual-checkpoint --run-dir /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619 --brief /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619/delivery/report-design-brief.json --package /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619/delivery/report-package-for-design.json
+exit=0
+stdout:
+{
+  "checkpoint": "visual_design",
+  "title": "視覺設計確認",
+  "actions": [
+    "確認視覺設計",
+    "調整視覺設計"
+  ],
+  "payload": {
+    "title": "費用分析視覺設計確認",
+    "catalog_guardrail": "financial-control",
+    "layout": {
+      "mode": "kpi-first-dashboard",
+      "sections": [
+        "executive-summary",
+        "kpi-overview",
+        "expense-trend",
+        "exception-review",
+        "data-table"
+      ],
+      "density": "analysis-first"
+    },
+    "kpis": [
+      {
+        "label": "total_amount",
+        "value": 120000
+      },
+      {
+        "label": "total_budget",
+        "value": 100000
+      },
+      {
+        "label": "variance_amount",
+        "value": 20000
+      },
+      {
+        "label": "max_expense_ratio",
+        "value": 0.35
+      }
+    ],
+    "charts": [
+      {
+        "id": "expense-budget-variance",
+        "type": "combo",
+        "purpose": "Compare actual expense, budget, and variance in one control view."
+      },
+      {
+        "id": "expense-composition",
+        "type": "stacked-bar",
+        "purpose": "Show expense composition across departments or categories."
+      },
+      {
+        "id": "expense-driver-ranking",
+        "type": "bar",
+        "purpose": "Rank the largest expense drivers for exception review."
+      }
+    ],
+    "tables": [
+      {
+        "id": "expense-detail-table",
+        "type": "data-table",
+        "columns": [
+          "department_code",
+          "department_name",
+          "expense_subject",
+          "amount",
+          "budget_amount",
+          "variance_amount",
+          "expense_ratio"
+        ],
+        "features": [
+          "filter",
+          "sort",
+          "drilldown",
+          "column_visibility"
+        ],
+        "row_count": 6
+      }
+    ],
+    "interactions": {
+      "filters": [
+        "department_code",
+        "department_name",
+        "expense_subject",
+        "amount",
+        "budget_amount",
+        "variance_amount",
+        "expense_ratio"
+      ],
+      "drilldowns": [
+        "department",
+        "category",
+        "document"
+      ]
+    },
+    "visual_direction": {
+      "tone": "quiet financial operations dashboard",
+      "emphasis": [
+        "variance",
+        "outliers",
+        "approval-ready summary"
+      ]
+    },
+    "data_profile": {
+      "row_count": 6,
+      "columns": [
+        "department_code",
+        "department_name",
+        "expense_subject",
+        "amount",
+        "budget_amount",
+        "variance_amount",
+        "expense_ratio"
+      ],
+      "embedded_mode": "full_rows",
+      "embedded_rows": 6,
+      "full_rows_in_evidence_packet": false
+    }
+  },
+  "created_at": "2026-06-18T23:47:04.480122+00:00"
+}
+
+$ python3 -m skill_scripts.cli_report_harness confirm --run-dir /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619 --checkpoint visual_design --action 確認視覺設計 --comment 視覺 checkpoint 使用真 labels 與 aggregates。
+exit=0
+stdout:
+{
+  "status": "confirmed",
+  "checkpoint": "visual_design",
+  "action": "確認視覺設計",
+  "selectedOptions": {},
+  "state": {
+    "run_id": "expense-analysis-harness-20260619",
+    "prompt": "費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。",
+    "input_files": [],
+    "schema_snapshot": null,
+    "excel_requirement": null,
+    "sql_candidate": "SELECT\n    [department_code] AS department_code,\n    [department_name] AS department_name,\n    [expense_subject] AS expense_subject,\n    [amount] AS amount,\n    [budget_amount] AS budget_amount,\n    [amount] - [budget_amount] AS variance_amount,\n    CAST([amount] AS REAL) / NULLIF((\n        SELECT SUM([budget_amount])\n        FROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\n        WHERE [year] = 2026 AND [account_type] = 'expense'\n    ), 0) AS expense_ratio\nFROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\nWHERE [year] = 2026 AND [account_type] = 'expense'\nORDER BY [department_code], [expense_subject]",
+    "sql_validation": {
+      "readonly": true,
+      "blockedKeywords": [],
+      "executionStatus": "not_executed",
+      "readonly_reason": "SQL starts with SELECT and contains no blocked write keywords or multi statements."
+    },
+    "execution_result_summary": {
+      "row_count": 6,
+      "columns": [
+        "department_code",
+        "department_name",
+        "expense_subject",
+        "amount",
+        "budget_amount",
+        "variance_amount",
+        "expense_ratio"
+      ],
+      "rows": [
+        {
+          "department_code": "ADM",
+          "department_name": "行政部",
+          "expense_subject": "文具",
+          "amount": 10000,
+          "budget_amount": 8000,
+          "variance_amount": 2000,
+          "expense_ratio": 0.1
+        },
+        {
+          "department_code": "ADM",
+          "department_name": "行政部",
+          "expense_subject": "旅費",
+          "amount": 35000,
+          "budget_amount": 30000,
+          "variance_amount": 5000,
+          "expense_ratio": 0.35
+        },
+        {
+          "department_code": "RND",
+          "department_name": "研發部",
+          "expense_subject": "軟體訂閱",
+          "amount": 25000,
+          "budget_amount": 22000,
+          "variance_amount": 3000,
+          "expense_ratio": 0.25
+        },
+        {
+          "department_code": "RND",
+          "department_name": "研發部",
+          "expense_subject": "雲端服務",
+          "amount": 30000,
+          "budget_amount": 25000,
+          "variance_amount": 5000,
+          "expense_ratio": 0.3
+        },
+        {
+          "department_code": "SAL",
+          "department_name": "業務部",
+          "expense_subject": "交際費",
+          "amount": 12000,
+          "budget_amount": 10000,
+          "variance_amount": 2000,
+          "expense_ratio": 0.12
+        },
+        {
+          "department_code": "SAL",
+          "department_name": "業務部",
+          "expense_subject": "廣告費",
+          "amount": 8000,
+          "budget_amount": 5000,
+          "variance_amount": 3000,
+          "expense_ratio": 0.08
+        }
+      ],
+      "aggregates": {
+        "total_amount": 120000,
+        "total_budget": 100000,
+        "variance_amount": 20000,
+        "max_expense_ratio": 0.35
+      },
+      "excluded_rows": {
+        "non_2026": 1,
+        "non_expense_account": 1
+      },
+      "execution": {
+        "engine": "SQLite",
+        "db_env": "test",
+        "real_sql_execution": true
+      }
+    },
+    "report_type": "financial-control",
+    "report_design": "financial-control",
+    "report_design_brief": {
+      "schema_version": "wferp.design-brief.v1",
+      "report_intent": {
+        "prompt": "費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。",
+        "report_type": "financial-control",
+        "primary_goal": "Expose financial-control exceptions and decision-ready expense signals."
+      },
+      "catalog_guardrail": "financial-control",
+      "target_audience": {
+        "role": "finance controller",
+        "needs": [
+          "budget variance review",
+          "expense concentration review",
+          "audit follow-up"
+        ]
+      },
+      "layout_recipe": {
+        "mode": "kpi-first-dashboard",
+        "sections": [
+          "executive-summary",
+          "kpi-overview",
+          "expense-trend",
+          "exception-review",
+          "data-table"
+        ],
+        "density": "analysis-first"
+      },
+      "chart_recipe": [
+        {
+          "id": "expense-budget-variance",
+          "type": "combo",
+          "purpose": "Compare actual expense, budget, and variance in one control view."
+        },
+        {
+          "id": "expense-composition",
+          "type": "stacked-bar",
+          "purpose": "Show expense composition across departments or categories."
+        },
+        {
+          "id": "expense-driver-ranking",
+          "type": "bar",
+          "purpose": "Rank the largest expense drivers for exception review."
+        }
+      ],
+      "table_recipe": [
+        {
+          "id": "expense-detail-table",
+          "type": "data-table",
+          "features": [
+            "filter",
+            "sort",
+            "drilldown",
+            "column_visibility"
+          ],
+          "row_count": 6
+        }
+      ],
+      "interaction_recipe": {
+        "filters": [
+          "department_code",
+          "department_name",
+          "expense_subject",
+          "amount",
+          "budget_amount",
+          "variance_amount",
+          "expense_ratio"
+        ],
+        "drilldowns": [
+          "department",
+          "category",
+          "document"
+        ]
+      },
+      "visual_direction": {
+        "tone": "quiet financial operations dashboard",
+        "emphasis": [
+          "variance",
+          "outliers",
+          "approval-ready summary"
+        ]
+      },
+      "embedded_data_policy": {
+        "mode": "smart-tiered",
+        "summary_threshold_rows": 5000
+      }
+    },
+    "visual_design_checkpoint": {
+      "title": "費用分析視覺設計確認",
+      "catalog_guardrail": "financial-control",
+      "layout": {
+        "mode": "kpi-first-dashboard",
+        "sections": [
+          "executive-summary",
+          "kpi-overview",
+          "expense-trend",
+          "exception-review",
+          "data-table"
+        ],
+        "density": "analysis-first"
+      },
+      "kpis": [
+        {
+          "label": "total_amount",
+          "value": 120000
+        },
+        {
+          "label": "total_budget",
+          "value": 100000
+        },
+        {
+          "label": "variance_amount",
+          "value": 20000
+        },
+        {
+          "label": "max_expense_ratio",
+          "value": 0.35
+        }
+      ],
+      "charts": [
+        {
+          "id": "expense-budget-variance",
+          "type": "combo",
+          "purpose": "Compare actual expense, budget, and variance in one control view."
+        },
+        {
+          "id": "expense-composition",
+          "type": "stacked-bar",
+          "purpose": "Show expense composition across departments or categories."
+        },
+        {
+          "id": "expense-driver-ranking",
+          "type": "bar",
+          "purpose": "Rank the largest expense drivers for exception review."
+        }
+      ],
+      "tables": [
+        {
+          "id": "expense-detail-table",
+          "type": "data-table",
+          "columns": [
+            "department_code",
+            "department_name",
+            "expense_subject",
+            "amount",
+            "budget_amount",
+            "variance_amount",
+            "expense_ratio"
+          ],
+          "features": [
+            "filter",
+            "sort",
+            "drilldown",
+            "column_visibility"
+          ],
+          "row_count": 6
+        }
+      ],
+      "interactions": {
+        "filters": [
+          "department_code",
+          "department_name",
+          "expense_subject",
+          "amount",
+          "budget_amount",
+          "variance_amount",
+          "expense_ratio"
+        ],
+        "drilldowns": [
+          "department",
+          "category",
+          "document"
+        ]
+      },
+      "visual_direction": {
+        "tone": "quiet financial operations dashboard",
+        "emphasis": [
+          "variance",
+          "outliers",
+          "approval-ready summary"
+        ]
+      },
+      "data_profile": {
+        "row_count": 6,
+        "columns": [
+          "department_code",
+          "department_name",
+          "expense_subject",
+          "amount",
+          "budget_amount",
+          "variance_amount",
+          "expense_ratio"
+        ],
+        "embedded_mode": "full_rows",
+        "embedded_rows": 6,
+        "full_rows_in_evidence_packet": false
+      }
+    },
+    "report_options": {
+      "include_chart": true,
+      "include_table": true,
+      "include_analysis": true,
+      "include_recommendations": true
+    },
+    "validator_results": [],
+    "user_confirmations": {
+      "excel_confirmation": "確認欄位與公式",
+      "sql_review": "同意查詢",
+      "data_preview": "資料正確",
+      "report_selection": "產生報告",
+      "design_brief": "確認設計",
+      "visual_design": "確認視覺設計"
+    },
+    "checkpoints": [
+      {
+        "checkpoint": "excel_confirmation",
+        "file": "checkpoints/01_excel_confirmation.json",
+        "created_at": "2026-06-18T23:46:59.396754+00:00"
+      },
+      {
+        "checkpoint": "sql_review",
+        "file": "checkpoints/02_sql_review.json",
+        "created_at": "2026-06-18T23:47:00.383655+00:00"
+      },
+      {
+        "checkpoint": "data_preview",
+        "file": "checkpoints/03_data_preview.json",
+        "created_at": "2026-06-18T23:47:01.410077+00:00"
+      },
+      {
+        "checkpoint": "report_selection",
+        "file": "checkpoints/04_report_selection.json",
+        "created_at": "2026-06-18T23:47:02.452321+00:00"
+      },
+      {
+        "checkpoint": "design_brief",
+        "file": "checkpoints/04a_design_brief.json",
+        "created_at": "2026-06-18T23:47:03.481659+00:00"
+      },
+      {
+        "checkpoint": "visual_design",
+        "file": "checkpoints/04b_visual_design.json",
+        "created_at": "2026-06-18T23:47:04.480122+00:00"
+      }
+    ],
+    "created_at": "2026-06-18T23:46:58.810320+00:00",
+    "updated_at": "2026-06-18T23:47:04.981782+00:00",
+    "user_confirmation_options": {
+      "excel_confirmation": {},
+      "sql_review": {},
+      "data_preview": {},
+      "report_selection": {
+        "reportType": "financial-control"
+      },
+      "design_brief": {},
+      "visual_design": {}
+    }
+  }
+}
+
+$ python3 -m skill_scripts.cli_report_harness write-report-draft --run-dir /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619 --payload /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619/reports/report-render-payload.json
+exit=0
+stdout:
+{
+  "checkpoint": "report_draft",
+  "title": "報告初稿審核",
+  "actions": [
+    "接受",
+    "修正報告"
+  ],
+  "payload": {
+    "kind": "report",
+    "title": "2026 費用分析測試報告",
+    "subtitle": "SQLite 本地 DB 真實 SQL 執行驗證，financial-control 樣式",
+    "options": {
+      "charts": true,
+      "tables": true,
+      "analysis": true,
+      "recommendations": true
+    },
+    "sections": [
+      {
+        "type": "analysis",
+        "title": "管理摘要",
+        "body": "2026 年費用共 6 筆，總金額 120,000，總預算 100,000，超支 20,000。行政部旅費單項占比最高，max_expense_ratio=0.35。"
+      },
+      {
+        "type": "analysis",
+        "title": "例外排除",
+        "body": "排除非 2026 年費用 1 筆，排除 2026 非費用科目 1 筆，排除規則已由 SQL WHERE 條件落實。"
+      },
+      {
+        "type": "recommendations",
+        "title": "建議事項",
+        "items": [
+          "針對行政部旅費與研發部雲端服務建立月度預算差異追蹤。",
+          "保留 query.sql、SQLite execution result、validator evidence 供審計追溯。"
+        ]
+      }
+    ],
+    "dataPreview": {
+      "rowCount": 6,
+      "columns": [
+        "department_code",
+        "department_name",
+        "expense_subject",
+        "amount",
+        "budget_amount",
+        "variance_amount",
+        "expense_ratio"
+      ],
+      "rows": [
+        {
+          "department_code": "ADM",
+          "department_name": "行政部",
+          "expense_subject": "文具",
+          "amount": 10000,
+          "budget_amount": 8000,
+          "variance_amount": 2000,
+          "expense_ratio": 0.1
+        },
+        {
+          "department_code": "ADM",
+          "department_name": "行政部",
+          "expense_subject": "旅費",
+          "amount": 35000,
+          "budget_amount": 30000,
+          "variance_amount": 5000,
+          "expense_ratio": 0.35
+        },
+        {
+          "department_code": "RND",
+          "department_name": "研發部",
+          "expense_subject": "軟體訂閱",
+          "amount": 25000,
+          "budget_amount": 22000,
+          "variance_amount": 3000,
+          "expense_ratio": 0.25
+        },
+        {
+          "department_code": "RND",
+          "department_name": "研發部",
+          "expense_subject": "雲端服務",
+          "amount": 30000,
+          "budget_amount": 25000,
+          "variance_amount": 5000,
+          "expense_ratio": 0.3
+        },
+        {
+          "department_code": "SAL",
+          "department_name": "業務部",
+          "expense_subject": "交際費",
+          "amount": 12000,
+          "budget_amount": 10000,
+          "variance_amount": 2000,
+          "expense_ratio": 0.12
+        },
+        {
+          "department_code": "SAL",
+          "department_name": "業務部",
+          "expense_subject": "廣告費",
+          "amount": 8000,
+          "budget_amount": 5000,
+          "variance_amount": 3000,
+          "expense_ratio": 0.08
+        }
+      ]
+    },
+    "validatorEvidence": [
+      {
+        "validator": "source_requirement_reviewer",
+        "status": "pass",
+        "message": "pass"
+      },
+      {
+        "validator": "excel_formula_reviewer",
+        "status": "pass",
+        "message": "pass"
+      },
+      {
+        "validator": "sql_safety_reviewer",
+        "status": "pass",
+        "message": "pass"
+      },
+      {
+        "validator": "schema_relationship_reviewer",
+        "status": "pass",
+        "message": "pass"
+      },
+      {
+        "validator": "data_preview_reviewer",
+        "status": "pass",
+        "message": "pass"
+      },
+      {
+        "validator": "report_content_reviewer",
+        "status": "pass",
+        "message": "pass"
+      },
+      {
+        "validator": "visual_taste_reviewer",
+        "status": "pass",
+        "message": "pass"
+      },
+      {
+        "validator": "data_visualization_reviewer",
+        "status": "pass",
+        "message": "pass"
+      },
+      {
+        "validator": "react_technical_reviewer",
+        "status": "pass",
+        "message": "pass"
+      }
+    ]
+  },
+  "created_at": "2026-06-18T23:47:05.487094+00:00"
+}
+
+$ python3 -m skill_scripts.cli_report_harness confirm --run-dir /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619 --checkpoint report_draft --action 接受 --comment 初稿內容、圖表、表格與 evidence drawer 可接受。
+exit=0
+stdout:
+{
+  "status": "confirmed",
+  "checkpoint": "report_draft",
+  "action": "接受",
+  "selectedOptions": {},
+  "state": {
+    "run_id": "expense-analysis-harness-20260619",
+    "prompt": "費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。",
+    "input_files": [],
+    "schema_snapshot": null,
+    "excel_requirement": null,
+    "sql_candidate": "SELECT\n    [department_code] AS department_code,\n    [department_name] AS department_name,\n    [expense_subject] AS expense_subject,\n    [amount] AS amount,\n    [budget_amount] AS budget_amount,\n    [amount] - [budget_amount] AS variance_amount,\n    CAST([amount] AS REAL) / NULLIF((\n        SELECT SUM([budget_amount])\n        FROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\n        WHERE [year] = 2026 AND [account_type] = 'expense'\n    ), 0) AS expense_ratio\nFROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\nWHERE [year] = 2026 AND [account_type] = 'expense'\nORDER BY [department_code], [expense_subject]",
+    "sql_validation": {
+      "readonly": true,
+      "blockedKeywords": [],
+      "executionStatus": "not_executed",
+      "readonly_reason": "SQL starts with SELECT and contains no blocked write keywords or multi statements."
+    },
+    "execution_result_summary": {
+      "row_count": 6,
+      "columns": [
+        "department_code",
+        "department_name",
+        "expense_subject",
+        "amount",
+        "budget_amount",
+        "variance_amount",
+        "expense_ratio"
+      ],
+      "rows": [
+        {
+          "department_code": "ADM",
+          "department_name": "行政部",
+          "expense_subject": "文具",
+          "amount": 10000,
+          "budget_amount": 8000,
+          "variance_amount": 2000,
+          "expense_ratio": 0.1
+        },
+        {
+          "department_code": "ADM",
+          "department_name": "行政部",
+          "expense_subject": "旅費",
+          "amount": 35000,
+          "budget_amount": 30000,
+          "variance_amount": 5000,
+          "expense_ratio": 0.35
+        },
+        {
+          "department_code": "RND",
+          "department_name": "研發部",
+          "expense_subject": "軟體訂閱",
+          "amount": 25000,
+          "budget_amount": 22000,
+          "variance_amount": 3000,
+          "expense_ratio": 0.25
+        },
+        {
+          "department_code": "RND",
+          "department_name": "研發部",
+          "expense_subject": "雲端服務",
+          "amount": 30000,
+          "budget_amount": 25000,
+          "variance_amount": 5000,
+          "expense_ratio": 0.3
+        },
+        {
+          "department_code": "SAL",
+          "department_name": "業務部",
+          "expense_subject": "交際費",
+          "amount": 12000,
+          "budget_amount": 10000,
+          "variance_amount": 2000,
+          "expense_ratio": 0.12
+        },
+        {
+          "department_code": "SAL",
+          "department_name": "業務部",
+          "expense_subject": "廣告費",
+          "amount": 8000,
+          "budget_amount": 5000,
+          "variance_amount": 3000,
+          "expense_ratio": 0.08
+        }
+      ],
+      "aggregates": {
+        "total_amount": 120000,
+        "total_budget": 100000,
+        "variance_amount": 20000,
+        "max_expense_ratio": 0.35
+      },
+      "excluded_rows": {
+        "non_2026": 1,
+        "non_expense_account": 1
+      },
+      "execution": {
+        "engine": "SQLite",
+        "db_env": "test",
+        "real_sql_execution": true
+      }
+    },
+    "report_type": "financial-control",
+    "report_design": "financial-control",
+    "report_design_brief": {
+      "schema_version": "wferp.design-brief.v1",
+      "report_intent": {
+        "prompt": "費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。",
+        "report_type": "financial-control",
+        "primary_goal": "Expose financial-control exceptions and decision-ready expense signals."
+      },
+      "catalog_guardrail": "financial-control",
+      "target_audience": {
+        "role": "finance controller",
+        "needs": [
+          "budget variance review",
+          "expense concentration review",
+          "audit follow-up"
+        ]
+      },
+      "layout_recipe": {
+        "mode": "kpi-first-dashboard",
+        "sections": [
+          "executive-summary",
+          "kpi-overview",
+          "expense-trend",
+          "exception-review",
+          "data-table"
+        ],
+        "density": "analysis-first"
+      },
+      "chart_recipe": [
+        {
+          "id": "expense-budget-variance",
+          "type": "combo",
+          "purpose": "Compare actual expense, budget, and variance in one control view."
+        },
+        {
+          "id": "expense-composition",
+          "type": "stacked-bar",
+          "purpose": "Show expense composition across departments or categories."
+        },
+        {
+          "id": "expense-driver-ranking",
+          "type": "bar",
+          "purpose": "Rank the largest expense drivers for exception review."
+        }
+      ],
+      "table_recipe": [
+        {
+          "id": "expense-detail-table",
+          "type": "data-table",
+          "features": [
+            "filter",
+            "sort",
+            "drilldown",
+            "column_visibility"
+          ],
+          "row_count": 6
+        }
+      ],
+      "interaction_recipe": {
+        "filters": [
+          "department_code",
+          "department_name",
+          "expense_subject",
+          "amount",
+          "budget_amount",
+          "variance_amount",
+          "expense_ratio"
+        ],
+        "drilldowns": [
+          "department",
+          "category",
+          "document"
+        ]
+      },
+      "visual_direction": {
+        "tone": "quiet financial operations dashboard",
+        "emphasis": [
+          "variance",
+          "outliers",
+          "approval-ready summary"
+        ]
+      },
+      "embedded_data_policy": {
+        "mode": "smart-tiered",
+        "summary_threshold_rows": 5000
+      }
+    },
+    "visual_design_checkpoint": {
+      "title": "費用分析視覺設計確認",
+      "catalog_guardrail": "financial-control",
+      "layout": {
+        "mode": "kpi-first-dashboard",
+        "sections": [
+          "executive-summary",
+          "kpi-overview",
+          "expense-trend",
+          "exception-review",
+          "data-table"
+        ],
+        "density": "analysis-first"
+      },
+      "kpis": [
+        {
+          "label": "total_amount",
+          "value": 120000
+        },
+        {
+          "label": "total_budget",
+          "value": 100000
+        },
+        {
+          "label": "variance_amount",
+          "value": 20000
+        },
+        {
+          "label": "max_expense_ratio",
+          "value": 0.35
+        }
+      ],
+      "charts": [
+        {
+          "id": "expense-budget-variance",
+          "type": "combo",
+          "purpose": "Compare actual expense, budget, and variance in one control view."
+        },
+        {
+          "id": "expense-composition",
+          "type": "stacked-bar",
+          "purpose": "Show expense composition across departments or categories."
+        },
+        {
+          "id": "expense-driver-ranking",
+          "type": "bar",
+          "purpose": "Rank the largest expense drivers for exception review."
+        }
+      ],
+      "tables": [
+        {
+          "id": "expense-detail-table",
+          "type": "data-table",
+          "columns": [
+            "department_code",
+            "department_name",
+            "expense_subject",
+            "amount",
+            "budget_amount",
+            "variance_amount",
+            "expense_ratio"
+          ],
+          "features": [
+            "filter",
+            "sort",
+            "drilldown",
+            "column_visibility"
+          ],
+          "row_count": 6
+        }
+      ],
+      "interactions": {
+        "filters": [
+          "department_code",
+          "department_name",
+          "expense_subject",
+          "amount",
+          "budget_amount",
+          "variance_amount",
+          "expense_ratio"
+        ],
+        "drilldowns": [
+          "department",
+          "category",
+          "document"
+        ]
+      },
+      "visual_direction": {
+        "tone": "quiet financial operations dashboard",
+        "emphasis": [
+          "variance",
+          "outliers",
+          "approval-ready summary"
+        ]
+      },
+      "data_profile": {
+        "row_count": 6,
+        "columns": [
+          "department_code",
+          "department_name",
+          "expense_subject",
+          "amount",
+          "budget_amount",
+          "variance_amount",
+          "expense_ratio"
+        ],
+        "embedded_mode": "full_rows",
+        "embedded_rows": 6,
+        "full_rows_in_evidence_packet": false
+      }
+    },
+    "report_options": {
+      "include_chart": true,
+      "include_table": true,
+      "include_analysis": true,
+      "include_recommendations": true
+    },
+    "validator_results": [],
+    "user_confirmations": {
+      "excel_confirmation": "確認欄位與公式",
+      "sql_review": "同意查詢",
+      "data_preview": "資料正確",
+      "report_selection": "產生報告",
+      "design_brief": "確認設計",
+      "visual_design": "確認視覺設計",
+      "report_draft": "接受"
+    },
+    "checkpoints": [
+      {
+        "checkpoint": "excel_confirmation",
+        "file": "checkpoints/01_excel_confirmation.json",
+        "created_at": "2026-06-18T23:46:59.396754+00:00"
+      },
+      {
+        "checkpoint": "sql_review",
+        "file": "checkpoints/02_sql_review.json",
+        "created_at": "2026-06-18T23:47:00.383655+00:00"
+      },
+      {
+        "checkpoint": "data_preview",
+        "file": "checkpoints/03_data_preview.json",
+        "created_at": "2026-06-18T23:47:01.410077+00:00"
+      },
+      {
+        "checkpoint": "report_selection",
+        "file": "checkpoints/04_report_selection.json",
+        "created_at": "2026-06-18T23:47:02.452321+00:00"
+      },
+      {
+        "checkpoint": "design_brief",
+        "file": "checkpoints/04a_design_brief.json",
+        "created_at": "2026-06-18T23:47:03.481659+00:00"
+      },
+      {
+        "checkpoint": "visual_design",
+        "file": "checkpoints/04b_visual_design.json",
+        "created_at": "2026-06-18T23:47:04.480122+00:00"
+      },
+      {
+        "checkpoint": "report_draft",
+        "file": "checkpoints/05_report_draft.json",
+        "created_at": "2026-06-18T23:47:05.487094+00:00"
+      }
+    ],
+    "created_at": "2026-06-18T23:46:58.810320+00:00",
+    "updated_at": "2026-06-18T23:47:05.981631+00:00",
+    "user_confirmation_options": {
+      "excel_confirmation": {},
+      "sql_review": {},
+      "data_preview": {},
+      "report_selection": {
+        "reportType": "financial-control"
+      },
+      "design_brief": {},
+      "visual_design": {},
+      "report_draft": {}
+    }
+  }
+}
+
+$ python3 -m skill_scripts.cli_report_harness write-final-review --run-dir /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619 --payload /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619/review/final-review-payload.json
+exit=0
+stdout:
+{
+  "checkpoint": "final_review",
+  "title": "最終報告審核",
+  "actions": [
+    "完成",
+    "回到初稿"
+  ],
+  "payload": {
+    "validator_results": [
+      {
+        "role": "source_requirement_reviewer",
+        "status": "pass",
+        "evidence": [
+          {
+            "artifact": "expense-analysis-harness",
+            "status": "pass"
+          }
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": []
+      },
+      {
+        "role": "excel_formula_reviewer",
+        "status": "pass",
+        "evidence": [
+          {
+            "artifact": "expense-analysis-harness",
+            "status": "pass"
+          }
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": []
+      },
+      {
+        "role": "sql_safety_reviewer",
+        "status": "pass",
+        "evidence": [
+          {
+            "artifact": "expense-analysis-harness",
+            "status": "pass"
+          }
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": []
+      },
+      {
+        "role": "schema_relationship_reviewer",
+        "status": "pass",
+        "evidence": [
+          {
+            "artifact": "expense-analysis-harness",
+            "status": "pass"
+          }
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": []
+      },
+      {
+        "role": "data_preview_reviewer",
+        "status": "pass",
+        "evidence": [
+          {
+            "artifact": "expense-analysis-harness",
+            "status": "pass",
+            "metrics": {
+              "row_count": 6,
+              "column_count": 7
+            }
+          }
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": []
+      },
+      {
+        "role": "report_content_reviewer",
+        "status": "pass",
+        "evidence": [
+          {
+            "artifact": "expense-analysis-harness",
+            "status": "pass"
+          }
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": []
+      },
+      {
+        "role": "visual_taste_reviewer",
+        "status": "pass",
+        "evidence": [
+          {
+            "artifact": "expense-analysis-harness",
+            "status": "pass"
+          }
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": []
+      },
+      {
+        "role": "data_visualization_reviewer",
+        "status": "pass",
+        "evidence": [
+          {
+            "artifact": "expense-analysis-harness",
+            "status": "pass"
+          }
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": []
+      },
+      {
+        "role": "react_technical_reviewer",
+        "status": "pass",
+        "evidence": [
+          {
+            "artifact": "expense-analysis-harness",
+            "status": "pass"
+          }
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": []
+      }
+    ]
+  },
+  "created_at": "2026-06-18T23:47:06.480467+00:00"
+}
+
+$ python3 -m skill_scripts.cli_report_harness confirm --run-dir /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619 --checkpoint final_review --action 完成 --comment 全部 validators pass，無 residual risk。
+exit=0
+stdout:
+{
+  "status": "confirmed",
+  "checkpoint": "final_review",
+  "action": "完成",
+  "selectedOptions": {},
+  "state": {
+    "run_id": "expense-analysis-harness-20260619",
+    "prompt": "費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。",
+    "input_files": [],
+    "schema_snapshot": null,
+    "excel_requirement": null,
+    "sql_candidate": "SELECT\n    [department_code] AS department_code,\n    [department_name] AS department_name,\n    [expense_subject] AS expense_subject,\n    [amount] AS amount,\n    [budget_amount] AS budget_amount,\n    [amount] - [budget_amount] AS variance_amount,\n    CAST([amount] AS REAL) / NULLIF((\n        SELECT SUM([budget_amount])\n        FROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\n        WHERE [year] = 2026 AND [account_type] = 'expense'\n    ), 0) AS expense_ratio\nFROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\nWHERE [year] = 2026 AND [account_type] = 'expense'\nORDER BY [department_code], [expense_subject]",
+    "sql_validation": {
+      "readonly": true,
+      "blockedKeywords": [],
+      "executionStatus": "not_executed",
+      "readonly_reason": "SQL starts with SELECT and contains no blocked write keywords or multi statements."
+    },
+    "execution_result_summary": {
+      "row_count": 6,
+      "columns": [
+        "department_code",
+        "department_name",
+        "expense_subject",
+        "amount",
+        "budget_amount",
+        "variance_amount",
+        "expense_ratio"
+      ],
+      "rows": [
+        {
+          "department_code": "ADM",
+          "department_name": "行政部",
+          "expense_subject": "文具",
+          "amount": 10000,
+          "budget_amount": 8000,
+          "variance_amount": 2000,
+          "expense_ratio": 0.1
+        },
+        {
+          "department_code": "ADM",
+          "department_name": "行政部",
+          "expense_subject": "旅費",
+          "amount": 35000,
+          "budget_amount": 30000,
+          "variance_amount": 5000,
+          "expense_ratio": 0.35
+        },
+        {
+          "department_code": "RND",
+          "department_name": "研發部",
+          "expense_subject": "軟體訂閱",
+          "amount": 25000,
+          "budget_amount": 22000,
+          "variance_amount": 3000,
+          "expense_ratio": 0.25
+        },
+        {
+          "department_code": "RND",
+          "department_name": "研發部",
+          "expense_subject": "雲端服務",
+          "amount": 30000,
+          "budget_amount": 25000,
+          "variance_amount": 5000,
+          "expense_ratio": 0.3
+        },
+        {
+          "department_code": "SAL",
+          "department_name": "業務部",
+          "expense_subject": "交際費",
+          "amount": 12000,
+          "budget_amount": 10000,
+          "variance_amount": 2000,
+          "expense_ratio": 0.12
+        },
+        {
+          "department_code": "SAL",
+          "department_name": "業務部",
+          "expense_subject": "廣告費",
+          "amount": 8000,
+          "budget_amount": 5000,
+          "variance_amount": 3000,
+          "expense_ratio": 0.08
+        }
+      ],
+      "aggregates": {
+        "total_amount": 120000,
+        "total_budget": 100000,
+        "variance_amount": 20000,
+        "max_expense_ratio": 0.35
+      },
+      "excluded_rows": {
+        "non_2026": 1,
+        "non_expense_account": 1
+      },
+      "execution": {
+        "engine": "SQLite",
+        "db_env": "test",
+        "real_sql_execution": true
+      }
+    },
+    "report_type": "financial-control",
+    "report_design": "financial-control",
+    "report_design_brief": {
+      "schema_version": "wferp.design-brief.v1",
+      "report_intent": {
+        "prompt": "費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。",
+        "report_type": "financial-control",
+        "primary_goal": "Expose financial-control exceptions and decision-ready expense signals."
+      },
+      "catalog_guardrail": "financial-control",
+      "target_audience": {
+        "role": "finance controller",
+        "needs": [
+          "budget variance review",
+          "expense concentration review",
+          "audit follow-up"
+        ]
+      },
+      "layout_recipe": {
+        "mode": "kpi-first-dashboard",
+        "sections": [
+          "executive-summary",
+          "kpi-overview",
+          "expense-trend",
+          "exception-review",
+          "data-table"
+        ],
+        "density": "analysis-first"
+      },
+      "chart_recipe": [
+        {
+          "id": "expense-budget-variance",
+          "type": "combo",
+          "purpose": "Compare actual expense, budget, and variance in one control view."
+        },
+        {
+          "id": "expense-composition",
+          "type": "stacked-bar",
+          "purpose": "Show expense composition across departments or categories."
+        },
+        {
+          "id": "expense-driver-ranking",
+          "type": "bar",
+          "purpose": "Rank the largest expense drivers for exception review."
+        }
+      ],
+      "table_recipe": [
+        {
+          "id": "expense-detail-table",
+          "type": "data-table",
+          "features": [
+            "filter",
+            "sort",
+            "drilldown",
+            "column_visibility"
+          ],
+          "row_count": 6
+        }
+      ],
+      "interaction_recipe": {
+        "filters": [
+          "department_code",
+          "department_name",
+          "expense_subject",
+          "amount",
+          "budget_amount",
+          "variance_amount",
+          "expense_ratio"
+        ],
+        "drilldowns": [
+          "department",
+          "category",
+          "document"
+        ]
+      },
+      "visual_direction": {
+        "tone": "quiet financial operations dashboard",
+        "emphasis": [
+          "variance",
+          "outliers",
+          "approval-ready summary"
+        ]
+      },
+      "embedded_data_policy": {
+        "mode": "smart-tiered",
+        "summary_threshold_rows": 5000
+      }
+    },
+    "visual_design_checkpoint": {
+      "title": "費用分析視覺設計確認",
+      "catalog_guardrail": "financial-control",
+      "layout": {
+        "mode": "kpi-first-dashboard",
+        "sections": [
+          "executive-summary",
+          "kpi-overview",
+          "expense-trend",
+          "exception-review",
+          "data-table"
+        ],
+        "density": "analysis-first"
+      },
+      "kpis": [
+        {
+          "label": "total_amount",
+          "value": 120000
+        },
+        {
+          "label": "total_budget",
+          "value": 100000
+        },
+        {
+          "label": "variance_amount",
+          "value": 20000
+        },
+        {
+          "label": "max_expense_ratio",
+          "value": 0.35
+        }
+      ],
+      "charts": [
+        {
+          "id": "expense-budget-variance",
+          "type": "combo",
+          "purpose": "Compare actual expense, budget, and variance in one control view."
+        },
+        {
+          "id": "expense-composition",
+          "type": "stacked-bar",
+          "purpose": "Show expense composition across departments or categories."
+        },
+        {
+          "id": "expense-driver-ranking",
+          "type": "bar",
+          "purpose": "Rank the largest expense drivers for exception review."
+        }
+      ],
+      "tables": [
+        {
+          "id": "expense-detail-table",
+          "type": "data-table",
+          "columns": [
+            "department_code",
+            "department_name",
+            "expense_subject",
+            "amount",
+            "budget_amount",
+            "variance_amount",
+            "expense_ratio"
+          ],
+          "features": [
+            "filter",
+            "sort",
+            "drilldown",
+            "column_visibility"
+          ],
+          "row_count": 6
+        }
+      ],
+      "interactions": {
+        "filters": [
+          "department_code",
+          "department_name",
+          "expense_subject",
+          "amount",
+          "budget_amount",
+          "variance_amount",
+          "expense_ratio"
+        ],
+        "drilldowns": [
+          "department",
+          "category",
+          "document"
+        ]
+      },
+      "visual_direction": {
+        "tone": "quiet financial operations dashboard",
+        "emphasis": [
+          "variance",
+          "outliers",
+          "approval-ready summary"
+        ]
+      },
+      "data_profile": {
+        "row_count": 6,
+        "columns": [
+          "department_code",
+          "department_name",
+          "expense_subject",
+          "amount",
+          "budget_amount",
+          "variance_amount",
+          "expense_ratio"
+        ],
+        "embedded_mode": "full_rows",
+        "embedded_rows": 6,
+        "full_rows_in_evidence_packet": false
+      }
+    },
+    "report_options": {
+      "include_chart": true,
+      "include_table": true,
+      "include_analysis": true,
+      "include_recommendations": true
+    },
+    "validator_results": [
+      {
+        "role": "source_requirement_reviewer",
+        "status": "pass",
+        "evidence": [
+          {
+            "artifact": "expense-analysis-harness",
+            "status": "pass"
+          }
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": []
+      },
+      {
+        "role": "excel_formula_reviewer",
+        "status": "pass",
+        "evidence": [
+          {
+            "artifact": "expense-analysis-harness",
+            "status": "pass"
+          }
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": []
+      },
+      {
+        "role": "sql_safety_reviewer",
+        "status": "pass",
+        "evidence": [
+          {
+            "artifact": "expense-analysis-harness",
+            "status": "pass"
+          }
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": []
+      },
+      {
+        "role": "schema_relationship_reviewer",
+        "status": "pass",
+        "evidence": [
+          {
+            "artifact": "expense-analysis-harness",
+            "status": "pass"
+          }
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": []
+      },
+      {
+        "role": "data_preview_reviewer",
+        "status": "pass",
+        "evidence": [
+          {
+            "artifact": "expense-analysis-harness",
+            "status": "pass",
+            "metrics": {
+              "row_count": 6,
+              "column_count": 7
+            }
+          }
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": []
+      },
+      {
+        "role": "report_content_reviewer",
+        "status": "pass",
+        "evidence": [
+          {
+            "artifact": "expense-analysis-harness",
+            "status": "pass"
+          }
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": []
+      },
+      {
+        "role": "visual_taste_reviewer",
+        "status": "pass",
+        "evidence": [
+          {
+            "artifact": "expense-analysis-harness",
+            "status": "pass"
+          }
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": []
+      },
+      {
+        "role": "data_visualization_reviewer",
+        "status": "pass",
+        "evidence": [
+          {
+            "artifact": "expense-analysis-harness",
+            "status": "pass"
+          }
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": []
+      },
+      {
+        "role": "react_technical_reviewer",
+        "status": "pass",
+        "evidence": [
+          {
+            "artifact": "expense-analysis-harness",
+            "status": "pass"
+          }
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": []
+      }
+    ],
+    "user_confirmations": {
+      "excel_confirmation": "確認欄位與公式",
+      "sql_review": "同意查詢",
+      "data_preview": "資料正確",
+      "report_selection": "產生報告",
+      "design_brief": "確認設計",
+      "visual_design": "確認視覺設計",
+      "report_draft": "接受",
+      "final_review": "完成"
+    },
+    "checkpoints": [
+      {
+        "checkpoint": "excel_confirmation",
+        "file": "checkpoints/01_excel_confirmation.json",
+        "created_at": "2026-06-18T23:46:59.396754+00:00"
+      },
+      {
+        "checkpoint": "sql_review",
+        "file": "checkpoints/02_sql_review.json",
+        "created_at": "2026-06-18T23:47:00.383655+00:00"
+      },
+      {
+        "checkpoint": "data_preview",
+        "file": "checkpoints/03_data_preview.json",
+        "created_at": "2026-06-18T23:47:01.410077+00:00"
+      },
+      {
+        "checkpoint": "report_selection",
+        "file": "checkpoints/04_report_selection.json",
+        "created_at": "2026-06-18T23:47:02.452321+00:00"
+      },
+      {
+        "checkpoint": "design_brief",
+        "file": "checkpoints/04a_design_brief.json",
+        "created_at": "2026-06-18T23:47:03.481659+00:00"
+      },
+      {
+        "checkpoint": "visual_design",
+        "file": "checkpoints/04b_visual_design.json",
+        "created_at": "2026-06-18T23:47:04.480122+00:00"
+      },
+      {
+        "checkpoint": "report_draft",
+        "file": "checkpoints/05_report_draft.json",
+        "created_at": "2026-06-18T23:47:05.487094+00:00"
+      },
+      {
+        "checkpoint": "final_review",
+        "file": "checkpoints/06_final_review.json",
+        "created_at": "2026-06-18T23:47:06.480467+00:00"
+      }
+    ],
+    "created_at": "2026-06-18T23:46:58.810320+00:00",
+    "updated_at": "2026-06-18T23:47:06.978348+00:00",
+    "user_confirmation_options": {
+      "excel_confirmation": {},
+      "sql_review": {},
+      "data_preview": {},
+      "report_selection": {
+        "reportType": "financial-control"
+      },
+      "design_brief": {},
+      "visual_design": {},
+      "report_draft": {},
+      "final_review": {}
+    },
+    "accepted_residual_risks": []
+  }
+}
+
+$ python3 -m skill_scripts.cli_report_harness can-deliver --run-dir /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619
+exit=0
+stdout:
+{
+  "status": "ok",
+  "allowed": true,
+  "blocking_validators": [],
+  "accepted_residual_risks": []
+}
+
+$ python3 -m skill_scripts.cli_report_harness export-single-html --run-dir /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619 --package /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619/delivery/report-package.json --brief /home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619/delivery/report-design-brief.json
+exit=0
+stdout:
+{
+  "status": "exported",
+  "html_path": "/home/timmypai/.codex/worktrees/5f5b/wferp/wferp-report-runs/expense-analysis-harness-20260619/delivery/report.html",
+  "html_sha256": "9bb4d82b522c691cd4f83f515ae015197dd5328d4dcf381cf7121be3b5d11c65"
+}
+

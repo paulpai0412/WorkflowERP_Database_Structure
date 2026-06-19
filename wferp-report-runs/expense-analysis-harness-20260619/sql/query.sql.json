@@ -1,0 +1,9 @@
+{
+  "sql": "SELECT\n    [department_code] AS department_code,\n    [department_name] AS department_name,\n    [expense_subject] AS expense_subject,\n    [amount] AS amount,\n    [budget_amount] AS budget_amount,\n    [amount] - [budget_amount] AS variance_amount,\n    CAST([amount] AS REAL) / NULLIF((\n        SELECT SUM([budget_amount])\n        FROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\n        WHERE [year] = 2026 AND [account_type] = 'expense'\n    ), 0) AS expense_ratio\nFROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\nWHERE [year] = 2026 AND [account_type] = 'expense'\nORDER BY [department_code], [expense_subject]",
+  "validation": {
+    "readonly": true,
+    "blockedKeywords": [],
+    "executionStatus": "not_executed",
+    "readonly_reason": "SQL starts with SELECT and contains no blocked write keywords or multi statements."
+  }
+}

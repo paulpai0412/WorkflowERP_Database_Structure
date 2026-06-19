@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>financial-control</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, "Noto Sans TC", sans-serif;
+      color: #17202a;
+      background: #f6f7f9;
+    }
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+    section {
+      background: #ffffff;
+      border: 1px solid #dde3ea;
+      border-radius: 8px;
+      margin-top: 16px;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 30px;
+      margin: 0 0 8px;
+    }
+    h2 {
+      font-size: 18px;
+      margin: 0 0 12px;
+    }
+    pre {
+      white-space: pre-wrap;
+      background: #111827;
+      color: #f9fafb;
+      padding: 16px;
+      border-radius: 6px;
+      overflow-wrap: anywhere;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>financial-control</h1>
+    <p>費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。</p>
+    <section>
+      <h2>Report Summary</h2>
+      <p>Rows: 6</p>
+      <p>Columns: department_code, department_name, expense_subject, amount, budget_amount, variance_amount, expense_ratio</p>
+    </section>
+    <section>
+      <h2>Query</h2>
+      <pre>SELECT
+    [department_code] AS department_code,
+    [department_name] AS department_name,
+    [expense_subject] AS expense_subject,
+    [amount] AS amount,
+    [budget_amount] AS budget_amount,
+    [amount] - [budget_amount] AS variance_amount,
+    CAST([amount] AS REAL) / NULLIF((
+        SELECT SUM([budget_amount])
+        FROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]
+        WHERE [year] = 2026 AND [account_type] = &#x27;expense&#x27;
+    ), 0) AS expense_ratio
+FROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]
+WHERE [year] = 2026 AND [account_type] = &#x27;expense&#x27;
+ORDER BY [department_code], [expense_subject]</pre>
+    </section>
+  </main>
+  <script>
+    window.__WFERP_REPORT_PACKAGE__ = "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";
+    window.__WFERP_REPORT_PACKAGE_ENCODING__ = "gzip+base64";
+  </script>
+</body>
+</html>

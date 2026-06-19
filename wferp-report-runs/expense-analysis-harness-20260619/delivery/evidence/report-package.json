@@ -1,0 +1,265 @@
+{
+  "accepted_residual_risks": [],
+  "aggregates": {
+    "max_expense_ratio": 0.35,
+    "total_amount": 120000,
+    "total_budget": 100000,
+    "variance_amount": 20000
+  },
+  "catalog_guardrail": "financial-control",
+  "data_profile": {
+    "columns": [
+      "department_code",
+      "department_name",
+      "expense_subject",
+      "amount",
+      "budget_amount",
+      "variance_amount",
+      "expense_ratio"
+    ],
+    "embedded_mode": "full_rows",
+    "embedded_rows": 6,
+    "full_rows_in_evidence_packet": false,
+    "row_count": 6
+  },
+  "datasets": {
+    "columns": [
+      "department_code",
+      "department_name",
+      "expense_subject",
+      "amount",
+      "budget_amount",
+      "variance_amount",
+      "expense_ratio"
+    ],
+    "embedded_rows": [
+      {
+        "amount": 10000,
+        "budget_amount": 8000,
+        "department_code": "ADM",
+        "department_name": "行政部",
+        "expense_ratio": 0.1,
+        "expense_subject": "文具",
+        "variance_amount": 2000
+      },
+      {
+        "amount": 35000,
+        "budget_amount": 30000,
+        "department_code": "ADM",
+        "department_name": "行政部",
+        "expense_ratio": 0.35,
+        "expense_subject": "旅費",
+        "variance_amount": 5000
+      },
+      {
+        "amount": 25000,
+        "budget_amount": 22000,
+        "department_code": "RND",
+        "department_name": "研發部",
+        "expense_ratio": 0.25,
+        "expense_subject": "軟體訂閱",
+        "variance_amount": 3000
+      },
+      {
+        "amount": 30000,
+        "budget_amount": 25000,
+        "department_code": "RND",
+        "department_name": "研發部",
+        "expense_ratio": 0.3,
+        "expense_subject": "雲端服務",
+        "variance_amount": 5000
+      },
+      {
+        "amount": 12000,
+        "budget_amount": 10000,
+        "department_code": "SAL",
+        "department_name": "業務部",
+        "expense_ratio": 0.12,
+        "expense_subject": "交際費",
+        "variance_amount": 2000
+      },
+      {
+        "amount": 8000,
+        "budget_amount": 5000,
+        "department_code": "SAL",
+        "department_name": "業務部",
+        "expense_ratio": 0.08,
+        "expense_subject": "廣告費",
+        "variance_amount": 3000
+      }
+    ]
+  },
+  "delivery_gate": {
+    "accepted_residual_risks": [],
+    "allowed": true,
+    "blocking_validators": []
+  },
+  "evidence_index": [
+    {
+      "id": "sql",
+      "path": "evidence/query.sql"
+    },
+    {
+      "id": "execution_result",
+      "path": "evidence/execution-result.json"
+    },
+    {
+      "id": "validators",
+      "path": "evidence/validator-results.json"
+    }
+  ],
+  "excluded_rows": {
+    "non_2026": 1,
+    "non_expense_account": 1
+  },
+  "hashes": {
+    "package_sha256": "43cbe62382ef32cca00caffdeada43712dba4a28a4ceaf46df68246eb47f856a",
+    "sql_sha256": "fbeb6f14f0400fa9119389af41a62fe160eacfdab5954671ad5f9946f8e2e8f6"
+  },
+  "package_id": "expense-analysis-harness-20260619",
+  "prompt": "費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。",
+  "report_options": {
+    "include_analysis": true,
+    "include_chart": true,
+    "include_recommendations": true,
+    "include_table": true
+  },
+  "report_type": "financial-control",
+  "run_id": "expense-analysis-harness-20260619",
+  "schema_version": "wferp.report-package.v1",
+  "security": {
+    "source_secret_key_paths": []
+  },
+  "sql": {
+    "text": "SELECT\n    [department_code] AS department_code,\n    [department_name] AS department_name,\n    [expense_subject] AS expense_subject,\n    [amount] AS amount,\n    [budget_amount] AS budget_amount,\n    [amount] - [budget_amount] AS variance_amount,\n    CAST([amount] AS REAL) / NULLIF((\n        SELECT SUM([budget_amount])\n        FROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\n        WHERE [year] = 2026 AND [account_type] = 'expense'\n    ), 0) AS expense_ratio\nFROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\nWHERE [year] = 2026 AND [account_type] = 'expense'\nORDER BY [department_code], [expense_subject]",
+    "validation": {
+      "blockedKeywords": [],
+      "executionStatus": "not_executed",
+      "readonly": true,
+      "readonly_reason": "SQL starts with SELECT and contains no blocked write keywords or multi statements."
+    }
+  },
+  "validator_summary": [
+    {
+      "evidence": [
+        {
+          "artifact": "expense-analysis-harness",
+          "status": "pass"
+        }
+      ],
+      "findings": [],
+      "requiredFixes": [],
+      "residualRisks": [],
+      "role": "source_requirement_reviewer",
+      "status": "pass"
+    },
+    {
+      "evidence": [
+        {
+          "artifact": "expense-analysis-harness",
+          "status": "pass"
+        }
+      ],
+      "findings": [],
+      "requiredFixes": [],
+      "residualRisks": [],
+      "role": "excel_formula_reviewer",
+      "status": "pass"
+    },
+    {
+      "evidence": [
+        {
+          "artifact": "expense-analysis-harness",
+          "status": "pass"
+        }
+      ],
+      "findings": [],
+      "requiredFixes": [],
+      "residualRisks": [],
+      "role": "sql_safety_reviewer",
+      "status": "pass"
+    },
+    {
+      "evidence": [
+        {
+          "artifact": "expense-analysis-harness",
+          "status": "pass"
+        }
+      ],
+      "findings": [],
+      "requiredFixes": [],
+      "residualRisks": [],
+      "role": "schema_relationship_reviewer",
+      "status": "pass"
+    },
+    {
+      "evidence": [
+        {
+          "artifact": "expense-analysis-harness",
+          "metrics": {
+            "column_count": 7,
+            "row_count": 6
+          },
+          "status": "pass"
+        }
+      ],
+      "findings": [],
+      "requiredFixes": [],
+      "residualRisks": [],
+      "role": "data_preview_reviewer",
+      "status": "pass"
+    },
+    {
+      "evidence": [
+        {
+          "artifact": "expense-analysis-harness",
+          "status": "pass"
+        }
+      ],
+      "findings": [],
+      "requiredFixes": [],
+      "residualRisks": [],
+      "role": "report_content_reviewer",
+      "status": "pass"
+    },
+    {
+      "evidence": [
+        {
+          "artifact": "expense-analysis-harness",
+          "status": "pass"
+        }
+      ],
+      "findings": [],
+      "requiredFixes": [],
+      "residualRisks": [],
+      "role": "visual_taste_reviewer",
+      "status": "pass"
+    },
+    {
+      "evidence": [
+        {
+          "artifact": "expense-analysis-harness",
+          "status": "pass"
+        }
+      ],
+      "findings": [],
+      "requiredFixes": [],
+      "residualRisks": [],
+      "role": "data_visualization_reviewer",
+      "status": "pass"
+    },
+    {
+      "evidence": [
+        {
+          "artifact": "expense-analysis-harness",
+          "status": "pass"
+        }
+      ],
+      "findings": [],
+      "requiredFixes": [],
+      "residualRisks": [],
+      "role": "react_technical_reviewer",
+      "status": "pass"
+    }
+  ]
+}

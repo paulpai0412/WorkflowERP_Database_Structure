@@ -1,6 +1,8 @@
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = ROOT / "scripts" / "validate_local_wferp_report_skill.py"
@@ -26,6 +28,9 @@ REQUIRED_PARITY_FILES = [
     "references/html-output.md",
     "references/validators.md",
     "references/e2e-expense-analysis.md",
+    "references/single-html-export.md",
+    "references/dynamic-design-brief.md",
+    "references/style-replay.md",
     "scripts/scaffold-report.sh",
     "scripts/validate-skill.sh",
     "scripts/print-expense-fixture-sql.sh",
@@ -123,6 +128,26 @@ def create_complete_skill_tree(root: Path) -> None:
         if path.exists():
             continue
         write_file(path, f"# {path.name}\n")
+    write_file(
+        root / "references" / "single-html-export.md",
+        "\n".join(
+            [
+                "# Single HTML Export",
+                "單檔 HTML delivery must use checkpoint-confirmed data.",
+                "HTML 不得連 DB。",
+                "HTML 不得執行 SQL。",
+                "network requests = 0",
+            ]
+        ),
+    )
+    write_file(
+        root / "references" / "dynamic-design-brief.md",
+        "# Dynamic Design Brief\nsingle HTML visual checkpoint and 使用者確認\n",
+    )
+    write_file(
+        root / "references" / "style-replay.md",
+        "# Style Replay\nsingle HTML style replay requires checkpoint for incompatible charts\n",
+    )
     write_file(
         root / "references" / "validators.md",
         "\n".join(
@@ -296,3 +321,62 @@ def test_validator_reports_invalid_utf8_in_read_files(tmp_path):
 
     assert result.ok is False
     assert "Invalid UTF-8: references/validators.md" in result.errors
+
+
+def test_skill_documents_single_html_export_and_style_replay(tmp_path):
+    skill_root = tmp_path / "wferp-report"
+    create_complete_skill_tree(skill_root)
+
+    for path in [
+        skill_root / "references" / "single-html-export.md",
+        skill_root / "references" / "dynamic-design-brief.md",
+        skill_root / "references" / "style-replay.md",
+    ]:
+        assert path.exists(), path
+        text = path.read_text(encoding="utf-8")
+        assert "single HTML" in text or "單檔 HTML" in text
+        assert "checkpoint" in text or "確認" in text
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "references/single-html-export.md",
+        "references/dynamic-design-brief.md",
+        "references/style-replay.md",
+    ],
+)
+def test_validator_rejects_missing_single_html_reference_files(tmp_path, relative_path):
+    module = load_validator_module()
+    skill_root = tmp_path / "wferp-report"
+    create_complete_skill_tree(skill_root)
+    (skill_root / relative_path).unlink()
+
+    result = module.validate_skill_tree(skill_root)
+
+    assert result.ok is False
+    assert f"Missing required file: {relative_path}" in result.errors
+
+
+def test_skill_requires_no_db_access_from_single_html(tmp_path):
+    skill_root = tmp_path / "wferp-report"
+    create_complete_skill_tree(skill_root)
+    text = (skill_root / "references" / "single-html-export.md").read_text(encoding="utf-8")
+
+    assert "不得連 DB" in text
+    assert "不得執行 SQL" in text
+    assert "network requests = 0" in text
+
+
+@pytest.mark.parametrize("needle", ["不得連 DB", "不得執行 SQL", "network requests = 0"])
+def test_validator_rejects_missing_single_html_safety_text(tmp_path, needle):
+    module = load_validator_module()
+    skill_root = tmp_path / "wferp-report"
+    create_complete_skill_tree(skill_root)
+    path = skill_root / "references" / "single-html-export.md"
+    path.write_text(path.read_text(encoding="utf-8").replace(needle, ""), encoding="utf-8")
+
+    result = module.validate_skill_tree(skill_root)
+
+    assert result.ok is False
+    assert f"single-html-export.md missing required text: {needle}" in result.errors
