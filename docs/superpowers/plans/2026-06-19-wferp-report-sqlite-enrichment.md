@@ -1,14 +1,52 @@
 # WFERP Report SQLite Enrichment Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Build the SQLite enrichment pipeline for `wferp-report` so the formal ERP database receives only one reviewed raw-field SELECT, while Excel formula and lookup fields are reconstructed in a run-scoped local SQLite workspace and validated through raw/enriched checkpoints.
 
 **Architecture:** The implementation adds focused Python modules for readable schema metadata, workbook column classification, SQLite workspace lifecycle, lookup import, formula translation, and enrichment execution. Existing harness state and CLI commands become the orchestration layer: classify workbook columns, confirm raw SQL, execute/import raw rows, enrich locally, show raw/enriched previews, and record retention decisions. Validator gates remain subagent-owned; local static checks are evidence input only.
 
-**Tech Stack:** Python 3 standard library, `openpyxl`, SQLite `sqlite3`, pytest, existing `skill_scripts/*`, existing checkpoint companion, WFERP `_Source` schema metadata, local `wferp-report` skill references.
+**Tech Stack:** Python 3 standard library, existing OOXML `.xlsx` parser, SQLite `sqlite3`, pytest, existing `skill_scripts/*`, existing checkpoint companion, WFERP `_Source` schema metadata, local `wferp-report` skill references.
 
 ---
+
+## Implementation Status
+
+Status: complete as of 2026-06-19.
+
+Note: historical task sketches below retain the original `openpyxl` examples. The committed implementation avoids adding an `openpyxl` runtime dependency and uses the repo's existing OOXML `.xlsx` parser in `skill_scripts.excel_intake`.
+
+Commits:
+
+- `3fef5ce feat: add readable schema metadata`
+- `628bc20 feat: classify workbook fields for sqlite enrichment`
+- `f6f7e57 feat: add run scoped sqlite workspace`
+- `44f004b feat: import workbook lookups into sqlite`
+- `d3461f9 feat: enrich workbook formulas in sqlite`
+- `4eecc83 feat: add sqlite enrichment checkpoints`
+- `a4f55b4 feat: tighten report validator gates`
+- `7c2d5f7 test: cover sqlite enrichment expense e2e`
+
+Final verification evidence:
+
+- `python3 -m py_compile skill_scripts/schema_metadata.py skill_scripts/workbook_classifier.py skill_scripts/sqlite_workspace.py skill_scripts/workbook_lookup_importer.py skill_scripts/formula_sqlite_translator.py skill_scripts/sqlite_enrichment.py skill_scripts/cli_report_harness.py skill_scripts/report_harness.py skill_scripts/report_harness_state.py skill_scripts/checkpoint_companion.py` passed.
+- `bash /home/timmypai/.codex/skills/wferp-report/scripts/validate-skill.sh` passed.
+- `pytest tests/skill_scripts/test_schema_metadata.py tests/skill_scripts/test_workbook_classifier.py tests/skill_scripts/test_sqlite_workspace.py tests/skill_scripts/test_workbook_lookup_importer.py tests/skill_scripts/test_formula_sqlite_translator.py tests/skill_scripts/test_sqlite_enrichment.py tests/skill_scripts/test_cli_report_harness.py tests/skill_scripts/test_validator_contracts.py tests/skill_scripts/test_sqlite_enrichment_expense_e2e.py tests/skill_scripts/test_expense_analysis_sqlite_e2e.py -v` passed with 69 tests.
+- `pytest tests/skill_scripts/test_checkpoint_companion.py -v` passed with 16 tests when run with local socket permission.
+- Subagent validator re-review passed for Task 7 validator gates and Task 8 SQLite enrichment expense E2E.
+
+Quantitative acceptance evidence:
+
+- Workbook classifier tests categorize all tested workbook output columns and require confidence, reason, and processing location.
+- Classification checkpoint rendering shows readable DB metadata for tested DB fields.
+- Lookup importer tests confirm header/meta rows are not imported as business mappings.
+- SQLite workspace tests record raw/enriched row counts and cleanup only manifest-listed tables.
+- Expense SQLite enrichment E2E verifies true `.xlsx` intake, workbook classification, formula translation, lookup import, raw/enriched SQLite tables, full enriched columns, row values, department aggregates, ignored lookup rows, manifest metadata, active retention, and delete retention cleanup.
+
+Residual risks:
+
+- The Task 8 E2E writes fixture raw rows into the run-scoped SQLite workspace; it validates SQLite enrichment rather than a full formal-DB-to-report harness run.
+- The test workbook is a minimal valid OOXML `.xlsx`; it does not cover all real Excel variants such as shared strings, styles, or cached formula values.
 
 ## Approved Spec
 
@@ -103,7 +141,7 @@ Use this prompt to execute the plan in a fresh Codex session:
 - Create: `skill_scripts/schema_metadata.py`
 - Create: `tests/skill_scripts/test_schema_metadata.py`
 
-- [ ] **Step 1: Write failing tests for table and field descriptions**
+- [x] **Step 1: Write failing tests for table and field descriptions**
 
 Add `tests/skill_scripts/test_schema_metadata.py`:
 
@@ -151,7 +189,7 @@ def test_describe_expression_includes_each_input_field():
     assert [item["column_name"] for item in expression["inputs"]] == ["借貸別", "原幣金額"]
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -161,7 +199,7 @@ pytest tests/skill_scripts/test_schema_metadata.py -v
 
 Expected: FAIL with `ModuleNotFoundError: No module named 'skill_scripts.schema_metadata'`.
 
-- [ ] **Step 3: Implement `SchemaMetadata`**
+- [x] **Step 3: Implement `SchemaMetadata`**
 
 Create `skill_scripts/schema_metadata.py`:
 
@@ -235,7 +273,7 @@ class SchemaMetadata:
         return {"metadata_status": status, "inputs": described}
 ```
 
-- [ ] **Step 4: Run tests to verify pass**
+- [x] **Step 4: Run tests to verify pass**
 
 Run:
 
@@ -245,7 +283,7 @@ pytest tests/skill_scripts/test_schema_metadata.py -v
 
 Expected: 3 passed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add skill_scripts/schema_metadata.py tests/skill_scripts/test_schema_metadata.py
@@ -261,7 +299,7 @@ git commit -m "feat: add readable schema metadata"
 - Create: `tests/skill_scripts/test_workbook_classifier.py`
 - Modify: `skill_scripts/excel_intake.py`
 
-- [ ] **Step 1: Write failing classifier tests**
+- [x] **Step 1: Write failing classifier tests**
 
 Add `tests/skill_scripts/test_workbook_classifier.py`:
 
@@ -317,7 +355,7 @@ def test_every_column_has_confidence_reason_and_processing_location(tmp_path: Pa
         assert column["processing_location"] in {"formal_db_sql", "sqlite_enrichment", "excluded_pending_rule"}
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -327,7 +365,7 @@ pytest tests/skill_scripts/test_workbook_classifier.py -v
 
 Expected: FAIL with `ModuleNotFoundError: No module named 'skill_scripts.workbook_classifier'`.
 
-- [ ] **Step 3: Implement classifier with deterministic seed mapping**
+- [x] **Step 3: Implement classifier with deterministic seed mapping**
 
 Create `skill_scripts/workbook_classifier.py`:
 
@@ -435,7 +473,7 @@ def classify_workbook(workbook_path: str | Path, *, source_dir: str | Path, prim
     return {"workbook_path": str(workbook_path), "primary_sheet": sheet.title, "columns": columns, "lookup_sheet_inventory": inventory}
 ```
 
-- [ ] **Step 4: Run classifier tests**
+- [x] **Step 4: Run classifier tests**
 
 Run:
 
@@ -445,7 +483,7 @@ pytest tests/skill_scripts/test_schema_metadata.py tests/skill_scripts/test_work
 
 Expected: all selected tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add skill_scripts/schema_metadata.py skill_scripts/workbook_classifier.py tests/skill_scripts/test_schema_metadata.py tests/skill_scripts/test_workbook_classifier.py
@@ -460,7 +498,7 @@ git commit -m "feat: classify workbook fields for sqlite enrichment"
 - Create: `skill_scripts/sqlite_workspace.py`
 - Create: `tests/skill_scripts/test_sqlite_workspace.py`
 
-- [ ] **Step 1: Write failing workspace tests**
+- [x] **Step 1: Write failing workspace tests**
 
 Add `tests/skill_scripts/test_sqlite_workspace.py`:
 
@@ -502,7 +540,7 @@ def test_workspace_writes_raw_rows_and_cleanup_only_manifest_tables(tmp_path: Pa
     assert workspace.manifest()["cleanup_status"] == "deleted"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -512,7 +550,7 @@ pytest tests/skill_scripts/test_sqlite_workspace.py -v
 
 Expected: FAIL with `ModuleNotFoundError: No module named 'skill_scripts.sqlite_workspace'`.
 
-- [ ] **Step 3: Implement workspace**
+- [x] **Step 3: Implement workspace**
 
 Create `skill_scripts/sqlite_workspace.py` with:
 
@@ -637,7 +675,7 @@ class SQLiteRunWorkspace:
         self._update_manifest(cleanup_status="deleted", retention_decision="delete")
 ```
 
-- [ ] **Step 4: Run workspace tests**
+- [x] **Step 4: Run workspace tests**
 
 Run:
 
@@ -647,7 +685,7 @@ pytest tests/skill_scripts/test_sqlite_workspace.py -v
 
 Expected: 2 passed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add skill_scripts/sqlite_workspace.py tests/skill_scripts/test_sqlite_workspace.py
@@ -663,7 +701,7 @@ git commit -m "feat: add run scoped sqlite workspace"
 - Create: `tests/skill_scripts/test_workbook_lookup_importer.py`
 - Modify: `skill_scripts/sqlite_workspace.py`
 
-- [ ] **Step 1: Write failing lookup importer tests**
+- [x] **Step 1: Write failing lookup importer tests**
 
 Add `tests/skill_scripts/test_workbook_lookup_importer.py`:
 
@@ -718,7 +756,7 @@ def test_import_lookup_sheet_ignores_header_meta_and_blank_rows(tmp_path: Path):
     assert rows == [("6111", "8.租金支出"), ("6113", "9001.旅費")]
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -728,7 +766,7 @@ pytest tests/skill_scripts/test_workbook_lookup_importer.py -v
 
 Expected: FAIL with `ModuleNotFoundError: No module named 'skill_scripts.workbook_lookup_importer'`.
 
-- [ ] **Step 3: Implement lookup importer**
+- [x] **Step 3: Implement lookup importer**
 
 Create `skill_scripts/workbook_lookup_importer.py`:
 
@@ -800,7 +838,7 @@ def import_lookup_sheet(
     }
 ```
 
-- [ ] **Step 4: Run lookup importer tests**
+- [x] **Step 4: Run lookup importer tests**
 
 Run:
 
@@ -810,7 +848,7 @@ pytest tests/skill_scripts/test_workbook_lookup_importer.py tests/skill_scripts/
 
 Expected: all selected tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add skill_scripts/workbook_lookup_importer.py skill_scripts/sqlite_workspace.py tests/skill_scripts/test_workbook_lookup_importer.py
@@ -827,7 +865,7 @@ git commit -m "feat: import workbook lookups into sqlite"
 - Create: `tests/skill_scripts/test_formula_sqlite_translator.py`
 - Create: `tests/skill_scripts/test_sqlite_enrichment.py`
 
-- [ ] **Step 1: Write failing formula translator tests**
+- [x] **Step 1: Write failing formula translator tests**
 
 Add `tests/skill_scripts/test_formula_sqlite_translator.py`:
 
@@ -860,7 +898,7 @@ def test_unsupported_formula_returns_structured_error():
     assert result["function"] == "INDIRECT"
 ```
 
-- [ ] **Step 2: Write failing enrichment tests**
+- [x] **Step 2: Write failing enrichment tests**
 
 Add `tests/skill_scripts/test_sqlite_enrichment.py`:
 
@@ -917,7 +955,7 @@ def test_run_enrichment_creates_enriched_table_from_raw_and_lookup(tmp_path: Pat
     assert rows == [("6111", 100.0, "8.租金支出"), ("6113", -25.0, "9001.旅費")]
 ```
 
-- [ ] **Step 3: Run tests to verify failure**
+- [x] **Step 3: Run tests to verify failure**
 
 Run:
 
@@ -927,7 +965,7 @@ pytest tests/skill_scripts/test_formula_sqlite_translator.py tests/skill_scripts
 
 Expected: FAIL with missing modules.
 
-- [ ] **Step 4: Implement formula translator**
+- [x] **Step 4: Implement formula translator**
 
 Create `skill_scripts/formula_sqlite_translator.py`:
 
@@ -977,7 +1015,7 @@ def translate_formula(formula: str, column_map: dict[str, str], *, strict: bool 
     return {"status": "unsupported", "function": function, "formula": formula}
 ```
 
-- [ ] **Step 5: Implement enrichment runner**
+- [x] **Step 5: Implement enrichment runner**
 
 Create `skill_scripts/sqlite_enrichment.py`:
 
@@ -1027,7 +1065,7 @@ def run_enrichment(
     return {"status": "enriched", "enriched_table": workspace.enriched_table, "enriched_row_count": row_count, "sql": sql}
 ```
 
-- [ ] **Step 6: Run formula and enrichment tests**
+- [x] **Step 6: Run formula and enrichment tests**
 
 Run:
 
@@ -1037,7 +1075,7 @@ pytest tests/skill_scripts/test_formula_sqlite_translator.py tests/skill_scripts
 
 Expected: all selected tests pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add skill_scripts/formula_sqlite_translator.py skill_scripts/sqlite_enrichment.py tests/skill_scripts/test_formula_sqlite_translator.py tests/skill_scripts/test_sqlite_enrichment.py
@@ -1056,7 +1094,7 @@ git commit -m "feat: enrich workbook formulas in sqlite"
 - Modify: `tests/skill_scripts/test_cli_report_harness.py`
 - Modify: `tests/skill_scripts/test_checkpoint_companion.py`
 
-- [ ] **Step 1: Write failing CLI flow tests**
+- [x] **Step 1: Write failing CLI flow tests**
 
 Add to `tests/skill_scripts/test_cli_report_harness.py`:
 
@@ -1093,7 +1131,7 @@ def test_cli_sqlite_enrichment_flow_writes_raw_and_enriched_checkpoints(tmp_path
     assert json.loads(raw_preview.stdout)["checkpoint"] == "raw_data_preview"
 ```
 
-- [ ] **Step 2: Write failing companion rendering test**
+- [x] **Step 2: Write failing companion rendering test**
 
 Add to `tests/skill_scripts/test_checkpoint_companion.py`:
 
@@ -1134,7 +1172,7 @@ def test_classification_checkpoint_renders_readable_db_metadata(tmp_path: Path):
     assert "ACTML.ML006" in html
 ```
 
-- [ ] **Step 3: Run tests to verify failure**
+- [x] **Step 3: Run tests to verify failure**
 
 Run:
 
@@ -1145,7 +1183,7 @@ pytest tests/skill_scripts/test_checkpoint_companion.py -k classification_checkp
 
 Expected: FAIL due missing CLI commands, checkpoint definitions, and renderer branch.
 
-- [ ] **Step 4: Add checkpoint definitions**
+- [x] **Step 4: Add checkpoint definitions**
 
 Modify `skill_scripts/report_harness_state.py` by adding definitions:
 
@@ -1176,7 +1214,7 @@ Modify `skill_scripts/report_harness_state.py` by adding definitions:
 },
 ```
 
-- [ ] **Step 5: Add harness methods**
+- [x] **Step 5: Add harness methods**
 
 Modify `skill_scripts/report_harness.py` with methods:
 
@@ -1199,7 +1237,7 @@ def write_sqlite_retention(self, payload: dict[str, Any]) -> dict[str, Any]:
     return record_checkpoint(self.run_dir, "sqlite_retention", payload)
 ```
 
-- [ ] **Step 6: Add CLI subcommands**
+- [x] **Step 6: Add CLI subcommands**
 
 Modify `skill_scripts/cli_report_harness.py` to dispatch these commands:
 
@@ -1220,7 +1258,7 @@ COMMANDS.update(
 
 The `_classify_workbook` command must call `classify_workbook()` and `harness.write_field_formula_classification()`. The `_init_sqlite_workspace` command must create `SQLiteRunWorkspace` and persist the manifest into harness state. The `_write_raw_table` command must load a JSON list of raw rows and write the raw table.
 
-- [ ] **Step 7: Render checkpoint tables**
+- [x] **Step 7: Render checkpoint tables**
 
 Modify `skill_scripts/checkpoint_companion.py` so classification payloads render as tables with:
 
@@ -1235,7 +1273,7 @@ Modify `skill_scripts/checkpoint_companion.py` so classification payloads render
 
 Raw preview and enriched preview pages must show row count, columns, aggregates, and sample table. SQLite retention page must show manifest path, table names, row counts, and default action `保留本地資料`.
 
-- [ ] **Step 8: Run CLI and companion tests**
+- [x] **Step 8: Run CLI and companion tests**
 
 Run:
 
@@ -1246,7 +1284,7 @@ pytest tests/skill_scripts/test_checkpoint_companion.py -k "classification_check
 
 Expected: selected tests pass. If companion tests fail in sandbox with socket permission, rerun the same command with sandbox escalation for local bind.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add skill_scripts/report_harness_state.py skill_scripts/report_harness.py skill_scripts/cli_report_harness.py skill_scripts/checkpoint_companion.py tests/skill_scripts/test_cli_report_harness.py tests/skill_scripts/test_checkpoint_companion.py
@@ -1268,7 +1306,7 @@ git commit -m "feat: add sqlite enrichment checkpoints"
 - Create: `/home/timmypai/.codex/skills/wferp-report/references/sqlite-enrichment.md`
 - Create: `/home/timmypai/.codex/skills/wferp-report/references/field-classification.md`
 
-- [ ] **Step 1: Write failing validator role tests**
+- [x] **Step 1: Write failing validator role tests**
 
 Add to `tests/skill_scripts/test_validator_contracts.py`:
 
@@ -1298,7 +1336,7 @@ def test_sqlite_enrichment_reviewer_requires_manifest_and_row_counts():
     assert result["valid"] is True
 ```
 
-- [ ] **Step 2: Run tests to verify failure**
+- [x] **Step 2: Run tests to verify failure**
 
 Run:
 
@@ -1308,7 +1346,7 @@ pytest tests/skill_scripts/test_validator_contracts.py -v
 
 Expected: FAIL because validator roles do not include the new reviewers.
 
-- [ ] **Step 3: Add validator roles**
+- [x] **Step 3: Add validator roles**
 
 Modify `skill_scripts/validator_contracts.py`:
 
@@ -1330,7 +1368,7 @@ REQUIRED_VALIDATORS = [
 
 Ensure `validate_evidence_packet()` accepts `type=file`, `type=metric`, `type=inspection`, and `type=command` evidence entries with non-empty identifying fields.
 
-- [ ] **Step 4: Update skill references**
+- [x] **Step 4: Update skill references**
 
 Create `/home/timmypai/.codex/skills/wferp-report/references/field-classification.md`:
 
@@ -1359,7 +1397,7 @@ Each run writes `sqlite_manifest.json`, uses unique table names, shows raw and e
 
 Update `SKILL.md` and `harness.md` so Phase 1 includes automatic field classification, Phase 5 writes raw DB rows to SQLite, Phase 6 performs SQLite enrichment, and Phase 12 includes SQLite retention.
 
-- [ ] **Step 5: Run validator tests**
+- [x] **Step 5: Run validator tests**
 
 Run:
 
@@ -1369,7 +1407,7 @@ pytest tests/skill_scripts/test_validator_contracts.py -v
 
 Expected: all validator contract tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add skill_scripts/validator_contracts.py tests/skill_scripts/test_validator_contracts.py
@@ -1387,7 +1425,7 @@ If local skill files are outside the repo, record their changed paths in the tas
 - Modify: `tests/skill_scripts/expense_report_fixture.py`
 - Modify: `tests/skill_scripts/test_expense_analysis_sqlite_e2e.py`
 
-- [ ] **Step 1: Write failing E2E test**
+- [x] **Step 1: Write failing E2E test**
 
 Create `tests/skill_scripts/test_sqlite_enrichment_expense_e2e.py`:
 
@@ -1468,7 +1506,7 @@ def test_expense_sqlite_enrichment_e2e_without_fake_or_mock(tmp_path: Path):
     assert manifest["cleanup_status"] == "active"
 ```
 
-- [ ] **Step 2: Run E2E to verify failure**
+- [x] **Step 2: Run E2E to verify failure**
 
 Run:
 
@@ -1478,7 +1516,7 @@ pytest tests/skill_scripts/test_sqlite_enrichment_expense_e2e.py -v
 
 Expected: FAIL until Tasks 3-5 are implemented, then pass.
 
-- [ ] **Step 3: Integrate with existing expense SQLite E2E fixture**
+- [x] **Step 3: Integrate with existing expense SQLite E2E fixture**
 
 Modify `tests/skill_scripts/expense_report_fixture.py` so expense E2E returns these additional keys:
 
@@ -1500,7 +1538,7 @@ assert result["ignored_lookup_rows"] >= 0
 assert result["sqlite_manifest"]["cleanup_status"] == "active"
 ```
 
-- [ ] **Step 4: Run full relevant tests**
+- [x] **Step 4: Run full relevant tests**
 
 Run:
 
@@ -1517,7 +1555,7 @@ pytest tests/skill_scripts/test_schema_metadata.py \
 
 Expected: all selected tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/skill_scripts/test_sqlite_enrichment_expense_e2e.py tests/skill_scripts/expense_report_fixture.py tests/skill_scripts/test_expense_analysis_sqlite_e2e.py
