@@ -11,7 +11,9 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 from skill_scripts.postgres_readonly_adapter import translate_sqlserver_select_to_postgres
+from skill_scripts.sqlite_enrichment import run_enrichment
 from skill_scripts.sqlite_readonly_adapter import translate_sqlserver_select_to_sqlite
+from skill_scripts.sqlite_workspace import SQLiteRunWorkspace
 
 
 TABLE_NAME = "EXPENSE_ANALYSIS_FIXTURE"
@@ -203,7 +205,20 @@ def run_expense_analysis_sqlite_e2e(tmp_path: Path) -> dict[str, Any]:
         }
     finally:
         conn.close()
-    return _build_result(rows, excluded_rows, sql)
+    result = _build_result(rows, excluded_rows, sql)
+
+    workspace = SQLiteRunWorkspace.create(tmp_path / "wferp-expense-run", run_id="expense_analysis")
+    workspace.write_raw_rows(rows)
+    run_enrichment(workspace, computed_columns=[], lookup_columns=[])
+    result.update(
+        {
+            "sqlite_manifest": workspace.manifest(),
+            "raw_table": workspace.raw_table,
+            "enriched_table": workspace.enriched_table,
+            "ignored_lookup_rows": 0,
+        }
+    )
+    return result
 
 
 def run_expense_analysis_postgres_e2e(container: str = "wferp-postgres-e2e") -> dict[str, Any]:

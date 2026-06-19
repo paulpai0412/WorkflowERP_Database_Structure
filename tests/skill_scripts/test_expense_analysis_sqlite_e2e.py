@@ -21,3 +21,7 @@ def test_expense_analysis_sqlite_e2e_quantitative_acceptance(tmp_path):
     assert result["excluded_rows"]["non_expense_account"] == 1
     assert result["sql_safety"]["readonly"] is True
     assert result["sql_safety"]["blocked_keywords"] == []
+    assert result["sqlite_manifest"]["raw_row_count"] >= 1
+    assert result["sqlite_manifest"]["enriched_row_count"] == result["sqlite_manifest"]["raw_row_count"]
+    assert result["ignored_lookup_rows"] >= 0
+    assert result["sqlite_manifest"]["cleanup_status"] == "active"
