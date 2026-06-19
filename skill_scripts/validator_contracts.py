@@ -6,13 +6,15 @@ from typing import Any
 
 REQUIRED_VALIDATORS = [
     "source_requirement_reviewer",
+    "excel_classification_reviewer",
     "excel_formula_reviewer",
-    "sql_safety_reviewer",
     "schema_relationship_reviewer",
+    "sql_safety_reviewer",
+    "sqlite_enrichment_reviewer",
     "data_preview_reviewer",
     "report_content_reviewer",
-    "visual_taste_reviewer",
     "data_visualization_reviewer",
+    "visual_taste_reviewer",
     "react_technical_reviewer",
 ]
 
@@ -75,6 +77,63 @@ def _has_quantitative_data_preview_check(evidence: list[dict[str, Any]]) -> bool
     return False
 
 
+def _validate_typed_evidence(item: dict[str, Any]) -> None:
+    evidence_type = item.get("type")
+    if evidence_type is None:
+        return
+    _require(evidence_type in {"file", "metric", "inspection", "command"}, f"Unknown evidence type: {evidence_type}")
+    if evidence_type == "file":
+        _require(bool(str(item.get("path", "")).strip()), "file evidence requires path")
+    elif evidence_type == "metric":
+        _require(bool(str(item.get("name", "")).strip()), "metric evidence requires name")
+        _require("value" in item, "metric evidence requires value")
+    elif evidence_type == "inspection":
+        _require(bool(str(item.get("name", "")).strip()), "inspection evidence requires name")
+        _require(bool(str(item.get("status", "")).strip()), "inspection evidence requires status")
+    elif evidence_type == "command":
+        _require(bool(str(item.get("command", "")).strip()), "command evidence requires command")
+
+
+def _has_metric(evidence: list[dict[str, Any]], name: str) -> bool:
+    return _metric_value(evidence, name) is not None
+
+
+def _metric_value(evidence: list[dict[str, Any]], name: str) -> Any:
+    for item in evidence:
+        if item.get("type") == "metric" and item.get("name") == name and "value" in item:
+            return item["value"]
+        metrics = item.get("metrics")
+        if isinstance(metrics, dict) and name in metrics:
+            return metrics[name]
+    return None
+
+
+def _has_non_negative_numeric_metric(evidence: list[dict[str, Any]], name: str) -> bool:
+    value = _metric_value(evidence, name)
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0
+
+
+def _has_file_evidence(evidence: list[dict[str, Any]], *, required_name_part: str) -> bool:
+    for item in evidence:
+        if item.get("type") != "file":
+            continue
+        path = str(item.get("path", ""))
+        if path.endswith(".json") and required_name_part in path:
+            return True
+    return False
+
+
+def _has_inspection(evidence: list[dict[str, Any]], name: str) -> bool:
+    for item in evidence:
+        if item.get("type") == "inspection" and item.get("name") == name:
+            return bool(str(item.get("status", "")).strip())
+    return False
+
+
+def _has_manifest_file(evidence: list[dict[str, Any]]) -> bool:
+    return _has_file_evidence(evidence, required_name_part="wferp_run_sqlite_manifest")
+
+
 def validate_evidence_packet(packet: dict[str, Any]) -> dict[str, Any]:
     for field in REQUIRED_PACKET_FIELDS:
         _require(field in packet, f"Evidence packet missing required field: {field}")
@@ -83,6 +142,8 @@ def validate_evidence_packet(packet: dict[str, Any]) -> dict[str, Any]:
     _require(packet["status"] in VALIDATOR_STATUSES, "Invalid validator status")
     _require(isinstance(packet["evidence"], list), "evidence must be a list")
     _require(all(isinstance(item, dict) for item in packet["evidence"]), "evidence must contain objects")
+    for item in packet["evidence"]:
+        _validate_typed_evidence(item)
     _require_string_list(packet["findings"], "findings")
     _require_string_list(packet["requiredFixes"], "requiredFixes")
     _require_string_list(packet["residualRisks"], "residualRisks")
@@ -96,7 +157,37 @@ def validate_evidence_packet(packet: dict[str, Any]) -> dict[str, Any]:
             _has_quantitative_data_preview_check(packet["evidence"]),
             "data_preview_reviewer requires quantitative row_count and column_count checks",
         )
-    return packet
+    if packet["role"] == "excel_classification_reviewer":
+        _require(
+            _has_file_evidence(packet["evidence"], required_name_part="classification"),
+            "excel_classification_reviewer requires classification json file evidence",
+        )
+        for metric in (
+            "classified_columns",
+            "db_field_count",
+            "formula_field_count",
+            "lookup_field_count",
+            "manual_only_count",
+        ):
+            _require(
+                _has_non_negative_numeric_metric(packet["evidence"], metric),
+                f"excel_classification_reviewer requires non-negative numeric {metric} metric",
+            )
+        _require(
+            _has_inspection(packet["evidence"], "metadata_readability"),
+            "excel_classification_reviewer requires metadata_readability inspection evidence",
+        )
+    if packet["role"] == "sqlite_enrichment_reviewer":
+        _require(
+            _has_manifest_file(packet["evidence"]),
+            "sqlite_enrichment_reviewer requires sqlite manifest file evidence",
+        )
+        for metric in ("raw_row_count", "enriched_row_count", "ignored_lookup_rows"):
+            _require(
+                _has_non_negative_numeric_metric(packet["evidence"], metric),
+                f"sqlite_enrichment_reviewer requires non-negative numeric {metric} metric",
+            )
+    return {"valid": True, **packet}
 
 
 def build_final_review_gate(

@@ -14,15 +14,22 @@ from skill_scripts.validator_contracts import (
 def test_validator_contracts_include_required_roles():
     assert REQUIRED_VALIDATORS == [
         "source_requirement_reviewer",
+        "excel_classification_reviewer",
         "excel_formula_reviewer",
-        "sql_safety_reviewer",
         "schema_relationship_reviewer",
+        "sql_safety_reviewer",
+        "sqlite_enrichment_reviewer",
         "data_preview_reviewer",
         "report_content_reviewer",
-        "visual_taste_reviewer",
         "data_visualization_reviewer",
+        "visual_taste_reviewer",
         "react_technical_reviewer",
     ]
+
+
+def test_required_validators_include_classification_and_sqlite_enrichment():
+    assert "excel_classification_reviewer" in REQUIRED_VALIDATORS
+    assert "sqlite_enrichment_reviewer" in REQUIRED_VALIDATORS
 
 
 def test_validator_result_requires_evidence_and_repair_fields():
@@ -36,6 +43,7 @@ def test_validator_result_requires_evidence_and_repair_fields():
     )
 
     assert result.to_dict() == {
+        "valid": True,
         "role": "sql_safety_reviewer",
         "status": "fail",
         "evidence": [{"command": "python3 -m skill_scripts.cli_report_harness validate-sql"}],
@@ -55,13 +63,118 @@ def test_validator_contract_requires_status_evidence_findings_and_repair_fields(
         "residualRisks": [],
     }
 
-    assert validate_evidence_packet(packet) == packet
+    assert validate_evidence_packet(packet) == {"valid": True, **packet}
 
     for field in ("role", "status", "evidence", "findings", "requiredFixes", "residualRisks"):
         incomplete = dict(packet)
         incomplete.pop(field)
         with pytest.raises(ValidatorContractError, match=field):
             validate_evidence_packet(incomplete)
+
+
+def test_validator_contract_accepts_structured_evidence_types():
+    packet = {
+        "role": "excel_classification_reviewer",
+        "status": "pass",
+        "evidence": [
+            {"type": "file", "path": "data/column-classification.json", "detail": "classification payload"},
+            {"type": "metric", "name": "classified_columns", "value": 12},
+            {"type": "metric", "name": "db_field_count", "value": 7},
+            {"type": "metric", "name": "formula_field_count", "value": 3},
+            {"type": "metric", "name": "lookup_field_count", "value": 1},
+            {"type": "metric", "name": "manual_only_count", "value": 1},
+            {"type": "inspection", "name": "metadata_readability", "status": "pass"},
+            {"type": "command", "command": "pytest tests/skill_scripts/test_workbook_classifier.py -v"},
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": [],
+    }
+
+    assert validate_evidence_packet(packet) == {"valid": True, **packet}
+
+
+def test_excel_classification_reviewer_requires_file_metrics_and_metadata_inspection():
+    packet = {
+        "role": "excel_classification_reviewer",
+        "status": "pass",
+        "evidence": [
+            {"type": "file", "path": "data/field-classification.json"},
+            {"type": "metric", "name": "classified_columns", "value": 12},
+            {"type": "metric", "name": "db_field_count", "value": 7},
+            {"type": "metric", "name": "formula_field_count", "value": 3},
+            {"type": "metric", "name": "lookup_field_count", "value": 1},
+            {"type": "metric", "name": "manual_only_count", "value": 1},
+            {"type": "inspection", "name": "metadata_readability", "status": "pass"},
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": [],
+    }
+
+    assert validate_evidence_packet(packet)["valid"] is True
+
+    for evidence_index, expected_message in [
+        (0, "classification json file"),
+        (1, "classified_columns"),
+        (2, "db_field_count"),
+        (3, "formula_field_count"),
+        (4, "lookup_field_count"),
+        (5, "manual_only_count"),
+        (6, "metadata_readability"),
+    ]:
+        missing = dict(packet)
+        missing["evidence"] = list(packet["evidence"])
+        missing["evidence"].pop(evidence_index)
+        with pytest.raises(ValidatorContractError, match=expected_message):
+            validate_evidence_packet(missing)
+
+
+def test_sqlite_enrichment_reviewer_requires_manifest_and_row_counts():
+    packet = {
+        "role": "sqlite_enrichment_reviewer",
+        "status": "pass",
+        "evidence": [
+            {
+                "type": "file",
+                "path": "sqlite/wferp_run_sqlite_manifest.json",
+                "detail": "manifest with raw/enriched row counts",
+            },
+            {"type": "metric", "name": "raw_row_count", "value": 2},
+            {"type": "metric", "name": "enriched_row_count", "value": 2},
+            {"type": "metric", "name": "ignored_lookup_rows", "value": 0},
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": [],
+    }
+
+    result = validate_evidence_packet(packet)
+
+    assert result["valid"] is True
+
+
+def test_sqlite_enrichment_metrics_must_be_non_negative_numbers():
+    packet = {
+        "role": "sqlite_enrichment_reviewer",
+        "status": "pass",
+        "evidence": [
+            {"type": "file", "path": "sqlite/wferp_run_sqlite_manifest.json"},
+            {"type": "metric", "name": "raw_row_count", "value": 2},
+            {"type": "metric", "name": "enriched_row_count", "value": 2},
+            {"type": "metric", "name": "ignored_lookup_rows", "value": 0},
+        ],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": [],
+    }
+
+    for bad_value in ("2", None, False, -1):
+        invalid = dict(packet)
+        invalid["evidence"] = list(packet["evidence"])
+        invalid["evidence"][1] = {"type": "metric", "name": "raw_row_count", "value": bad_value}
+        with pytest.raises(ValidatorContractError, match="raw_row_count"):
+            validate_evidence_packet(invalid)
 
 
 def test_validator_contract_rejects_missing_quantitative_checks_for_data_validator():
@@ -98,28 +211,47 @@ def test_data_preview_quantitative_checks_require_numeric_metrics():
         validate_evidence_packet(packet)
 
     packet["evidence"][0]["metrics"] = {"row_count": 10, "column_count": 4}
-    assert validate_evidence_packet(packet) == packet
+    assert validate_evidence_packet(packet) == {"valid": True, **packet}
 
 
 def test_report_final_review_requires_all_validators_pass_or_explicit_user_acceptance():
-    packets = [
-        {
-            "role": validator,
-            "status": "pass",
-            "evidence": [
-                {
-                    "name": "row_count",
-                    "status": "pass",
-                    "detail": "row_count=10; column_count=4",
-                    "metrics": {"row_count": 10, "column_count": 4},
-                }
-            ],
-            "findings": [],
-            "requiredFixes": [],
-            "residualRisks": [],
-        }
-        for validator in REQUIRED_VALIDATORS
-    ]
+    packets = []
+    for validator in REQUIRED_VALIDATORS:
+        evidence = [
+            {
+                "name": "row_count",
+                "status": "pass",
+                "detail": "row_count=10; column_count=4",
+                "metrics": {"row_count": 10, "column_count": 4},
+            }
+        ]
+        if validator == "sqlite_enrichment_reviewer":
+            evidence = [
+                {"type": "file", "path": "sqlite/wferp_run_sqlite_manifest.json"},
+                {"type": "metric", "name": "raw_row_count", "value": 10},
+                {"type": "metric", "name": "enriched_row_count", "value": 10},
+                {"type": "metric", "name": "ignored_lookup_rows", "value": 0},
+            ]
+        if validator == "excel_classification_reviewer":
+            evidence = [
+                {"type": "file", "path": "data/field-classification.json"},
+                {"type": "metric", "name": "classified_columns", "value": 10},
+                {"type": "metric", "name": "db_field_count", "value": 6},
+                {"type": "metric", "name": "formula_field_count", "value": 2},
+                {"type": "metric", "name": "lookup_field_count", "value": 1},
+                {"type": "metric", "name": "manual_only_count", "value": 1},
+                {"type": "inspection", "name": "metadata_readability", "status": "pass"},
+            ]
+        packets.append(
+            {
+                "role": validator,
+                "status": "pass",
+                "evidence": evidence,
+                "findings": [],
+                "requiredFixes": [],
+                "residualRisks": [],
+            }
+        )
 
     assert build_final_review_gate(packets)["allowed"] is True
 

@@ -20,11 +20,29 @@ CHECKPOINT_DEFINITIONS: dict[str, dict[str, Any]] = {
         "title": "SQL 查詢確認",
         "actions": ["同意查詢", "調整需求"],
     },
+    "field_formula_classification": {
+        "index": 1.5,
+        "file": "01b_field_formula_classification.json",
+        "title": "欄位分類與公式確認",
+        "actions": ["確認欄位分類", "要求修正"],
+    },
     "data_preview": {
         "index": 3,
         "file": "03_data_preview.json",
         "title": "資料預覽確認",
         "actions": ["資料正確", "確認資料", "重新查詢"],
+    },
+    "raw_data_preview": {
+        "index": 3.1,
+        "file": "03a_raw_data_preview.json",
+        "title": "DB 原始資料確認",
+        "actions": ["原始資料正確", "重新查詢"],
+    },
+    "enriched_data_preview": {
+        "index": 3.2,
+        "file": "03b_enriched_data_preview.json",
+        "title": "SQLite 補欄資料確認",
+        "actions": ["補欄資料正確", "修正補欄規則"],
     },
     "report_selection": {
         "index": 4,
@@ -55,6 +73,12 @@ CHECKPOINT_DEFINITIONS: dict[str, dict[str, Any]] = {
         "file": "06_final_review.json",
         "title": "最終報告審核",
         "actions": ["完成", "回到初稿"],
+    },
+    "sqlite_retention": {
+        "index": 6.5,
+        "file": "06b_sqlite_retention.json",
+        "title": "SQLite 暫存資料保留確認",
+        "actions": ["保留本地資料", "刪除本次資料", "匯出封存後刪除"],
     },
 }
 
@@ -104,6 +128,12 @@ def create_report_run(
         "excel_requirement": None,
         "sql_candidate": None,
         "sql_validation": None,
+        "column_classification": None,
+        "sqlite_manifest": None,
+        "sqlite_manifest_path": None,
+        "raw_data_preview": None,
+        "enriched_data_preview": None,
+        "sqlite_retention": None,
         "execution_result_summary": None,
         "report_type": None,
         "report_design": None,

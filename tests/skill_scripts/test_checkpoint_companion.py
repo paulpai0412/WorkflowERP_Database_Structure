@@ -22,6 +22,23 @@ def _validator_result(role: str, status: str = "pass") -> dict[str, object]:
                 "metrics": {"row_count": 10, "column_count": 4},
             }
         ]
+    if role == "excel_classification_reviewer":
+        evidence = [
+            {"type": "file", "path": "data/field-classification.json"},
+            {"type": "metric", "name": "classified_columns", "value": 10},
+            {"type": "metric", "name": "db_field_count", "value": 6},
+            {"type": "metric", "name": "formula_field_count", "value": 2},
+            {"type": "metric", "name": "lookup_field_count", "value": 1},
+            {"type": "metric", "name": "manual_only_count", "value": 1},
+            {"type": "inspection", "name": "metadata_readability", "status": "pass"},
+        ]
+    if role == "sqlite_enrichment_reviewer":
+        evidence = [
+            {"type": "file", "path": "sqlite/wferp_run_sqlite_manifest.json"},
+            {"type": "metric", "name": "raw_row_count", "value": 10},
+            {"type": "metric", "name": "enriched_row_count", "value": 10},
+            {"type": "metric", "name": "ignored_lookup_rows", "value": 0},
+        ]
     return {
         "role": role,
         "status": status,
@@ -214,6 +231,97 @@ def test_current_checkpoint_page_renders_data_preview_payload(tmp_path: Path):
     assert "actual_amount_sum" in html
     assert "asset_account_excluded" in html
     assert "<table" in html
+
+
+def test_classification_checkpoint_renders_readable_db_metadata(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="費用分析")
+    harness.write_field_formula_classification(
+        {
+            "columns": [
+                {
+                    "excel_header": "科目編號",
+                    "classification": "db_source_field",
+                    "processing_location": "formal_db_sql",
+                    "field_metadata": [
+                        {
+                            "table_id": "ACTML",
+                            "table_name": "分類帳檔",
+                            "column_id": "ML006",
+                            "column_name": "明細科目編號",
+                            "business_meaning": "Main ledger account code",
+                            "metadata_status": "ok",
+                        }
+                    ],
+                    "confidence": "high",
+                    "reason": "Header matched schema.",
+                }
+            ]
+        }
+    )
+
+    with CheckpointCompanionServer.serve(tmp_path / "run-001") as server:
+        with urlopen(f"{server.base_url}/runs/run-001/checkpoints/current", timeout=5) as response:
+            html = response.read().decode("utf-8")
+
+    assert "科目編號" in html
+    assert "db_source_field" in html
+    assert "formal_db_sql" in html
+    assert "明細科目編號" in html
+    assert "分類帳檔" in html
+    assert "ACTML.ML006" in html
+
+
+def test_current_checkpoint_page_renders_sqlite_preview_and_retention_payloads(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="費用分析")
+    harness.write_raw_data_preview(
+        {
+            "row_count": 1,
+            "columns": ["account_code", "amount"],
+            "sample_rows": [{"account_code": "6111", "amount": 100}],
+        }
+    )
+
+    with CheckpointCompanionServer.serve(tmp_path / "run-001") as server:
+        with urlopen(f"{server.base_url}/runs/run-001/checkpoints/current", timeout=5) as response:
+            raw_html = response.read().decode("utf-8")
+
+    assert "DB 原始資料確認" in raw_html
+    assert "Row Count" in raw_html
+    assert "account_code" in raw_html
+    assert "6111" in raw_html
+
+    harness.write_enriched_data_preview(
+        {
+            "row_count": 1,
+            "columns": ["account_code", "amount", "amount_twice"],
+            "sample_rows": [{"account_code": "6111", "amount": 100, "amount_twice": 200}],
+        }
+    )
+
+    with CheckpointCompanionServer.serve(tmp_path / "run-001") as server:
+        with urlopen(f"{server.base_url}/runs/run-001/checkpoints/current", timeout=5) as response:
+            enriched_html = response.read().decode("utf-8")
+
+    assert "SQLite 補欄資料確認" in enriched_html
+    assert "amount_twice" in enriched_html
+    assert "200" in enriched_html
+
+    harness.write_sqlite_retention(
+        {
+            "manifest_path": "/tmp/run/sqlite/manifest.json",
+            "tables": [{"table_name": "wferp_run_raw_ledger", "row_count": 1}],
+            "default_action": "保留本地資料",
+        }
+    )
+
+    with CheckpointCompanionServer.serve(tmp_path / "run-001") as server:
+        with urlopen(f"{server.base_url}/runs/run-001/checkpoints/current", timeout=5) as response:
+            retention_html = response.read().decode("utf-8")
+
+    assert "SQLite 暫存資料保留確認" in retention_html
+    assert "/tmp/run/sqlite/manifest.json" in retention_html
+    assert "wferp_run_raw_ledger" in retention_html
+    assert "保留本地資料" in retention_html
 
 
 def test_excel_confirmation_page_renders_fields_and_formulas_as_tables(tmp_path: Path):

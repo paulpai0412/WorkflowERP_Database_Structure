@@ -393,6 +393,83 @@ def _render_field_formula_checkpoint(payload: Mapping[str, Any]) -> str:
     return "".join(html) if html else _render_value(payload)
 
 
+def _render_classification_checkpoint(payload: Mapping[str, Any]) -> str:
+    columns = _mapping_list(payload.get("columns"))
+    rows: list[dict[str, Any]] = []
+    for column in columns:
+        metadata_items = _mapping_list(column.get("field_metadata")) or _mapping_list(
+            column.get("lineage_inputs")
+        )
+        if not metadata_items:
+            rows.append(
+                {
+                    "Excel Header": column.get("excel_header"),
+                    "Classification": column.get("classification"),
+                    "Processing Location": column.get("processing_location"),
+                    "Table Name": "",
+                    "Column Name": "",
+                    "ERP Code": "",
+                    "Confidence": column.get("confidence"),
+                    "Reason": column.get("reason"),
+                }
+            )
+            continue
+        for metadata in metadata_items:
+            table_id = str(metadata.get("table_id") or "")
+            column_id = str(metadata.get("column_id") or "")
+            rows.append(
+                {
+                    "Excel Header": column.get("excel_header"),
+                    "Classification": column.get("classification"),
+                    "Processing Location": column.get("processing_location"),
+                    "Table Name": metadata.get("table_name"),
+                    "Column Name": metadata.get("column_name"),
+                    "ERP Code": f"{table_id}.{column_id}" if table_id and column_id else "",
+                    "Confidence": column.get("confidence"),
+                    "Reason": column.get("reason") or metadata.get("business_meaning"),
+                }
+            )
+    return _render_table(rows) if rows else _render_value(payload)
+
+
+def _render_sqlite_preview(payload: Mapping[str, Any]) -> str:
+    summary = {
+        "Row Count": payload.get("row_count"),
+        "Table": payload.get("table_name"),
+        "SQLite DB": payload.get("sqlite_db_path"),
+        "Columns": ", ".join(_string_list(payload.get("columns"))),
+    }
+    html = ["<h3>Preview Summary</h3>", _render_key_values(summary)]
+    rows = payload.get("sample_rows")
+    columns = payload.get("columns")
+    if isinstance(rows, list):
+        html.extend(
+            [
+                "<h3>Sample Rows</h3>",
+                _render_table(rows, columns if isinstance(columns, list) else None),
+            ]
+        )
+    aggregates = payload.get("aggregates")
+    if isinstance(aggregates, Mapping):
+        html.extend(["<h3>Aggregates</h3>", _render_kpi_grid(aggregates)])
+    return "".join(html)
+
+
+def _render_sqlite_retention(payload: Mapping[str, Any]) -> str:
+    summary = {
+        "Manifest Path": payload.get("manifest_path"),
+        "SQLite DB": payload.get("sqlite_db_path"),
+        "Default Action": payload.get("default_action", "保留本地資料"),
+        "Retention Decision": payload.get("retention_decision"),
+        "Cleanup Status": payload.get("cleanup_status"),
+    }
+    html = ["<h3>Retention Summary</h3>", _render_key_values(summary)]
+    tables = payload.get("tables")
+    if isinstance(tables, list):
+        html.extend(["<h3>Manifest Tables</h3>", _render_table(tables)])
+    return "".join(html)
+
+
 def _render_payload_sections(checkpoint: str, payload: dict[str, Any]) -> str:
     sections: list[str] = []
 
@@ -405,6 +482,8 @@ def _render_payload_sections(checkpoint: str, payload: dict[str, Any]) -> str:
         evidence = payload.get("validator_evidence")
         if isinstance(evidence, Mapping):
             add("Validator Evidence", _render_key_values(dict(evidence)))
+    elif checkpoint == "field_formula_classification":
+        add("欄位分類與 DB Metadata", _render_classification_checkpoint(payload))
     elif checkpoint == "sql_review":
         add("SQL", f"<pre class=\"code-block\"><code>{escape(str(payload.get('sql', '')))}</code></pre>")
         validation = payload.get("validation")
@@ -421,6 +500,10 @@ def _render_payload_sections(checkpoint: str, payload: dict[str, Any]) -> str:
         checks = payload.get("acceptance_checks")
         if isinstance(checks, Mapping):
             add("Acceptance Checks", _render_key_values(dict(checks)))
+    elif checkpoint in {"raw_data_preview", "enriched_data_preview"}:
+        add("SQLite Preview", _render_sqlite_preview(payload))
+    elif checkpoint == "sqlite_retention":
+        add("SQLite Retention", _render_sqlite_retention(payload))
     elif checkpoint == "report_selection":
         selected = {
             "selected_report_type": payload.get("selected_report_type"),
@@ -493,10 +576,22 @@ def _render_payload_sections(checkpoint: str, payload: dict[str, Any]) -> str:
         "sql",
         "technical_details",
         "validator_evidence",
+        "workbook_path",
+        "primary_sheet",
+        "lookup_sheet_inventory",
+        "field_metadata",
         "validation",
         "aggregates",
         "rows",
+        "sample_rows",
         "columns",
+        "row_count",
+        "table_name",
+        "sqlite_db_path",
+        "manifest_path",
+        "default_action",
+        "retention_decision",
+        "cleanup_status",
         "acceptance_checks",
         "report_designs",
         "report_types",
@@ -614,7 +709,10 @@ def _render_progress(state: Mapping[str, Any], current: str, run_id: str) -> str
         if isinstance(entry, Mapping) and entry.get("checkpoint")
     } if isinstance(checkpoint_entries, list) else set()
     items = []
-    for key, definition in CHECKPOINT_DEFINITIONS.items():
+    for key, definition in sorted(
+        CHECKPOINT_DEFINITIONS.items(),
+        key=lambda item: float(item[1]["index"]),
+    ):
         css = "step"
         if key == current:
             css += " current"
