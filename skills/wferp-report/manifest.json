@@ -1,0 +1,36 @@
+{
+  "name": "wferp-report",
+  "version": "0.1.0",
+  "description": "Workflow ERP schema-aware LLM-driven report harness for prompt/Excel intake, read-only SQL, DB-backed data preview, React single-file HTML reports, and subagent validator gates.",
+  "entrypoint": "SKILL.md",
+  "language": "zh-TW",
+  "references": [
+    "references/harness.md",
+    "references/db-config.md",
+    "references/excel-intake.md",
+    "references/field-classification.md",
+    "references/schema-context.md",
+    "references/sql-safety.md",
+    "references/sqlite-enrichment.md",
+    "references/checkpoint-payload-schema.md",
+    "references/report-payload-schema.md",
+    "references/component-policy.md",
+    "references/rawblock-policy.md",
+    "references/react-renderer.md",
+    "references/scaffold.md",
+    "references/section-build.md",
+    "references/report-plan-template.md",
+    "references/review-checklist.md",
+    "references/repair-policy.md",
+    "references/html-output.md",
+    "references/validators.md",
+    "references/e2e-expense-analysis.md",
+    "references/single-html-export.md",
+    "references/dynamic-design-brief.md",
+    "references/style-replay.md"
+  ],
+  "scripts": {
+    "validate": "scripts/validate-skill.sh",
+    "scaffold_report": "scripts/scaffold-report.sh"
+  }
+}
