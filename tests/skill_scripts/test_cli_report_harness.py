@@ -666,6 +666,7 @@ def test_cli_write_sql_review_prompt_only_requires_llm_provider(tmp_path: Path):
             str(run_dir),
         ],
         cwd=Path.cwd(),
+        env={"LLM_PROVIDER": "none"},
     )
 
     assert result.returncode == 2

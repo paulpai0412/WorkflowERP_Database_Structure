@@ -368,7 +368,7 @@ def _build_prompt_sql(
     prompt: str,
     *,
     source_dir: str | Path = "_Source",
-    llm_provider: str = "none",
+    llm_provider: str = "codex",
     llm_model: str = "none",
     llm_timeout_seconds: float = 30.0,
     llm_min_confidence: float = 0.6,
@@ -469,7 +469,7 @@ def _write_sql_review(argv: list[str]) -> int:
     parser.add_argument("--prompt", default="")
     parser.add_argument("--validation", default="")
     parser.add_argument("--source-dir", default="_Source")
-    parser.add_argument("--llm-provider", default=os.getenv("LLM_PROVIDER", "none"))
+    parser.add_argument("--llm-provider", default=os.getenv("LLM_PROVIDER", "codex"))
     parser.add_argument("--llm-model", default=os.getenv("LLM_MODEL", "none"))
     parser.add_argument("--llm-timeout-seconds", type=float, default=30.0)
     parser.add_argument("--llm-min-confidence", type=float, default=0.6)
@@ -605,7 +605,7 @@ def _classify_workbook(argv: list[str]) -> int:
     parser.add_argument("--input-file", required=True, type=Path)
     parser.add_argument("--primary-sheet", default="")
     parser.add_argument("--source-dir", default="_Source")
-    parser.add_argument("--llm-provider", default=os.getenv("LLM_PROVIDER", "none"))
+    parser.add_argument("--llm-provider", default=os.getenv("LLM_PROVIDER", "codex"))
     parser.add_argument("--llm-model", default=os.getenv("LLM_MODEL", "default"))
     parser.add_argument("--llm-timeout-seconds", type=float, default=60.0)
     args = parser.parse_args(argv)
@@ -1033,7 +1033,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--input-file", action="append", type=Path, default=[])
     parser.add_argument("--run-dir", required=True)
     parser.add_argument("--source-dir", default="_Source")
-    parser.add_argument("--llm-provider", default=os.getenv("LLM_PROVIDER", "none"))
+    parser.add_argument("--llm-provider", default=os.getenv("LLM_PROVIDER", "codex"))
     parser.add_argument("--llm-model", default=os.getenv("LLM_MODEL", "none"))
     parser.add_argument("--llm-timeout-seconds", type=float, default=30.0)
     parser.add_argument("--llm-min-confidence", type=float, default=0.6)

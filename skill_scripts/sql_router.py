@@ -17,7 +17,7 @@ JsonDict = dict[str, Any]
 @dataclass(frozen=True)
 class RoutingOptions:
     mode: str = "llm-first"
-    llm_provider: str = "opencode"
+    llm_provider: str = "codex"
     llm_model: str = "none"
     llm_timeout_sec: float = 30.0
     min_confidence: float = 0.6

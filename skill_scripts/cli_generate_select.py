@@ -67,7 +67,7 @@ def main():
     parser.add_argument("--source", default="_Source")
     parser.add_argument("--build-artifacts", action="store_true")
     parser.add_argument("--mode", choices=["rule", "shadow", "llm-first"], default="llm-first")
-    parser.add_argument("--llm-provider", default="opencode")
+    parser.add_argument("--llm-provider", default="codex")
     parser.add_argument("--llm-model", default="none")
     parser.add_argument("--llm-timeout-sec", type=float, default=30.0)
     parser.add_argument("--llm-min-confidence", type=float, default=0.6)

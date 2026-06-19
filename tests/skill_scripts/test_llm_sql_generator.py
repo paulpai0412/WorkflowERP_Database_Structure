@@ -75,3 +75,31 @@ def test_call_llm_opencode_provider_reads_text_event(monkeypatch):
     raw = call_llm(provider="opencode", model="none", prompt_text="anything", timeout_sec=1.0)
     parsed = parse_llm_response(raw)
     assert parsed["sql"].startswith("SELECT TOP 3")
+
+
+def test_call_llm_codex_provider_uses_codex_exec_oauth_path(monkeypatch):
+    payload = {
+        "sql": "SELECT TOP 7 * FROM [VPIC1].[dbo].[ACTMK]",
+        "used_tables": ["ACTMK"],
+        "assumptions": ["codex oauth provider"],
+        "confidence": 0.88,
+    }
+
+    def _fake_run(command, capture_output, text, check, timeout):
+        assert command[:2] == ["codex", "exec"]
+        assert "--ephemeral" in command
+        assert "--sandbox" in command
+        assert "read-only" in command
+        assert "--output-last-message" in command
+        assert "opencode" not in command
+        output_path = command[command.index("--output-last-message") + 1]
+        with open(output_path, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=False))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr("skill_scripts.llm_sql_generator.subprocess.run", _fake_run)
+
+    raw = call_llm(provider="codex", model="none", prompt_text="anything", timeout_sec=1.0)
+    parsed = parse_llm_response(raw)
+    assert parsed["sql"].startswith("SELECT TOP 7")
+    assert parsed["used_tables"] == ["ACTMK"]
