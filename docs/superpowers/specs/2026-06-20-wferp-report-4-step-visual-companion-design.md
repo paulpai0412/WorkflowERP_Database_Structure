@@ -152,6 +152,61 @@ Primary sections:
 
 Final delivery is blocked until required validators pass or the user explicitly accepts matching residual risks.
 
+## State Machine Contract
+
+The run `state.json` must be the workflow source of truth. It must not be only a metadata ledger, and the main agent must not advance the harness from chat memory or informal reasoning.
+
+Required state fields:
+
+- `run_id`
+- `current_user_step`
+- `current_internal_phase`
+- `user_step_mapping`
+- `phase_status`
+- `gate_status`
+- `allowed_next_actions`
+- `required_artifacts`
+- `required_validators`
+- `validator_results`
+- `user_confirmations`
+- `confirmation_identity`
+- `blocking_repair_request`
+- `sqlite_manifest_path`
+- `delivery_status`
+
+Gate progression rules:
+
+- Every internal phase transition must be checked against `state.json`.
+- Every user step transition must be checked against `state.json`.
+- A gate can advance only when required artifacts exist, required validators pass, required confirmation identity matches, and no blocking repair request is open.
+- `fail` or `blocked` validator status must set the relevant gate to blocked and route to Phase 11 repair.
+- Visual Companion prompt repair must write `blocking_repair_request` and remove the affected user step from `allowed_next_actions`.
+- Repair completion must clear only the repaired scope, rerun affected validators, recompute affected payload hashes, and reopen the relevant user step.
+- Stale checkpoint payloads, stale confirmations, stale previews, or mismatched payload hashes must block progression.
+- SQLite state must be represented both in the SQLite manifest and in `state.json` through `sqlite_manifest_path` and related gate status.
+
+Minimum `gate_status` shape:
+
+```json
+{
+  "phase_4_sql_review": {
+    "status": "pending | ready_for_user | confirmed | blocked | complete",
+    "user_step": 2,
+    "required_artifacts": ["sql/query.sql", "checkpoints/02_sql_review.json"],
+    "required_validators": ["sql_safety_reviewer", "schema_mapping_reviewer"],
+    "confirmation": {
+      "required": true,
+      "checkpoint_id": "sql_review",
+      "payload_hash": "..."
+    },
+    "allowed_next_actions": ["execute_select", "request_changes"],
+    "blocking_reason": ""
+  }
+}
+```
+
+The 4-step Visual Companion reads this state to decide what the user can do. It must not infer availability from file presence alone.
+
 ## Prompt-Based Repair Loop
 
 Every user step must provide a prompt input for change requests.
@@ -281,6 +336,7 @@ Implementation should be planned separately. Likely work areas:
 - HTML report preview integration with web app/data visualization capabilities.
 - Excel workbook preview and final `.xlsx` generation path through spreadsheet tooling.
 - Tests for current run identity, prompt repair POST, confirmation persistence, 50-row preview, stale run rejection, and no mock data in Step 3.
+- Tests for state-gated progression: no phase or user step can advance when required artifacts, validators, confirmation identity, or repair state are missing.
 
 ## Acceptance Criteria
 
@@ -290,5 +346,7 @@ Implementation should be planned separately. Likely work areas:
 - Step 3 renders real current-run raw/enriched data, HTML report preview, and Excel workbook preview.
 - Data preview default is 50 rows.
 - Prompt repair from Visual Companion routes back to the main agent and blocks forward progress.
+- `state.json` controls current user step, current internal phase, gate status, allowed next actions, validator requirements, confirmation identity, and blocking repair requests.
+- The harness cannot advance from chat memory, stale files, stale confirmation, or file presence alone.
 - Final delivery includes real HTML and real `.xlsx` when Excel output is requested.
 - No fake data, stale run page, static JSON viewer, or silent fallback is accepted.
