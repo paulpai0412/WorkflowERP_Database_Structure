@@ -1,0 +1,9 @@
+{
+  "checkpoint": "report_selection",
+  "action": "產生報告",
+  "comment": "採 financial-control，含圖表、表格、分析與建議。",
+  "selectedOptions": {
+    "reportType": "financial-control"
+  },
+  "created_at": "2026-06-18T23:47:02.945335+00:00"
+}

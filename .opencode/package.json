@@ -1,0 +1,9 @@
+{
+  "plugin": [
+    "./plugins/session-continuation.ts",
+    "./plugins/session-continuation-tui.ts"
+  ],
+  "dependencies": {
+    "@opencode-ai/plugin": "1.14.33"
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "catalog_guardrail": "financial-control",
+  "chart_recipe": [
+    {
+      "id": "expense-budget-variance",
+      "purpose": "Compare actual expense, budget, and variance in one control view.",
+      "type": "combo"
+    },
+    {
+      "id": "expense-composition",
+      "purpose": "Show expense composition across departments or categories.",
+      "type": "stacked-bar"
+    },
+    {
+      "id": "expense-driver-ranking",
+      "purpose": "Rank the largest expense drivers for exception review.",
+      "type": "bar"
+    }
+  ],
+  "embedded_data_policy": {
+    "mode": "smart-tiered",
+    "summary_threshold_rows": 5000
+  },
+  "interaction_recipe": {
+    "drilldowns": [
+      "department",
+      "category",
+      "document"
+    ],
+    "filters": [
+      "department_code",
+      "department_name",
+      "expense_subject",
+      "amount",
+      "budget_amount",
+      "variance_amount",
+      "expense_ratio"
+    ]
+  },
+  "layout_recipe": {
+    "density": "analysis-first",
+    "mode": "kpi-first-dashboard",
+    "sections": [
+      "executive-summary",
+      "kpi-overview",
+      "expense-trend",
+      "exception-review",
+      "data-table"
+    ]
+  },
+  "report_intent": {
+    "primary_goal": "Expose financial-control exceptions and decision-ready expense signals.",
+    "prompt": "費用分析測試案例：查詢 2026 年費用科目，依部門與科目列出金額、預算、差異與費用占比，產出財務控管報告。",
+    "report_type": "financial-control"
+  },
+  "schema_version": "wferp.design-brief.v1",
+  "table_recipe": [
+    {
+      "features": [
+        "filter",
+        "sort",
+        "drilldown",
+        "column_visibility"
+      ],
+      "id": "expense-detail-table",
+      "row_count": 6,
+      "type": "data-table"
+    }
+  ],
+  "target_audience": {
+    "needs": [
+      "budget variance review",
+      "expense concentration review",
+      "audit follow-up"
+    ],
+    "role": "finance controller"
+  },
+  "visual_direction": {
+    "emphasis": [
+      "variance",
+      "outliers",
+      "approval-ready summary"
+    ],
+    "tone": "quiet financial operations dashboard"
+  }
+}

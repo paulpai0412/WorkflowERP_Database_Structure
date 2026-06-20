@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <title>費用分析視覺設計確認</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 32px; color: #202124; background: #f7f8fa; }
+    main { max-width: 1080px; margin: 0 auto; }
+    section { background: #fff; border: 1px solid #d8dde6; border-radius: 8px; padding: 20px; margin: 16px 0; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    article { border-left: 4px solid #2563eb; background: #f8fafc; padding: 12px; }
+    article span, li span { display: block; color: #5f6b7a; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>費用分析視覺設計確認</h1>
+    <section>
+      <h2>版面</h2>
+      <p>kpi-first-dashboard / analysis-first</p>
+      <ul><li>executive-summary</li><li>kpi-overview</li><li>expense-trend</li><li>exception-review</li><li>data-table</li></ul>
+    </section>
+    <section>
+      <h2>KPI</h2>
+      <div class="kpis"><article><span>total_amount</span><strong>120000</strong></article><article><span>total_budget</span><strong>100000</strong></article><article><span>variance_amount</span><strong>20000</strong></article><article><span>max_expense_ratio</span><strong>0.35</strong></article></div>
+    </section>
+    <section>
+      <h2>圖表目的</h2>
+      <ul><li><strong>combo</strong><span>Compare actual expense, budget, and variance in one control view.</span></li><li><strong>stacked-bar</strong><span>Show expense composition across departments or categories.</span></li><li><strong>bar</strong><span>Rank the largest expense drivers for exception review.</span></li></ul>
+    </section>
+    <section>
+      <h2>表格</h2>
+      <ul><li><strong>expense-detail-table</strong><span>department_code, department_name, expense_subject, amount, budget_amount, variance_amount, expense_ratio</span></li></ul>
+    </section>
+    <section>
+      <h2>互動</h2>
+      <h3>篩選</h3>
+      <ul><li>department_code</li><li>department_name</li><li>expense_subject</li><li>amount</li><li>budget_amount</li><li>variance_amount</li><li>expense_ratio</li></ul>
+      <h3>下鑽</h3>
+      <ul><li>department</li><li>category</li><li>document</li></ul>
+    </section>
+    <section>
+      <h2>視覺方向</h2>
+      <p>quiet financial operations dashboard</p>
+      <ul><li>variance</li><li>outliers</li><li>approval-ready summary</li></ul>
+    </section>
+    <section>
+      <h2>資料輪廓</h2>
+      <p>rows: 6</p>
+      <p>columns: department_code, department_name, expense_subject, amount, budget_amount, variance_amount, expense_ratio</p>
+    </section>
+  </main>
+</body>
+</html>

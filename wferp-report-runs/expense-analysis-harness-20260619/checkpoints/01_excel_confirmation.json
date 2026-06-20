@@ -1,0 +1,90 @@
+{
+  "checkpoint": "excel_confirmation",
+  "title": "確認欄位與公式",
+  "actions": [
+    "確認欄位與公式",
+    "要求修正"
+  ],
+  "payload": {
+    "kind": "checkpoint",
+    "checkpointId": "expense-analysis-harness-20260619-field-formula",
+    "title": "費用分析欄位與公式確認",
+    "step": "excel_confirmation",
+    "requirementSummary": "以本地 SQLite 測試資料模擬費用分析需求，欄位包含部門、科目、金額、預算、差異與費用占比。",
+    "fieldFormulaReview": {
+      "fields": [
+        {
+          "label": "部門代號",
+          "source": "EXPENSE_ANALYSIS_FIXTURE.department_code",
+          "confirmation": "由費用測試資料表輸出。"
+        },
+        {
+          "label": "部門名稱",
+          "source": "EXPENSE_ANALYSIS_FIXTURE.department_name",
+          "confirmation": "用於管理報表分組與圖表標籤。"
+        },
+        {
+          "label": "費用科目",
+          "source": "EXPENSE_ANALYSIS_FIXTURE.expense_subject",
+          "confirmation": "列示費用明細科目。"
+        },
+        {
+          "label": "金額",
+          "source": "EXPENSE_ANALYSIS_FIXTURE.amount",
+          "confirmation": "費用實際發生金額。"
+        },
+        {
+          "label": "預算金額",
+          "source": "EXPENSE_ANALYSIS_FIXTURE.budget_amount",
+          "confirmation": "用於差異分析。"
+        }
+      ],
+      "formulas": [
+        {
+          "label": "差異金額",
+          "expression": "amount - budget_amount",
+          "confirmation": "正數代表超支。"
+        },
+        {
+          "label": "費用占比",
+          "expression": "amount / 2026 expense budget total",
+          "confirmation": "以總預算 100000 作分母，最大占比預期 0.35。"
+        }
+      ]
+    },
+    "dataPreview": {
+      "rowCount": 0,
+      "columns": [
+        "department_code",
+        "department_name",
+        "expense_subject",
+        "amount",
+        "budget_amount",
+        "variance_amount",
+        "expense_ratio"
+      ],
+      "rows": []
+    },
+    "aggregateChecks": [],
+    "exceptions": [
+      "本案例使用 SQLite 本地 DB 測試資料，不連線正式 DB。"
+    ],
+    "validatorEvidence": [
+      {
+        "validator": "source_requirement_reviewer",
+        "status": "pass",
+        "message": "來源、欄位與公式已確認為測試案例範圍。"
+      },
+      {
+        "validator": "excel_formula_reviewer",
+        "status": "pass",
+        "message": "衍生公式可由 SQL 欄位計算。"
+      }
+    ],
+    "actions": [
+      "確認欄位與公式",
+      "要求修正"
+    ]
+  },
+  "created_at": "2026-06-18T23:46:59.396754+00:00"
+}

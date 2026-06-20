@@ -1,0 +1,155 @@
+{
+  "checkpoint": "report_draft",
+  "title": "報告初稿審核",
+  "actions": [
+    "接受",
+    "修正報告"
+  ],
+  "payload": {
+    "kind": "report",
+    "title": "2026 費用分析測試報告",
+    "subtitle": "SQLite 本地 DB 真實 SQL 執行驗證，financial-control 樣式",
+    "options": {
+      "charts": true,
+      "tables": true,
+      "analysis": true,
+      "recommendations": true
+    },
+    "sections": [
+      {
+        "type": "analysis",
+        "title": "管理摘要",
+        "body": "2026 年費用共 6 筆，總金額 120,000，總預算 100,000，超支 20,000。行政部旅費單項占比最高，max_expense_ratio=0.35。"
+      },
+      {
+        "type": "analysis",
+        "title": "例外排除",
+        "body": "排除非 2026 年費用 1 筆，排除 2026 非費用科目 1 筆，排除規則已由 SQL WHERE 條件落實。"
+      },
+      {
+        "type": "recommendations",
+        "title": "建議事項",
+        "items": [
+          "針對行政部旅費與研發部雲端服務建立月度預算差異追蹤。",
+          "保留 query.sql、SQLite execution result、validator evidence 供審計追溯。"
+        ]
+      }
+    ],
+    "dataPreview": {
+      "rowCount": 6,
+      "columns": [
+        "department_code",
+        "department_name",
+        "expense_subject",
+        "amount",
+        "budget_amount",
+        "variance_amount",
+        "expense_ratio"
+      ],
+      "rows": [
+        {
+          "department_code": "ADM",
+          "department_name": "行政部",
+          "expense_subject": "文具",
+          "amount": 10000,
+          "budget_amount": 8000,
+          "variance_amount": 2000,
+          "expense_ratio": 0.1
+        },
+        {
+          "department_code": "ADM",
+          "department_name": "行政部",
+          "expense_subject": "旅費",
+          "amount": 35000,
+          "budget_amount": 30000,
+          "variance_amount": 5000,
+          "expense_ratio": 0.35
+        },
+        {
+          "department_code": "RND",
+          "department_name": "研發部",
+          "expense_subject": "軟體訂閱",
+          "amount": 25000,
+          "budget_amount": 22000,
+          "variance_amount": 3000,
+          "expense_ratio": 0.25
+        },
+        {
+          "department_code": "RND",
+          "department_name": "研發部",
+          "expense_subject": "雲端服務",
+          "amount": 30000,
+          "budget_amount": 25000,
+          "variance_amount": 5000,
+          "expense_ratio": 0.3
+        },
+        {
+          "department_code": "SAL",
+          "department_name": "業務部",
+          "expense_subject": "交際費",
+          "amount": 12000,
+          "budget_amount": 10000,
+          "variance_amount": 2000,
+          "expense_ratio": 0.12
+        },
+        {
+          "department_code": "SAL",
+          "department_name": "業務部",
+          "expense_subject": "廣告費",
+          "amount": 8000,
+          "budget_amount": 5000,
+          "variance_amount": 3000,
+          "expense_ratio": 0.08
+        }
+      ]
+    },
+    "validatorEvidence": [
+      {
+        "validator": "source_requirement_reviewer",
+        "status": "pass",
+        "message": "pass"
+      },
+      {
+        "validator": "excel_formula_reviewer",
+        "status": "pass",
+        "message": "pass"
+      },
+      {
+        "validator": "sql_safety_reviewer",
+        "status": "pass",
+        "message": "pass"
+      },
+      {
+        "validator": "schema_relationship_reviewer",
+        "status": "pass",
+        "message": "pass"
+      },
+      {
+        "validator": "data_preview_reviewer",
+        "status": "pass",
+        "message": "pass"
+      },
+      {
+        "validator": "report_content_reviewer",
+        "status": "pass",
+        "message": "pass"
+      },
+      {
+        "validator": "visual_taste_reviewer",
+        "status": "pass",
+        "message": "pass"
+      },
+      {
+        "validator": "data_visualization_reviewer",
+        "status": "pass",
+        "message": "pass"
+      },
+      {
+        "validator": "react_technical_reviewer",
+        "status": "pass",
+        "message": "pass"
+      }
+    ]
+  },
+  "created_at": "2026-06-18T23:47:05.487094+00:00"
+}

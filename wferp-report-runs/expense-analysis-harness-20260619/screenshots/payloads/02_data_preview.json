@@ -1,0 +1,218 @@
+{
+  "kind": "checkpoint",
+  "checkpointId": "expense-analysis-harness-20260619-data-preview",
+  "title": "資料預覽確認",
+  "step": "data_preview",
+  "requirementSummary": "確認 2026 年費用分析 SQL，只查 expense account 並排除非 2026 與非費用科目。",
+  "fieldFormulaReview": {
+    "fields": [
+      {
+        "label": "部門代號",
+        "source": "EXPENSE_ANALYSIS_FIXTURE.department_code",
+        "confirmation": "由費用測試資料表輸出。"
+      },
+      {
+        "label": "部門名稱",
+        "source": "EXPENSE_ANALYSIS_FIXTURE.department_name",
+        "confirmation": "用於管理報表分組與圖表標籤。"
+      },
+      {
+        "label": "費用科目",
+        "source": "EXPENSE_ANALYSIS_FIXTURE.expense_subject",
+        "confirmation": "列示費用明細科目。"
+      },
+      {
+        "label": "金額",
+        "source": "EXPENSE_ANALYSIS_FIXTURE.amount",
+        "confirmation": "費用實際發生金額。"
+      },
+      {
+        "label": "預算金額",
+        "source": "EXPENSE_ANALYSIS_FIXTURE.budget_amount",
+        "confirmation": "用於差異分析。"
+      }
+    ],
+    "formulas": [
+      {
+        "label": "差異金額",
+        "expression": "amount - budget_amount",
+        "confirmation": "正數代表超支。"
+      },
+      {
+        "label": "費用占比",
+        "expression": "amount / 2026 expense budget total",
+        "confirmation": "以總預算 100000 作分母，最大占比預期 0.35。"
+      }
+    ]
+  },
+  "sqlReview": {
+    "title": "費用分析 SQL",
+    "sql": "SELECT\n    [department_code] AS department_code,\n    [department_name] AS department_name,\n    [expense_subject] AS expense_subject,\n    [amount] AS amount,\n    [budget_amount] AS budget_amount,\n    [amount] - [budget_amount] AS variance_amount,\n    CAST([amount] AS REAL) / NULLIF((\n        SELECT SUM([budget_amount])\n        FROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\n        WHERE [year] = 2026 AND [account_type] = 'expense'\n    ), 0) AS expense_ratio\nFROM [VPIC1].[dbo].[EXPENSE_ANALYSIS_FIXTURE]\nWHERE [year] = 2026 AND [account_type] = 'expense'\nORDER BY [department_code], [expense_subject]",
+    "validation": {
+      "readonly": true,
+      "blockedKeywords": [],
+      "executionStatus": "not_executed"
+    },
+    "schemaMapping": [
+      {
+        "field": "department_code",
+        "table": "EXPENSE_ANALYSIS_FIXTURE",
+        "column": "department_code",
+        "note": "SQLite fixture / WFERP-style SQL test column"
+      },
+      {
+        "field": "department_name",
+        "table": "EXPENSE_ANALYSIS_FIXTURE",
+        "column": "department_name",
+        "note": "SQLite fixture / WFERP-style SQL test column"
+      },
+      {
+        "field": "expense_subject",
+        "table": "EXPENSE_ANALYSIS_FIXTURE",
+        "column": "expense_subject",
+        "note": "SQLite fixture / WFERP-style SQL test column"
+      },
+      {
+        "field": "amount",
+        "table": "EXPENSE_ANALYSIS_FIXTURE",
+        "column": "amount",
+        "note": "SQLite fixture / WFERP-style SQL test column"
+      },
+      {
+        "field": "budget_amount",
+        "table": "EXPENSE_ANALYSIS_FIXTURE",
+        "column": "budget_amount",
+        "note": "SQLite fixture / WFERP-style SQL test column"
+      },
+      {
+        "field": "variance_amount",
+        "table": "EXPENSE_ANALYSIS_FIXTURE",
+        "column": "variance_amount",
+        "note": "SQLite fixture / WFERP-style SQL test column"
+      },
+      {
+        "field": "expense_ratio",
+        "table": "EXPENSE_ANALYSIS_FIXTURE",
+        "column": "expense_ratio",
+        "note": "SQLite fixture / WFERP-style SQL test column"
+      }
+    ],
+    "relationshipPath": [
+      "單表費用分析測試資料，無 join；WHERE year=2026 AND account_type=expense"
+    ],
+    "safetyChecks": [
+      "read-only SELECT",
+      "no blocked write keywords",
+      "single statement"
+    ],
+    "executionEnvironment": "DB_ENV=test, SQLite local fixture"
+  },
+  "dataPreview": {
+    "rowCount": 6,
+    "columns": [
+      "department_code",
+      "department_name",
+      "expense_subject",
+      "amount",
+      "budget_amount",
+      "variance_amount",
+      "expense_ratio"
+    ],
+    "rows": [
+      {
+        "department_code": "ADM",
+        "department_name": "行政部",
+        "expense_subject": "文具",
+        "amount": 10000,
+        "budget_amount": 8000,
+        "variance_amount": 2000,
+        "expense_ratio": 0.1
+      },
+      {
+        "department_code": "ADM",
+        "department_name": "行政部",
+        "expense_subject": "旅費",
+        "amount": 35000,
+        "budget_amount": 30000,
+        "variance_amount": 5000,
+        "expense_ratio": 0.35
+      },
+      {
+        "department_code": "RND",
+        "department_name": "研發部",
+        "expense_subject": "軟體訂閱",
+        "amount": 25000,
+        "budget_amount": 22000,
+        "variance_amount": 3000,
+        "expense_ratio": 0.25
+      },
+      {
+        "department_code": "RND",
+        "department_name": "研發部",
+        "expense_subject": "雲端服務",
+        "amount": 30000,
+        "budget_amount": 25000,
+        "variance_amount": 5000,
+        "expense_ratio": 0.3
+      },
+      {
+        "department_code": "SAL",
+        "department_name": "業務部",
+        "expense_subject": "交際費",
+        "amount": 12000,
+        "budget_amount": 10000,
+        "variance_amount": 2000,
+        "expense_ratio": 0.12
+      },
+      {
+        "department_code": "SAL",
+        "department_name": "業務部",
+        "expense_subject": "廣告費",
+        "amount": 8000,
+        "budget_amount": 5000,
+        "variance_amount": 3000,
+        "expense_ratio": 0.08
+      }
+    ]
+  },
+  "aggregateChecks": [
+    {
+      "label": "費用筆數",
+      "expected": 6,
+      "actual": 6,
+      "status": "pass"
+    },
+    {
+      "label": "總金額",
+      "expected": 120000,
+      "actual": 120000,
+      "status": "pass"
+    },
+    {
+      "label": "總預算",
+      "expected": 100000,
+      "actual": 100000,
+      "status": "pass"
+    },
+    {
+      "label": "差異金額",
+      "expected": 20000,
+      "actual": 20000,
+      "status": "pass"
+    }
+  ],
+  "exceptions": [
+    "排除 2025 費用 1 筆；排除 2026 非費用科目 1 筆。"
+  ],
+  "validatorEvidence": [
+    {
+      "validator": "data_preview",
+      "status": "pass",
+      "message": "SQLite 查詢結果與量化驗收一致。"
+    }
+  ],
+  "actions": [
+    "資料正確",
+    "重新查詢"
+  ]
+}
