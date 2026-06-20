@@ -1,0 +1,48 @@
+schema_version: "1.0"
+kind: evidence_packet
+line_cap: 60
+raw_evidence_policy: index_only_manifest_no_raw_logs_or_traces
+
+subject: {type: "issue_pr", issue_number: "20", pr_number: "21", phase: "", branch: "agent/issue-20-reconstruct-governed-query-traceability", sha: "92e8b1772beaae339ced49895354d8b9378152d1"}
+verifier: {actor: "Sisyphus-Junior", actor_role: "pr_verifier", verifier_session_id: "pr-verifier:issue-20-pr-21-2026-05-07", started_at: "2026-05-07T19:10:00+08:00", completed_at: "2026-05-07T19:10:00+08:00"}
+
+proof_of_separation:
+  worker_result_ref: "docs/agents/worker-results/issue-20.yaml"
+  worker_actor: "Sisyphus-Junior"
+  worker_session_id: "worker-result:issue-20"
+  verifier_actor: "Sisyphus-Junior"
+  verifier_session_id: "pr-verifier:issue-20-pr-21-2026-05-07"
+  verifier_is_distinct_from_worker: true
+  verifier_read_worker_result_only: false
+
+status: "pass"
+
+acceptance_criteria_matrix:
+  - {ac_id: "AC1", status: "pass", evidence_ref: "docs/agents/issue-packets/issue-20.yaml", note: "Issue #20 packet scopes retrospective repair to merged PR #8 and stays within the declared line cap."}
+  - {ac_id: "AC2", status: "pass", evidence_ref: "docs/agents/handoffs/issue-2.yaml", note: "Issue #2 handoff maps all historical ACs to durable compact refs without inlining raw logs."}
+  - {ac_id: "AC3", status: "pass", evidence_ref: "docs/agents/evidence/issue-2-pr-8.yaml", note: "Issue #2 evidence packet records status, AC coverage, gates, artifact refs, and explicit pre-enforcement limitations."}
+  - {ac_id: "AC4", status: "pass", evidence_ref: "docs/agents/runtime/context-checkpoint.yaml", note: "Checkpoint now points PRD #1 completeness work back to the reconstructed issue #2 refs."}
+  - {ac_id: "AC5", status: "pass", evidence_ref: "docs/agents/evidence/issue-2-pr-8.yaml + docs/agents/handoffs/issue-2.yaml + docs/agents/worker-results/issue-20.yaml", note: "Artifacts stay compact and index-only; no raw logs, traces, screenshots, or transcripts were added."}
+
+gates:
+  diagnostics_and_build_gate: {status: "pass", evidence_ref: "verifier:python3 scripts/agent_context_budget_check.py + py_compile + lsp_diagnostics"}
+  surface_qa_gate: {status: "pass", evidence_ref: "verifier doc review of issue #20 packet, issue #2 handoff/evidence, worker result, checkpoint, and PR #21 diff"}
+  review_gate: {status: "pass", evidence_ref: "lightweight verifier diff review against issue #20 scope and workflow policy"}
+  security_gate: {status: "pass", evidence_ref: "doc/script diff review: no secrets, credentials, or new write/network surface"}
+
+role_boundary: {acceptance_qa_owner: "pr_verifier", main_agent_ran_issue_qa: false, worker_self_checks_are_not_final_acceptance: true}
+
+artifact_manifest:
+  bundle_ref: "local verifier run for PR #21"
+  retention: "Repo docs keep index-only refs; raw logs/traces remain outside repo docs."
+  items:
+    - {id: "verifier-script-gate", kind: "summary", executor_role: "pr_verifier", path: "scripts/agent_context_budget_check.py", sha256: "", description: "Context-budget gate and py_compile passed on the PR branch."}
+    - {id: "verifier-doc-review", kind: "summary", executor_role: "pr_verifier", path: "docs/agents/evidence/issue-20-pr-21.yaml", sha256: "", description: "Diff and artifact review confirmed honest retrospective traceability plus explicit historical limits."}
+
+compact_summary:
+  outcome: "Issue #20 passes as a workflow self-repair slice; reconstructed issue #2 refs are honest and sufficient for the PRD #1 completeness audit to resume."
+  automated_checks: "Context-budget script, py_compile, and changed-file diagnostics passed; relevant compact artifacts stayed within their declared caps."
+  manual_qa: "Verifier read the issue #20 packet, issue #2 handoff/evidence, worker result, checkpoint, and PR #21 diff; no raw logs were inlined and historical limits stayed explicit."
+  risks_or_limitations: ["Issue #2 remains historical-only traceability; this packet does not claim fresh worker/verifier proof or fresh product verification for PR #8."]
+
+next_recommended_step: "Use docs/agents/handoffs/issue-2.yaml and docs/agents/evidence/issue-2-pr-8.yaml to resume the PRD #1 completeness audit."

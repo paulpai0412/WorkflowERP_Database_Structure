@@ -1,0 +1,21 @@
+schema_version: "1.0"
+kind: issue_handoff
+line_cap: 35
+issue_identity: {number: "33", title: "E2E: Query Analyst Approval gate before Chart Spec", url: "https://github.com/paulpai0412/wferp/issues/33", branch: "agent/issue-33-e2e-query-analyst-approval-gate-before-chart-spe", pr: "https://github.com/paulpai0412/wferp/pull/37"}
+acceptance_criteria_evidence:
+  - {ac_id: "AC1", status: worker_self_check_pass, evidence_ref: "tests/skill_scripts/test_query_approval_chart_spec_e2e.py", note: "Worker observed a governed query result for 查詢2026年的工程預算明細 with MK002/MK006 columns and three deterministic 2026 rows."}
+  - {ac_id: "AC2", status: worker_self_check_pass, evidence_ref: "tests/skill_scripts/test_query_approval_chart_spec_e2e.py", note: "Worker confirmed both author_chart_spec and create_dashboard_chart_draft refuse the unapproved governed query result with QUERY_RESULT_NOT_APPROVED."}
+  - {ac_id: "AC3", status: worker_self_check_pass, evidence_ref: "tests/skill_scripts/test_query_approval_chart_spec_e2e.py", note: "Worker approved the same query result and observed bar Chart Spec creation succeed with MK006 as the value field."}
+  - {ac_id: "AC4", status: worker_self_check_pass, evidence_ref: "docs/agents/worker-results/issue-33.yaml", note: "Worker artifacts stay compact and index-only; refusal and success path evidence is summarized without raw logs."}
+  - {ac_id: "AC5", status: worker_self_check_pass, evidence_ref: "tests/skill_scripts/test_governed_query.py + tests/skill_scripts/test_chart_spec.py + tests/skill_scripts/test_dashboard_canvas.py", note: "Focused regression bucket passed without weakening governed-query, Chart Spec, or Dashboard Canvas assertions."}
+compact_verification_summary:
+  status: verifier_pending
+  diagnostics_and_build_gate: "worker self-check pass: target case 2/2, focused regression bucket 25/25, py_compile, and changed-file LSP checks passed on HEAD 0200368."
+  surface_qa_gate: "pending fresh verifier: issue #33 is a library surface and worker does not claim final acceptance."
+  review_gate: "pending fresh verifier review for PR #37."
+evidence_packet_refs: {worker_result: "docs/agents/worker-results/issue-33.yaml", verifier_packet: "docs/agents/evidence/issue-33-pr-37.yaml", pr: "https://github.com/paulpai0412/wferp/pull/37", raw_evidence_policy: "Index-only refs in repo docs; raw logs stay outside main-agent context."}
+files_changed_summary:
+  - {path: "tests/skill_scripts/test_query_approval_chart_spec_e2e.py", summary: "Adds the focused E2E-003 target case for refusal-before-approval and success-after-approval behavior."}
+  - {path: "docs/agents/e2e/test-case-catalog.yaml + docs/agents/worker-results/issue-33.yaml + docs/agents/handoffs/issue-33.yaml", summary: "Records compact orchestrator/worker metadata for verifier pickup and PR #37 traceability."}
+blockers_or_risks: ["Fresh verifier evidence for PR #37 is still required.", "Issue #33 covers only the current library surface; no browser UI exists yet."]
+next_recommended_step: "Spawn a fresh pr_verifier for PR #37 to confirm E2E-003 plus the focused dashboard-builder regression bucket."

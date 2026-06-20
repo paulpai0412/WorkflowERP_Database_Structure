@@ -1,0 +1,58 @@
+schema_version: "1.0"
+kind: evidence_packet
+line_cap: 60
+raw_evidence_policy: index_only_manifest_no_raw_logs_or_traces
+subject:
+  type: "issue_pr"
+  issue_number: "33"
+  pr_number: "37"
+  phase: ""
+  branch: "agent/issue-33-e2e-query-analyst-approval-gate-before-chart-spe"
+  sha: "b695e76f55a249e718930d2e9b94f3b37eb94ea3"
+verifier:
+  actor: "Sisyphus-pr_verifier"
+  actor_role: "pr_verifier"
+  verifier_session_id: "verifier:issue-33-pr-37-20260510-2359"
+  started_at: "2026-05-10T23:59:00+08:00"
+  completed_at: "2026-05-11T00:05:00+08:00"
+proof_of_separation:
+  worker_result_ref: "docs/agents/worker-results/issue-33.yaml"
+  worker_actor: "Sisyphus-issue_worker"
+  worker_session_id: "worker:issue-33-20260510-2310"
+  verifier_actor: "Sisyphus-pr_verifier"
+  verifier_session_id: "verifier:issue-33-pr-37-20260510-2359"
+  verifier_is_distinct_from_worker: true
+  verifier_read_worker_result_only: false
+status: "pass"
+failure_classification: {kind: "none", retryable: false, routed_to: "release_worker", root_cause_signature: "none"}
+test_case_verification: {applies: true, test_case_id: "E2E-003", target_case: "pass", regression_bucket: "pass", failure_signature: "none", artifact_manifest_ref: "local-verifier:issue-33-pr-37-b695e76"}
+acceptance_criteria_matrix:
+  - {ac_id: "AC1", status: "pass", evidence_ref: "surface-driver", note: "Governed query for 查詢2026年的工程預算明細 returned MK002/MK006 with 3 deterministic rows."}
+  - {ac_id: "AC2", status: "pass", evidence_ref: "surface-driver", note: "Both Chart Spec entry points refused the unapproved result with QUERY_RESULT_NOT_APPROVED."}
+  - {ac_id: "AC3", status: "pass", evidence_ref: "surface-driver", note: "After approval, bar Chart Spec/draft succeeded with x=MK002, y=MK006, and MK006 currency formatting."}
+  - {ac_id: "AC4", status: "pass", evidence_ref: "target-case + issue-33-pr-37.yaml", note: "Verifier kept refusal/success evidence as compact refs only; no raw logs were copied into repo docs."}
+  - {ac_id: "AC5", status: "pass", evidence_ref: "regression-bucket", note: "Focused dashboard-builder regression bucket passed 25/25 with existing governed-query/chart/dashboard assertions intact."}
+gates:
+  diagnostics_and_build_gate: {status: "pass", evidence_ref: "target-case 2/2 + regression bucket 25/25 + py_compile clean + lsp_diagnostics clean on changed files"}
+  surface_qa_gate: {status: "pass", evidence_ref: "surface-driver observed both refusal-before-approval and approved MK006 happy path through the library surface"}
+  review_gate: {status: "pass", evidence_ref: "PR #37 isDraft=false, mergeable=MERGEABLE, mergeStateStatus=CLEAN; diff limited to E2E-003 test plus compact worker metadata/docs"}
+  security_gate: {status: "pass", evidence_ref: "Diff review found no secrets, no new script/network surface, and no bypass of required approval gates"}
+role_boundary:
+  acceptance_qa_owner: "pr_verifier"
+  main_agent_ran_issue_qa: false
+  worker_self_checks_are_not_final_acceptance: true
+artifact_manifest:
+  bundle_ref: "local-verifier:issue-33-pr-37-b695e76"
+  retention: "index-only refs in repo docs; raw verifier artifacts stay under /tmp/opencode/wferp-issue33-artifacts"
+  items:
+    - {id: "pr-metadata", kind: "summary", executor_role: "pr_verifier", path: "gh pr view 37", sha256: "", description: "PR open, not draft, MERGEABLE/CLEAN, no configured CI status checks."}
+    - {id: "target-case", kind: "log", executor_role: "pr_verifier", path: "/tmp/opencode/wferp-issue33-artifacts/target-case-b695e76.log", sha256: "149e983c325e1215d8fe411fd58fb9c0fa38bc5dfa119c4a6a92d44ee61e3e10", description: "Independent pytest target case passed 2/2."}
+    - {id: "regression-bucket", kind: "log", executor_role: "pr_verifier", path: "/tmp/opencode/wferp-issue33-artifacts/regression-bucket-b695e76.log", sha256: "514c0c2f8b12583c82d1ab0eee136d9dd023fe6435e73e4dc59b08a1d5a61c18", description: "Focused dashboard-builder regression bucket passed 25/25."}
+    - {id: "changed-file-diagnostics", kind: "log", executor_role: "pr_verifier", path: "/tmp/opencode/wferp-issue33-artifacts/py-compile-b695e76.log + lsp_diagnostics", sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", description: "py_compile clean; lsp_diagnostics returned no issues for changed test and compact YAML files."}
+    - {id: "surface-driver", kind: "summary", executor_role: "pr_verifier", path: "/tmp/opencode/wferp-issue33-artifacts/surface-driver-b695e76.json", sha256: "f62af684a858881bb976f7958dc61c7e1c686fdfaf47e3db8c9343bae58b8e84", description: "Independent library driver observed refusal before approval and approved MK006 chart creation."}
+compact_summary:
+  outcome: "PR #37 satisfies issue #33 / E2E-003 acceptance criteria at HEAD b695e76."
+  automated_checks: "Independent verifier reran the target case (2/2), focused regression bucket (25/25), py_compile, and changed-file diagnostics successfully."
+  manual_qa: "Library-surface driver reproduced the real refusal path before Analyst Approval and the approved MK006 bar-chart path after approval."
+  risks_or_limitations: ["GitHub PR #37 has no configured CI status checks; local verifier artifacts are the recorded gate evidence.", "Scope is library-only for this issue; no browser surface applies."]
+next_recommended_step: "Hand PR #37 to release_worker for merge-gate evaluation; bypass_approval may skip human merge approval only after this verifier pass is honored."

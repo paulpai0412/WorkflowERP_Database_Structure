@@ -1,0 +1,121 @@
+schema_version: "1.0"
+kind: evidence_packet
+legacy_note:
+  pre_enforcement: true
+  limitation: "Fresh verifier separation was recorded, but this full-form evidence packet predates compact line-cap enforcement and is retained as historical detail."
+
+subject:
+  type: "issue_pr"
+  issue_number: "5"
+  pr_number: "15"
+  phase: ""
+  branch: "agent/issue-5-final-dashboard-approval-and-immutable-publish"
+  sha: "e466e373815404345d3134bf5cbe5dad8e7800d1"
+
+verifier:
+  actor: "pr_verifier (claude-sonnet-4.6 / Sisyphus-Junior)"
+  actor_role: "pr_verifier"
+  verifier_session_id: "pr15-verify-2026-05-07T06:08:05Z"
+  started_at: "2026-05-07T06:05:00Z"
+  completed_at: "2026-05-07T06:08:05Z"
+
+proof_of_separation:
+  worker_result_ref: "PR #15 body (worker self-checks declared as implementation feedback only)"
+  worker_actor: "worker session (Hephaestus / prior agent)"
+  worker_session_id: "pr15-worker-session"
+  verifier_actor: "pr_verifier (claude-sonnet-4.6 / Sisyphus-Junior)"
+  verifier_session_id: "pr15-verify-2026-05-07T06:08:05Z"
+  verifier_is_distinct_from_worker: true
+  verifier_read_worker_result_only: true
+
+status: "pass"
+
+acceptance_criteria_matrix:
+  - ac_id: "AC1"
+    status: "pass"
+    evidence_ref: "test_dashboard_draft_preview_includes_canvas_chart_specs_and_template + driver HAPPY_PATH"
+    note: "preview_dashboard_draft returns payload with canvas (layout+chart_specs), template, dashboard_id, state=draft; round-trip via load_dashboard_canvas confirmed."
+  - ac_id: "AC2"
+    status: "pass"
+    evidence_ref: "test_dashboard_draft_requires_final_analyst_approval_before_publish + driver REFUSAL_1"
+    note: "publish_dashboard on unapproved draft raises RuntimeError DASHBOARD_FINAL_APPROVAL_REQUIRED; approved draft publishes successfully."
+  - ac_id: "AC3"
+    status: "pass"
+    evidence_ref: "test_published_dashboard_version_is_immutable_after_draft_changes + driver IMMUTABILITY"
+    note: "PublishedDashboard is a frozen dataclass with deep-copied payload; mutating draft after publish leaves published.payload unchanged at version=1."
+  - ac_id: "AC4"
+    status: "pass"
+    evidence_ref: "test_data_meaning_changes_require_reapproval_before_republish + driver REFUSAL_2 + REPUBLISH_AFTER_REAPPROVAL"
+    note: "mark_dashboard_data_meaning_changed sets state=reapproval_required; publish_dashboard raises DASHBOARD_REAPPROVAL_REQUIRED; re-approval unblocks republish at version=2."
+  - ac_id: "AC5"
+    status: "pass"
+    evidence_ref: "test_approval_rejection_publish_and_reapproval_events_are_audited"
+    note: "Stable event names dashboard_final_approved, dashboard_final_rejected, dashboard_published, dashboard_reapproval_required recorded with dashboard_id and version identifiers."
+  - ac_id: "AC6"
+    status: "pass"
+    evidence_ref: "6/6 tests in test_dashboard_publish.py; test names cover draft, approved, published, rejected, reapproval_required, invalid transitions"
+    note: "All 6 tests exercise public functions only; no private helper (_required_text, _audit_events, etc.) called from test file."
+
+gates:
+  diagnostics_and_build_gate:
+    status: "pass"
+    evidence_ref: "py_compile COMPILE_OK; import IMPORT_OK; 30/30 regression tests pass in isolated worktree /tmp/opencode/wferp-pr15-verify"
+  surface_qa_gate:
+    status: "pass"
+    evidence_ref: "manual driver: HAPPY_PATH OK, REFUSAL_1 OK, REFUSAL_2 OK, REFUSAL_3 OK, REPUBLISH_AFTER_REAPPROVAL OK, IMMUTABILITY OK; ALL_DRIVER_CHECKS: PASS"
+  review_gate:
+    status: "pass"
+    evidence_ref: "code review inline: frozen dataclasses for immutability, deterministic RuntimeError codes, deep-copy via _copy_mapping, no private helpers in tests, no secrets/injection vectors"
+  security_gate:
+    status: "pass"
+    evidence_ref: "grep for eval/exec/subprocess/os.system/pickle/secrets: NO_INJECTION_VECTORS, NO_SECRETS_FOUND; library-only, no DB writes, no network calls"
+
+role_boundary:
+  acceptance_qa_owner: "pr_verifier"
+  main_agent_ran_issue_qa: false
+  worker_self_checks_are_not_final_acceptance: true
+
+artifact_manifest:
+  bundle_ref: "docs/agents/evidence/issue-5-pr-15.yaml"
+  retention: "until issue #5 closed and PR #15 merged"
+  items:
+    - id: "compile-check"
+      kind: "log"
+      executor_role: "pr_verifier"
+      path: "inline: py_compile COMPILE_OK"
+      sha256: ""
+      description: "py_compile on dashboard_publish.py and test_dashboard_publish.py"
+    - id: "focused-publish-tests"
+      kind: "junit"
+      executor_role: "pr_verifier"
+      path: "inline: 6/6 passed test_dashboard_publish.py"
+      sha256: ""
+      description: "pytest focused publish workflow tests in isolated worktree"
+    - id: "regression-suite"
+      kind: "junit"
+      executor_role: "pr_verifier"
+      path: "inline: 30/30 passed chart_spec+canvas+design_template+publish"
+      sha256: ""
+      description: "Full dependency regression suite in isolated worktree"
+    - id: "manual-driver"
+      kind: "driver-output"
+      executor_role: "pr_verifier"
+      path: "inline: ALL_DRIVER_CHECKS: PASS"
+      sha256: ""
+      description: "Public API driver covering happy path, 3 refusal paths, republish, immutability"
+    - id: "security-scan"
+      kind: "log"
+      executor_role: "pr_verifier"
+      path: "inline: NO_INJECTION_VECTORS, NO_SECRETS_FOUND"
+      sha256: ""
+      description: "grep for injection vectors and secrets in changed files"
+
+compact_summary:
+  outcome: "PR #15 fully satisfies all 6 ACs for issue #5; all gates pass."
+  automated_checks: "py_compile OK; 6/6 focused publish tests pass; 30/30 dependency regression tests pass in isolated worktree."
+  manual_qa: "Public API driver confirmed happy path, 3 refusal paths (unapproved publish, reapproval-required republish, invalid transition), republish at version=2, and immutability of published payload."
+  risks_or_limitations:
+    - "Issue #6 token link/view-only runtime intentionally out of scope per issue packet."
+    - "Worker noted stale LSP import-resolution warnings in their session; verifier py_compile and import checks clean."
+
+next_recommended_step: "Merge PR #15 and close issue #5."

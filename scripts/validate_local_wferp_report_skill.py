@@ -1,0 +1,202 @@
+#!/usr/bin/env python3
+"""Validate the local wferp-report Codex skill tree."""
+
+from __future__ import annotations
+
+import argparse
+import re
+from pathlib import Path
+
+
+REQUIRED_FILES = [
+    "SKILL.md",
+    "manifest.json",
+    "README.md",
+    "references/harness.md",
+    "references/db-config.md",
+    "references/excel-intake.md",
+    "references/schema-context.md",
+    "references/sql-safety.md",
+    "references/checkpoint-payload-schema.md",
+    "references/report-payload-schema.md",
+    "references/component-policy.md",
+    "references/rawblock-policy.md",
+    "references/scaffold.md",
+    "references/section-build.md",
+    "references/report-plan-template.md",
+    "references/review-checklist.md",
+    "references/repair-policy.md",
+    "references/html-output.md",
+    "references/validators.md",
+    "references/e2e-expense-analysis.md",
+    "references/single-html-export.md",
+    "references/dynamic-design-brief.md",
+    "references/style-replay.md",
+    "scripts/scaffold-report.sh",
+    "scripts/validate-skill.sh",
+    "scripts/print-expense-fixture-sql.sh",
+    "scripts/run-expense-sqlite-e2e.sh",
+    "scripts/run-expense-postgres-e2e.sh",
+    "report_designs/index.json",
+    "report_designs/design.md",
+    "report_designs/financial-control.md",
+    "report_designs/executive-summary.md",
+    "report_designs/detail-ledger.md",
+    "report_designs/exception-audit.md",
+    "report_designs/operations-review.md",
+    "report_designs/trend-briefing.md",
+    "assets/scaffold-template/package.json",
+    "assets/scaffold-template/index.html",
+    "assets/scaffold-template/report/Report.tsx",
+]
+
+REQUIRED_SKILL_SECTIONS = {
+    "uploaded files": "SKILL.md must describe intake of uploaded files.",
+    "Excel confirmation": "SKILL.md must describe Excel confirmation HTML.",
+    "WFERP schema": "SKILL.md must describe mapping to WFERP schema and relationships.",
+    "read-only SQL": "SKILL.md must describe read-only SQL generation.",
+    "SQL safety": "SKILL.md must describe local SQL safety validation.",
+    "user confirmation": "SKILL.md must require user confirmation before execution.",
+    "data preview": "SKILL.md must describe data preview HTML.",
+    "report type": "SKILL.md must ask the user to choose report type/design/options.",
+    "React renderer": "SKILL.md must describe report draft generation via React renderer.",
+    "validators": "SKILL.md must describe validators.",
+    "validation evidence": "SKILL.md must present final validation evidence.",
+}
+
+REQUIRED_VALIDATOR_TEXT = {
+    "需求/來源 validator": "validators.md must define 需求/來源 validator.",
+    "Excel 欄位與公式 validator": "validators.md must define Excel 欄位與公式 validator.",
+    "SQL 安全 validator": "validators.md must define SQL 安全 validator.",
+    "Schema/relationship validator": "validators.md must define Schema/relationship validator.",
+    "Data preview validator": "validators.md must define Data preview validator.",
+    "報告內容 validator": "validators.md must define 報告內容 validator.",
+    "視覺/技術 validator": "validators.md must define 視覺/技術 validator.",
+}
+
+REQUIRED_PHASES = [
+    "Phase 0 —— Intake",
+    "Phase 1 —— Source / Excel Requirement",
+    "Phase 2 —— Report Planning",
+    "Phase 3 —— Field & Formula Checkpoint",
+    "Phase 4 —— SQL Review Checkpoint",
+    "Phase 5 —— Confirmed DB Execution",
+    "Phase 6 —— Data Preview Checkpoint",
+    "Phase 7 —— Report Selection Checkpoint",
+    "Phase 8 —— Final Report Scaffold",
+    "Phase 9 —— Section Build",
+    "Phase 10 —— Final Review",
+    "Phase 11 —— Repair",
+    "Phase 12 —— Delivery",
+]
+
+REQUIRED_PHASE_FIELDS = [
+    "目標：",
+    "輸入：",
+    "必讀 references：",
+    "執行步驟：",
+    "產物：",
+    "停止條件：",
+    "使用者 checkpoint：",
+    "validator：",
+    "失敗時 repair slice：",
+]
+
+
+class ValidationResult:
+    def __init__(self, errors: list[str]):
+        self.errors = errors
+
+    @property
+    def ok(self) -> bool:
+        return not self.errors
+
+
+def relative_path(root: Path, path: Path) -> str:
+    return path.relative_to(root).as_posix()
+
+
+def read_text(root: Path, path: Path, errors: list[str]) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        errors.append(f"Invalid UTF-8: {relative_path(root, path)}")
+        return None
+
+
+def markdown_section(text: str, heading: str) -> str | None:
+    match = re.search(rf"^## {re.escape(heading)}\s*$", text, flags=re.MULTILINE)
+    if not match:
+        return None
+    start = match.end()
+    next_heading = re.search(r"^## .+$", text[start:], flags=re.MULTILINE)
+    end = start + next_heading.start() if next_heading else len(text)
+    return text[start:end]
+
+
+def validate_phase_structure(skill_text: str, errors: list[str]) -> None:
+    for phase in REQUIRED_PHASES:
+        section = markdown_section(skill_text, phase)
+        if section is None:
+            errors.append(f"Missing required SKILL.md phase: {phase}")
+            continue
+        for field in REQUIRED_PHASE_FIELDS:
+            if field not in section:
+                errors.append(f"{phase} missing required field: {field}")
+
+
+def validate_skill_tree(skill_root: str | Path) -> ValidationResult:
+    root = Path(skill_root)
+    errors: list[str] = []
+
+    for relative_path in REQUIRED_FILES:
+        path = root / relative_path
+        if not path.is_file():
+            errors.append(f"Missing required file: {relative_path}")
+
+    skill_md = root / "SKILL.md"
+    if skill_md.is_file():
+        skill_text = read_text(root, skill_md, errors)
+        if skill_text is not None:
+            for needle, message in REQUIRED_SKILL_SECTIONS.items():
+                if needle not in skill_text:
+                    errors.append(message)
+            validate_phase_structure(skill_text, errors)
+
+    references_root = root / "references"
+    validators_path = references_root / "validators.md"
+    if validators_path.is_file():
+        validators_text = read_text(root, validators_path, errors)
+        if validators_text is not None:
+            for needle, message in REQUIRED_VALIDATOR_TEXT.items():
+                if needle not in validators_text:
+                    errors.append(message)
+
+    single_html_path = references_root / "single-html-export.md"
+    if single_html_path.is_file():
+        single_html_text = read_text(root, single_html_path, errors)
+        if single_html_text is not None:
+            for needle in ["不得連 DB", "不得執行 SQL", "network requests = 0"]:
+                if needle not in single_html_text:
+                    errors.append(f"single-html-export.md missing required text: {needle}")
+
+    return ValidationResult(errors)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Validate local wferp-report skill files.")
+    parser.add_argument("--skill-root", required=True, help="Path to /home/.../.codex/skills/wferp-report")
+    args = parser.parse_args()
+
+    result = validate_skill_tree(args.skill_root)
+    if result.ok:
+        print("wferp-report skill validation passed")
+        return 0
+    print("wferp-report skill validation failed")
+    for error in result.errors:
+        print(f"- {error}")
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

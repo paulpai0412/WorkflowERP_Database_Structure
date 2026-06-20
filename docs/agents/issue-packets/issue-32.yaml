@@ -1,0 +1,53 @@
+schema_version: "1.0"
+kind: issue_packet
+line_cap: 80
+raw_evidence_policy: index_only_refs_no_raw_logs_or_transcripts
+issue:
+  number: "32"
+  title: "E2E: Prompt-to-Published-Dashboard live LLM evidence"
+  url: "https://github.com/paulpai0412/wferp/issues/32"
+  labels: [ready-for-agent, e2e-test-case]
+  parent: {type: "prd", reference: "https://github.com/paulpai0412/wferp/issues/30"}
+branch: {name: "agent/issue-32-prompt-to-published-dashboard-e2e", base: "main"}
+objective: "Materialize the CLI/library prompt-to-published-dashboard E2E path while recording live LLM governed-query evidence as non-blocking evidence and deterministic regression as the release gate."
+acceptance_criteria:
+  - {id: "AC1", text: "The target case records live LLM governed-query evidence for `查詢2026年的工程預算明細` and classifies live-LLM failures separately from product/test-data failures.", evidence_hint: "Verifier checks compact artifact refs and failure classification; live LLM availability is non-blocking by default."}
+  - {id: "AC2", text: "The approved query result can create a bar Chart Spec using MK006 as the budget value field and place it on a Dashboard Canvas.", evidence_hint: "Verifier reruns deterministic library/CLI target and chart/canvas regression bucket."}
+  - {id: "AC3", text: "Final Analyst Approval is required before publishing, and the resulting Published Dashboard Link renders in view-only mode.", evidence_hint: "Verifier observes final approval gate, publish, link creation, and render through the existing library surface."}
+  - {id: "AC4", text: "The deterministic regression bucket covers governed query, Chart Spec, Dashboard Canvas, Design Template, and Published Dashboard runtime behavior without depending on live LLM availability.", evidence_hint: "Verifier reruns focused tests for the dashboard builder path in deterministic mode."}
+  - {id: "AC5", text: "Worker/verifier artifacts follow the E2E issue loop with worker self-checks as implementation feedback only and final acceptance in a fresh verifier packet.", evidence_hint: "Contract validation checks worker result and verifier evidence packet shape."}
+test_case:
+  applies: true
+  id: "E2E-001"
+  source: {type: "prd_ac", ref: "#30 E2E-001"}
+  surface: "cli|library"
+  scenario: "Prompt-to-Published-Dashboard happy path for 2026 engineering budget."
+  expected_outcome: "Live LLM evidence is recorded separately; deterministic flow approves the query, creates an MK006 bar chart, places it on a canvas, approves/publishes, and renders a view-only link."
+  regression_bucket: ["test_governed_query", "test_chart_spec", "test_dashboard_canvas", "test_design_template_catalog", "test_dashboard_publish"]
+scope:
+  in: ["skill_scripts/governed_query.py", "skill_scripts/chart_spec.py", "skill_scripts/dashboard_canvas.py", "skill_scripts/design_template_catalog.py", "skill_scripts/dashboard_publish.py", "tests/skill_scripts/test_governed_query.py", "tests/skill_scripts/test_chart_spec.py", "tests/skill_scripts/test_dashboard_canvas.py", "tests/skill_scripts/test_design_template_catalog.py", "tests/skill_scripts/test_dashboard_publish.py", "docs/agents/e2e/test-case-catalog.yaml"]
+  out: ["Browser Playwright coverage", "Dashboard Web UI implementation", "Treating live LLM failure as automatic release blocker", "Runtime AI fixture generation", "Production or non-test database execution", "Raw logs in repo docs"]
+bootstrap_context:
+  required_reads: ["AGENTS.md", "docs/agents/autonomous-development-workflow.yaml", "docs/agents/e2e/test-case-issue-loop.md", "docs/prds/2026-05-09-sql-to-dashboard-e2e-test-cases.md", "docs/prds/2026-05-06-workflow-erp-dashboard-builder.md"]
+  relevant_paths: ["docs/agents/issue-packets/issue-31.yaml", "docs/agents/handoffs/issue-31.yaml", "docs/agents/evidence/issue-31-pr-35.yaml", "tests/skill_scripts/test_governed_query.py", "tests/skill_scripts/test_chart_spec.py", "tests/skill_scripts/test_dashboard_canvas.py", "tests/skill_scripts/test_design_template_catalog.py", "tests/skill_scripts/test_dashboard_publish.py", "skill_scripts/governed_query.py", "skill_scripts/chart_spec.py", "skill_scripts/dashboard_canvas.py", "skill_scripts/design_template_catalog.py", "skill_scripts/dashboard_publish.py"]
+  prior_handoff: "docs/agents/handoffs/issue-31.yaml"
+  context_budget: {checkpoint_warning_at_percent: 45, stop_and_rotate_at_percent: 50}
+implementation_notes:
+  constraints:
+    - "Live LLM governed-query evidence is required as compact evidence but non-blocking by default; deterministic regression remains the release-suitable gate."
+    - "Preserve Analyst Approval domain terms and existing guardrails; do not weaken assertions or expected outcomes."
+    - "Keep worker/verifier artifacts compact and index-only; no raw logs, SQL output, screenshots, or verbose transcripts."
+  risks: ["No browser Dashboard Web UI exists, so this issue must stay on CLI/library surfaces.", "Catalog already has a historical E2E-001 entry for issue #28; worker should update metadata without losing prior refs."]
+  dependencies: ["Issue #31 is released and closed; issue #34 remains blocked by issue #32."]
+verification_plan:
+  worker_self_checks:
+    - {command: "python3 -m pytest tests/skill_scripts/test_governed_query.py tests/skill_scripts/test_chart_spec.py tests/skill_scripts/test_dashboard_canvas.py tests/skill_scripts/test_design_template_catalog.py tests/skill_scripts/test_dashboard_publish.py -q", purpose: "implementation feedback only", success_criteria: "Focused deterministic dashboard builder regression bucket passes before worker returns."}
+  verifier_acceptance_checks:
+    required_gates: ["diagnostics_and_build_gate", "surface_qa_gate", "review_gate"]
+    automated_checks:
+      - {command: "rerun the deterministic prompt-to-published-dashboard target and focused dashboard regression bucket", success_criteria: "Verifier observes approved query -> MK006 bar chart -> canvas -> final approval -> published link render, with live LLM evidence classified separately."}
+  verifier_manual_qa: {owner: "pr_verifier", surface: "cli|library", happy_path: "Exercise the governed-query-to-published-link journey through public CLI/library surfaces.", refusal_or_error_path: "Confirm live LLM unavailable/failure evidence is classified separately and does not masquerade as product failure."}
+handoff_contract: {repo_path: "docs/agents/handoffs/issue-32.yaml", github_summary_required: true}
+result_contract: {template_path: "docs/agents/worker-result-template.yaml", verifier_template_path: "docs/agents/evidence-packet-template.yaml", allowed_statuses: [success, blocked, failed]}
+role_boundary: {orchestrator_may_validate_contract_only: true, worker_may_emit_final_acceptance: false, verifier_packet_required_for_completion: true}
+prepared_by: {actor: "Hephaestus", prepared_at: "2026-05-09T22:07:00+08:00"}

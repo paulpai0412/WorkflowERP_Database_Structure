@@ -1,0 +1,42 @@
+schema_version: "1.0"
+kind: evidence_packet
+line_cap: 60
+raw_evidence_policy: index_only_manifest_no_raw_logs_or_traces
+legacy_note: {historical_reconstruction: true, pre_enforcement: true, limitation: "PR #8 merged before fresh worker/verifier packet enforcement; this packet indexes durable historical refs only."}
+subject: {type: "issue_pr", issue_number: "2", pr_number: "8", phase: "dashboard-builder-mvp", branch: "agent/issue-2-governed-query-evidence-path", sha: "014a3d991d50547256e979435d79ac3551b39f6a"}
+verifier: {actor: "historical-pr-summary", actor_role: "historical_review_summary", verifier_session_id: "github-pr-8-history", started_at: "2026-05-07T01:42:47Z", completed_at: "2026-05-07T01:42:47Z"}
+proof_of_separation:
+  worker_result_ref: "historical: none recorded before workflow packet enforcement"
+  worker_actor: "unrecorded-pre-enforcement-worker"
+  worker_session_id: "unrecorded"
+  verifier_actor: "historical-pr-summary"
+  verifier_session_id: "github-pr-8-history"
+  verifier_is_distinct_from_worker: false
+  verifier_read_worker_result_only: false
+status: "pass"
+acceptance_criteria_matrix:
+  - {ac_id: "AC1", status: "pass", evidence_ref: "pr-8-body:acceptance-criteria + skill_scripts/governed_query.py", note: "One SQL statement or refusal path was documented in PR #8 and is present in merged governed query code."}
+  - {ac_id: "AC2", status: "pass", evidence_ref: "pr-8-body:acceptance-criteria + tests/skill_scripts/test_governed_query.py + tests/skill_scripts/test_sql2000_guard.py", note: "Non-SELECT, metadata-invalid, and SQL Server 2000-incompatible SQL were documented as rejected before execution."}
+  - {ac_id: "AC3", status: "pass", evidence_ref: "pr-8-body:verification + skill_scripts/governed_query.py", note: "PR #8 recorded read-only execution against the test boundary and the merged code still enforces DB_ENV=test unless explicitly overridden."}
+  - {ac_id: "AC4", status: "pass", evidence_ref: "pr-8-body:acceptance-criteria + skill_scripts/governed_query.py", note: "Historical evidence JSON covered prompt, SQL, statuses, timestamp, returned columns, row count, sample rows, and aggregate checks."}
+  - {ac_id: "AC5", status: "pass", evidence_ref: "pr-8-body:acceptance-criteria + tests/skill_scripts/test_governed_query.py", note: "Merged public API keeps unapproved results blocked from chart-spec creation until explicit approval."}
+  - {ac_id: "AC6", status: "pass", evidence_ref: "pr-8-body:verification + tests/skill_scripts/test_governed_query.py", note: "Historical pytest coverage referenced fake DB/LLM paths and execution-result validation for the governed path."}
+gates:
+  diagnostics_and_build_gate: {status: "pass", evidence_ref: "pr-8-body:verification"}
+  surface_qa_gate: {status: "pass", evidence_ref: "pr-8-body:manual-qa"}
+  review_gate: {status: "pass", evidence_ref: "https://github.com/paulpai0412/wferp/pull/8"}
+  security_gate: {status: "pass", evidence_ref: "merged-diff-review:read-only-governed-query-scope"}
+role_boundary: {acceptance_qa_owner: "historical_pr_review_summary", main_agent_ran_issue_qa: false, worker_self_checks_are_not_final_acceptance: true}
+artifact_manifest:
+  bundle_ref: "https://github.com/paulpai0412/wferp/pull/8"
+  retention: "Repo stores only compact historical refs; raw logs were not preserved locally."
+  items:
+    - {id: "pr-8-body:acceptance-criteria", kind: "summary", executor_role: "historical_review_summary", path: "https://github.com/paulpai0412/wferp/pull/8", sha256: "", description: "PR body recorded AC coverage and verification summaries for issue #2."}
+    - {id: "merged-files:governed-query", kind: "summary", executor_role: "historical_merge_state", path: "skill_scripts/governed_query.py", sha256: "", description: "Merged governed query code defines evidence payload, approval states, and chart-spec gating."}
+    - {id: "merged-tests:governed-query", kind: "summary", executor_role: "historical_merge_state", path: "tests/skill_scripts/test_governed_query.py", sha256: "", description: "Merged tests cover happy path, refusals, approval gating, and JSON-safe sample rows."}
+compact_summary:
+  outcome: "Issue #2 / PR #8 now has compact repo-local traceability reconstructed from GitHub issue/PR text and merged repo state."
+  automated_checks: "Historical PR #8 recorded pytest, governed CLI QA, and changed-file LSP summaries; this packet does not claim a fresh rerun."
+  manual_qa: "Historical PR #8 manual CLI QA recorded happy-path evidence JSON and refusal-path denial without SQL execution."
+  risks_or_limitations: ["Worker/verifier session ids and raw logs were not preserved before workflow enforcement, so proof-of-separation is historical-only."]
+next_recommended_step: "Use this packet plus docs/agents/handoffs/issue-2.yaml to finish PRD #1 completeness audit honestly."

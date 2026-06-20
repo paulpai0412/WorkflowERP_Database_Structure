@@ -1,0 +1,52 @@
+schema_version: "1.0"
+kind: worker_result
+line_cap: 80
+raw_evidence_policy: index_only_refs_no_raw_logs_or_transcripts
+issue: {number: "31", title: "E2E: Deterministic ACTMK fixture and SQL correctness", url: "https://github.com/paulpai0412/wferp/issues/31"}
+branch: "agent/issue-31-deterministic-actmk-sql-correctness"
+status: "success"
+summary:
+  objective: "Materialize E2E-002 by proving deterministic 2026 ACTMK budget correctness through the existing governed-query test-db path."
+  outcome: "Confirmed the branch already adds deterministic ACTMK seed data plus result-based DB_ENV=test assertions, reran the focused worker self-check bucket, and recorded compact worker artifacts for PR #35 without claiming final acceptance."
+files_changed:
+  - {path: "test_db/init/01_create_wferp_test.sql", summary: "Seeds three deterministic 2026 ACTMK rows totaling 450000 plus one 2025 contrast row for SQL correctness coverage."}
+  - {path: "skill_scripts/database_client.py", summary: "Preserves read-only test DB execution while parsing connection-string fields needed by the deterministic SQL correctness path."}
+  - {path: "tests/skill_scripts/test_sql_correctness_e2e.py", summary: "Executes the real DB_ENV=test governed-query path and asserts MK002/MK006 columns, three 2026 rows, sum(MK006)=450000, and 2025 contrast-row exclusion."}
+  - {path: "tests/skill_scripts/test_database_client.py", summary: "Covers the connection parsing and read-only execution behavior used by the ACTMK target case."}
+  - {path: "docs/agents/worker-results/issue-31.yaml", summary: "Stores the structured worker result for issue #31."}
+  - {path: "docs/agents/handoffs/issue-31.yaml", summary: "Updates the compact issue handoff from pending worker boot state to waiting for fresh verifier evidence."}
+test_case_repair:
+  applies: true
+  test_case_id: "E2E-002"
+  attempted_target_case: true
+  repaired_categories: ["fixture", "test", "harness"]
+  failure_signature: "none"
+  assertion_changed: false
+  expected_outcome_changed: false
+verification:
+  note: "Worker self-checks support implementation feedback only; final acceptance comes from the verifier evidence packet."
+  gates: {tdd_gate: "pass", implementation_self_check_gate: "pass", git_gate: "pass"}
+  implementation_self_checks:
+    - command: "python3 -m pytest tests/skill_scripts/test_database_client.py -q"
+      result: "pass"
+      evidence_ref: "local-worker:self-check-issue-31-db-client"
+      summary: "Focused database-client regression passed 7/7."
+    - command: "WFERP_RUN_DB_E2E=1 python3 -m pytest tests/skill_scripts/test_sql_correctness_e2e.py tests/skill_scripts/test_governed_query.py tests/skill_scripts/test_execution_validator.py tests/skill_scripts/test_sql_router.py -q"
+      result: "pass"
+      evidence_ref: "local-worker:self-check-issue-31-sql-correctness"
+      summary: "Deterministic ACTMK target case plus required regression bucket passed 25/25 in DB_ENV=test."
+    - command: "lsp_diagnostics on changed Python files"
+      result: "pass"
+      evidence_ref: "local-worker:self-check-issue-31-lsp"
+      summary: "Changed implementation/test files had no blocking diagnostics; one test-file basedpyright warning remains non-blocking around db_client typing."
+  final_acceptance_claim: false
+evidence_packet_refs:
+  worker_artifact_bundle: "docs/agents/worker-results/issue-31.yaml"
+  verifier_packet: "docs/agents/evidence/issue-31-pr-35.yaml"
+  raw_evidence_policy: "stored_outside_main_agent_context"
+role_boundary: {actor_role: "issue_worker", may_execute_implementation_self_checks: true, may_execute_final_acceptance_qa: false, may_emit_final_verification: false, verifier_packet_required_for_completion: true}
+pr: {number: "35", url: "https://github.com/paulpai0412/wferp/pull/35", ready_for_review: true}
+blockers: ["Fresh verifier evidence for PR #35 is still required before issue #31 can be claimed as fully passed."]
+next_recommended_step: "Validate this worker result schema, then spawn a distinct verifier for PR #35 to rerun E2E-002 and its focused SQL regression bucket."
+handoff: {repo_path: "docs/agents/handoffs/issue-31.yaml", github_summary_posted: false}
+metadata: {worker: "OpenCode-gpt-5.4", worker_session_id: "worker-result:issue-31", completed_at: "2026-05-09T21:10:29+08:00"}

@@ -1,0 +1,161 @@
+schema_version: "1.0"
+kind: issue_packet
+legacy_note:
+  pre_enforcement: true
+  limitation: "Full-form issue packet retained from before compact line-cap enforcement; excluded from the generic compact-artifact gate."
+
+issue:
+  number: "5"
+  title: "Final Dashboard Approval and immutable publish"
+  url: "https://github.com/paulpai0412/wferp/issues/5"
+  labels:
+    - ready-for-agent
+  parent:
+    type: "prd"
+    reference: "https://github.com/paulpai0412/wferp/issues/1"
+
+branch:
+  name: "agent/issue-5-final-dashboard-approval-and-immutable-publish"
+  base: "main"
+
+objective: "Build the library-only final approval and immutable Published Dashboard tracer bullet on top of completed Chart Spec, Dashboard Canvas, and Design Template surfaces."
+
+acceptance_criteria:
+  - id: "AC1"
+    text: "A Dashboard draft can be previewed with approved Chart Specs, persisted Dashboard Canvas layout, and one Design Template."
+    evidence_hint: "Public module test constructs a draft from DashboardCanvas.to_payload()/load_dashboard_canvas(), DesignTemplateSelection, and chart payloads, then asserts the preview payload includes layout, chart specs, and template."
+  - id: "AC2"
+    text: "A Dashboard draft cannot become a Published Dashboard without final Analyst Approval."
+    evidence_hint: "State-transition test proves unapproved drafts cannot publish and returns a deterministic refusal code."
+  - id: "AC3"
+    text: "Publishing creates an immutable Published Dashboard version distinct from the mutable draft."
+    evidence_hint: "Test mutates or recreates the draft after publish and proves the published version payload remains unchanged and versioned."
+  - id: "AC4"
+    text: "SQL, Dashboard Data Source, or query-semantics changes require re-approval before republishing."
+    evidence_hint: "Tests mark data-meaning changes on a published draft and prove republish is blocked until a fresh final approval occurs."
+  - id: "AC5"
+    text: "Approval and publish events are recorded for audit."
+    evidence_hint: "Audit log test asserts final approval, rejection, publish, and re-approval-required events are recorded with stable event names and dashboard/version identifiers."
+  - id: "AC6"
+    text: "Workflow behavior is covered by tests for draft, approved, published, rejected, re-approval-required, and invalid transition paths."
+    evidence_hint: "Focused tests cover the state machine through public functions only; no private helper assertions."
+
+scope:
+  in:
+    - "skill_scripts/dashboard_publish.py or similarly focused library module for draft approval, immutable publish, and audit events."
+    - "tests/skill_scripts/test_dashboard_publish.py or equivalent focused public-interface tests."
+    - "docs/agents/handoffs/issue-5.yaml and docs/agents/evidence/issue-5-pr-<pr-number>.yaml after verifier acceptance."
+  out:
+    - "Browser UI, CLI commands, live production ERP queries, background refresh scheduler, published token-link runtime, and issue #6 link/view-only runtime behavior."
+    - "Changing legacy static schema docs or _Source generation."
+    - "Writing to production databases or adding arbitrary SQL execution."
+
+bootstrap_context:
+  required_reads:
+    - "AGENTS.md"
+    - "CONTEXT.md"
+    - "docs/agents/domain.md"
+    - "docs/agents/autonomous-development-workflow.yaml"
+    - "docs/prds/2026-05-06-workflow-erp-dashboard-builder.md"
+    - "docs/agents/handoffs/issue-3.yaml"
+    - "docs/agents/handoffs/issue-4.yaml"
+    - "docs/agents/handoffs/issue-7.yaml"
+  relevant_paths:
+    - "skill_scripts/chart_spec.py"
+    - "skill_scripts/dashboard_canvas.py"
+    - "skill_scripts/design_template_catalog.py"
+    - "skill_scripts/governed_query.py"
+    - "tests/skill_scripts/test_chart_spec.py"
+    - "tests/skill_scripts/test_dashboard_canvas.py"
+    - "tests/skill_scripts/test_design_template_catalog.py"
+  prior_handoff: "docs/agents/handoffs/issue-3.yaml, docs/agents/handoffs/issue-4.yaml, docs/agents/handoffs/issue-7.yaml"
+
+implementation_notes:
+  constraints:
+    - "Keep this issue library-only unless existing code clearly provides another surface; issue #6 owns token link/view-only runtime."
+    - "Reuse completed public surfaces: ChartSpec payloads, DashboardCanvas.to_payload()/load_dashboard_canvas(), and DesignTemplateSelection canonical payloads."
+    - "Published Dashboard must be an immutable version snapshot, not a mutable draft reference."
+    - "Final Analyst Approval is distinct from the query-result approval required before chart creation."
+    - "SQL, Dashboard Data Source, and query-semantics changes are data-meaning changes and must force re-approval before republish. Visual-only edits may be recorded but must not silently alter published data meaning."
+    - "Follow existing error-code style with deterministic RuntimeError messages."
+    - "Tests must exercise public functions/state transitions, not private helpers."
+  risks:
+    - "PRD mentions token links, refresh, and view-only runtime, but GitHub issue #5 is scoped to final approval and immutable publish; leave link/runtime for issue #6 unless needed as an opaque placeholder in published metadata."
+    - "Issue #3 and #7 evidence are pre-enforcement legacy; use their completed APIs, not their evidence as fresh verifier proof."
+  dependencies:
+    - "Closed: issue #3 Chart Spec authoring and validation."
+    - "Closed: issue #4 Design Template catalog and selection."
+    - "Closed: issue #7 Dashboard Canvas layout persistence."
+
+verification_plan:
+  worker_self_checks:
+    - command: "python3 -m py_compile skill_scripts/dashboard_publish.py tests/skill_scripts/test_dashboard_publish.py"
+      purpose: "implementation feedback only; not final acceptance QA"
+      success_criteria: "New module and focused tests compile."
+    - command: "python3 -m pytest tests/skill_scripts/test_dashboard_publish.py -q"
+      purpose: "implementation feedback only; not final acceptance QA"
+      success_criteria: "Focused issue #5 public-interface tests pass."
+    - command: "python3 -m pytest tests/skill_scripts/test_chart_spec.py tests/skill_scripts/test_dashboard_canvas.py tests/skill_scripts/test_design_template_catalog.py tests/skill_scripts/test_dashboard_publish.py -q"
+      purpose: "implementation feedback only; not final acceptance QA"
+      success_criteria: "Dependency behavior and new publish workflow pass together."
+  verifier_acceptance_checks:
+    required_gates:
+      - "diagnostics_and_build_gate"
+      - "surface_qa_gate"
+      - "review_gate"
+    automated_checks:
+      - command: "python3 -m pytest tests/skill_scripts/test_dashboard_publish.py -q"
+        success_criteria: "Verifier observes focused publish workflow coverage for all ACs."
+      - command: "python3 -m pytest tests/skill_scripts/test_chart_spec.py tests/skill_scripts/test_dashboard_canvas.py tests/skill_scripts/test_design_template_catalog.py tests/skill_scripts/test_dashboard_publish.py -q"
+        success_criteria: "Verifier observes dependency regression suite pass or records a precise blocker."
+  verifier_manual_qa:
+    owner: "pr_verifier"
+    surface: "library"
+    happy_path: "Run a minimal public API driver that builds a draft from approved chart/canvas/template payloads, final-approves it, publishes an immutable version, and renders/inspects the preview payload."
+    refusal_or_error_path: "Driver attempts publish before approval, republish after SQL/data-source/query-semantics change without re-approval, and invalid transition/rejected draft paths."
+
+handoff_contract:
+  repo_path: "docs/agents/handoffs/issue-5.yaml"
+  github_summary_required: true
+  required_sections:
+    - issue_identity
+    - acceptance_criteria_evidence
+    - compact_verification_summary
+    - evidence_packet_refs
+    - files_changed_summary
+    - blockers_or_risks
+    - next_recommended_step
+
+result_contract:
+  template_path: "docs/agents/worker-result-template.yaml"
+  verifier_template_path: "docs/agents/evidence-packet-template.yaml"
+  allowed_statuses:
+    - success
+    - blocked
+    - failed
+  required_fields:
+    - issue
+    - branch
+    - status
+    - summary
+    - files_changed
+    - verification
+    - pr
+    - blockers
+    - next_recommended_step
+    - evidence_packet_refs
+    - role_boundary
+  forbidden_payloads:
+    - full_worker_transcript
+    - full_verifier_transcript
+    - raw_test_logs
+    - verbose_manual_qa_transcript
+
+role_boundary:
+  orchestrator_may_validate_contract_only: true
+  worker_may_emit_final_acceptance: false
+  verifier_packet_required_for_completion: true
+
+prepared_by:
+  actor: "Hephaestus"
+  prepared_at: "2026-05-07T14:00:00+08:00"

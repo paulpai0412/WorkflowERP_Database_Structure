@@ -1,0 +1,58 @@
+schema_version: "1.0"
+kind: worker_result
+line_cap: 80
+raw_evidence_policy: index_only_refs_no_raw_logs_or_transcripts
+issue:
+  number: "20"
+  title: "Reconstruct governed query traceability artifacts"
+  url: "https://github.com/paulpai0412/wferp/issues/20"
+branch: "agent/issue-20-reconstruct-governed-query-traceability"
+status: "success"
+summary:
+  objective: "Rebuild compact repo-local traceability for issue #2 / PR #8 without re-implementing governed query behavior."
+  outcome: "Added compact issue #2 evidence/handoff artifacts, refreshed the workflow checkpoint for the PRD audit, and prepared issue #20 worker handoff docs without claiming fresh product acceptance."
+files_changed:
+  - path: "docs/agents/issue-packets/issue-20.yaml"
+    summary: "Captures the workflow self-repair scope, evidence sources, and verifier-owned acceptance contract for issue #20."
+  - path: "docs/agents/evidence/issue-2-pr-8.yaml"
+    summary: "Indexes historical issue #2 / PR #8 acceptance evidence and limitations from durable GitHub and merged-repo sources."
+  - path: "docs/agents/handoffs/issue-2.yaml"
+    summary: "Maps issue #2 acceptance criteria to the retrospective evidence packet for PRD coverage review."
+  - path: "docs/agents/runtime/context-checkpoint.yaml"
+    summary: "Updates the compact checkpoint so the PRD audit can resume from the reconstructed issue #2 refs."
+  - path: "docs/agents/handoffs/issue-20.yaml"
+    summary: "Records issue #20 worker-side traceability, self-check status, and verifier handoff."
+  - path: "docs/agents/worker-results/issue-20.yaml"
+    summary: "Stores the structured worker result for this workflow self-repair slice."
+  - path: "scripts/agent_context_budget_check.py"
+    summary: "Extends artifact-cap validation to the new issue #2 and issue #20 compact artifacts."
+verification:
+  note: "Worker self-checks support implementation feedback only; final acceptance comes from the verifier evidence packet."
+  gates:
+    tdd_gate: "not_applicable"
+    implementation_self_check_gate: "pass"
+    git_gate: "pass"
+  implementation_self_checks:
+    - command: "python3 scripts/agent_context_budget_check.py"
+      result: "pass"
+      evidence_ref: "local-worker:self-check-context-budget"
+      summary: "Artifact cap script passed after adding the compact issue #2 and issue #20 documents."
+    - command: "python3 -m py_compile scripts/agent_context_budget_check.py"
+      result: "pass"
+      evidence_ref: "local-worker:self-check-py-compile"
+      summary: "The updated workflow self-check script compiled successfully."
+    - command: "lsp_diagnostics on changed YAML and Python files"
+      result: "pass"
+      evidence_ref: "local-worker:self-check-lsp"
+      summary: "No diagnostics remained on the changed issue packet, handoff, evidence, checkpoint, worker-result, or script files."
+  final_acceptance_claim: false
+evidence_packet_refs:
+  worker_artifact_bundle: "docs/agents/worker-results/issue-20.yaml"
+  verifier_packet: "docs/agents/evidence/issue-20-pr-21.yaml"
+  raw_evidence_policy: "stored_outside_main_agent_context"
+role_boundary: {actor_role: "issue_worker", may_execute_implementation_self_checks: true, may_execute_final_acceptance_qa: false, may_emit_final_verification: false, verifier_packet_required_for_completion: true}
+pr: {number: "21", url: "https://github.com/paulpai0412/wferp/pull/21", ready_for_review: true}
+blockers: ["A fresh verifier packet is still required for issue #20 before final acceptance can be claimed."]
+next_recommended_step: "Push the issue #20 branch, open the PR, and hand it to a fresh verifier that can validate the reconstructed traceability artifacts."
+handoff: {repo_path: "docs/agents/handoffs/issue-20.yaml", github_summary_posted: true}
+metadata: {worker: "Sisyphus-Junior", worker_session_id: "worker-result:issue-20", completed_at: "2026-05-07T18:45:00+08:00"}

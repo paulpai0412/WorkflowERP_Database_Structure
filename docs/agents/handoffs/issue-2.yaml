@@ -1,0 +1,24 @@
+schema_version: "1.0"
+kind: issue_handoff
+line_cap: 35
+legacy_note: {historical_reconstruction: true, pre_enforcement: true, limitation: "Compact repo-local handoff reconstructed after PR #8 merged; not a fresh verifier handoff."}
+issue_identity: {number: "2", title: "Governed query evidence path", url: "https://github.com/paulpai0412/wferp/issues/2", branch: "agent/issue-2-governed-query-evidence-path", pr: "https://github.com/paulpai0412/wferp/pull/8"}
+acceptance_criteria_evidence:
+  - {ac_id: "AC1", status: pass, evidence_ref: "docs/agents/evidence/issue-2-pr-8.yaml#AC1", note: "PR #8 documented one governed SQL statement or a clear refusal/error state."}
+  - {ac_id: "AC2", status: pass, evidence_ref: "docs/agents/evidence/issue-2-pr-8.yaml#AC2", note: "Historical PR evidence and merged tests capture non-SELECT, metadata-invalid, and SQL2000-incompatible refusals."}
+  - {ac_id: "AC3", status: pass, evidence_ref: "docs/agents/evidence/issue-2-pr-8.yaml#AC3", note: "Read-only execution through the test boundary was documented in PR #8 and remains visible in merged governed-query code."}
+  - {ac_id: "AC4", status: pass, evidence_ref: "docs/agents/evidence/issue-2-pr-8.yaml#AC4", note: "Evidence payload fields are reconstructable from PR #8 summaries and merged code."}
+  - {ac_id: "AC5", status: pass, evidence_ref: "docs/agents/evidence/issue-2-pr-8.yaml#AC5", note: "Chart-spec creation remains blocked until explicit query-result approval."}
+  - {ac_id: "AC6", status: pass, evidence_ref: "docs/agents/evidence/issue-2-pr-8.yaml#AC6", note: "Focused tests for fake DB/LLM paths and execution-result validation were recorded in PR #8."}
+compact_verification_summary:
+  status: pass
+  diagnostics_and_build_gate: "historical pass: PR #8 body recorded pytest, CLI QA, and changed-file LSP summaries."
+  surface_qa_gate: "historical pass: PR #8 body recorded happy-path governed JSON output and refusal-path denial."
+  review_gate: "historical pass: merged PR #8 closed issue #2 before role-separation enforcement."
+evidence_packet_refs: {verifier_packet: "docs/agents/evidence/issue-2-pr-8.yaml", pr: "https://github.com/paulpai0412/wferp/pull/8", raw_evidence_policy: "Detailed logs remain outside repo docs; this handoff keeps compact refs only."}
+files_changed_summary:
+  - {path: "skill_scripts/governed_query.py", summary: "Added governed query evidence payload, approval states, and chart-spec gating."}
+  - {path: "skill_scripts/cli_generate_select.py", summary: "Exposed the governed-query JSON CLI surface used in PR #8 evidence."}
+  - {path: "tests/skill_scripts/test_governed_query.py", summary: "Covered happy path, refusal path, execution evidence, and approval gating."}
+blockers_or_risks: ["Historical worker/verifier artifacts were not captured pre-enforcement; see legacy note in the evidence packet."]
+next_recommended_step: "Reference this handoff and docs/agents/evidence/issue-2-pr-8.yaml when auditing PRD #1 coverage."

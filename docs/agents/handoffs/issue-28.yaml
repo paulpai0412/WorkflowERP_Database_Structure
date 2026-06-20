@@ -1,0 +1,21 @@
+schema_version: "1.0"
+kind: issue_handoff
+line_cap: 35
+issue_identity: {number: "28", title: "E2E: Validate dashboard builder MVP journey", url: "https://github.com/paulpai0412/wferp/issues/28", branch: "agent/issue-28-ac17-e2e-test-case", pr: "https://github.com/paulpai0412/wferp/pull/29"}
+acceptance_criteria_evidence:
+  - {ac_id: "AC1", status: worker_self_check_pass, evidence_ref: "tests/skill_scripts/test_dashboard_builder_e2e.py", note: "Worker target case covers prompt -> validated SQL -> approved result -> chart -> canvas -> template -> final approval -> publish -> token view -> bounded refresh -> revoke."}
+  - {ac_id: "AC2", status: worker_self_check_pass, evidence_ref: "tests/skill_scripts/test_dashboard_builder_e2e.py", note: "Worker target case refuses chart creation before query approval and publish before final dashboard approval."}
+  - {ac_id: "AC3", status: worker_self_check_pass, evidence_ref: "docs/agents/worker-results/issue-28.yaml", note: "Worker result records E2E-001 test_case_repair and keeps final_acceptance_claim=false with no raw logs."}
+  - {ac_id: "AC4", status: verifier_pass, evidence_ref: "docs/agents/evidence/issue-28-pr-29.yaml", note: "Fresh verifier packet records proof of separation plus passing target-case and regression-bucket acceptance evidence for PR #29."}
+compact_verification_summary:
+  status: verifier_acceptance_passed
+  diagnostics_and_build_gate: "pass: verifier-owned focused pytest suite passed 46/46 for the target case plus required regression bucket."
+  surface_qa_gate: "pass: fresh verifier reran the CLI/library target case and confirmed refusal gates before charting and publishing."
+  review_gate: "pass: PR #29 diff review found no goal, security, or role-boundary violations."
+evidence_packet_refs: {worker_result: "docs/agents/worker-results/issue-28.yaml", verifier_packet: "docs/agents/evidence/issue-28-pr-29.yaml", pr: "https://github.com/paulpai0412/wferp/pull/29", raw_evidence_policy: "Index-only refs in repo docs; raw logs stay outside main-agent context."}
+files_changed_summary:
+  - {path: "tests/skill_scripts/test_dashboard_builder_e2e.py", summary: "Adds the focused executable E2E-001 target case on the CLI/library MVP surface."}
+  - {path: "docs/agents/e2e/test-case-catalog.yaml + docs/agents/runtime/context-checkpoint.yaml", summary: "Updates compact workflow metadata for PR #29 and the pending verifier handoff."}
+  - {path: "docs/agents/worker-results/issue-28.yaml + docs/agents/handoffs/issue-28.yaml", summary: "Stores the compact worker result and orchestrator/verifier handoff for issue #28."}
+blockers_or_risks: ["CLI/library acceptance passed; browser UI coverage is out of scope for this issue and remains unclaimed."]
+next_recommended_step: "Hand PR #29 to release_worker or human merge review; verifier acceptance is complete and should not be rerun unless the PR changes."

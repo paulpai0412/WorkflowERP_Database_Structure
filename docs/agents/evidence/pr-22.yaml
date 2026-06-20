@@ -1,0 +1,48 @@
+schema_version: "1.0"
+kind: evidence_packet
+line_cap: 60
+raw_evidence_policy: index_only_manifest_no_raw_logs_or_traces
+
+subject: {type: "issue_pr", issue_number: "", pr_number: "22", phase: "", branch: "agent/bypass-approval-policy", sha: "213d2991ee3d8553675914e67cf2142c1180e7eb"}
+verifier: {actor: "Sisyphus-Junior", actor_role: "pr_verifier", verifier_session_id: "pr-verifier:pr-22-bypass-approval-policy-2026-05-07", started_at: "2026-05-07T20:15:00+08:00", completed_at: "2026-05-07T20:15:00+08:00"}
+
+proof_of_separation:
+  worker_result_ref: "no-linked-local-issue-packet-found"
+  worker_actor: "n/a"
+  worker_session_id: "n/a"
+  verifier_actor: "Sisyphus-Junior"
+  verifier_session_id: "pr-verifier:pr-22-bypass-approval-policy-2026-05-07"
+  verifier_is_distinct_from_worker: true
+  verifier_read_worker_result_only: false
+
+status: "pass"
+
+acceptance_criteria_matrix:
+  - {ac_id: "AC1", status: "pass", evidence_ref: "python3 scripts/agent_context_budget_check.py + python3 -m py_compile scripts/agent_context_budget_check.py", note: "Both required verifier commands passed from repo root."}
+  - {ac_id: "AC2", status: "pass", evidence_ref: "docs/agents/evidence-packet-template.yaml + docs/agents/evidence/issue-16-pr-17.yaml + docs/agents/evidence/issue-20-pr-21.yaml", note: "Compact structure matches repo template/examples; PR #22 and commit 213d2991ee3d8553675914e67cf2142c1180e7eb are recorded; issue_number is intentionally empty."}
+
+gates:
+  diagnostics_and_build_gate: {status: "pass", evidence_ref: "verifier summary: context_budget_check pass; py_compile pass"}
+  surface_qa_gate: {status: "not_applicable", evidence_ref: "policy packet only; no browser/UI surface"}
+  review_gate: {status: "pass", evidence_ref: "template/example parity review"}
+  security_gate: {status: "pass", evidence_ref: "doc-only; no secrets, credentials, or network surface"}
+
+role_boundary:
+  acceptance_qa_owner: "pr_verifier"
+  main_agent_ran_issue_qa: false
+  worker_self_checks_are_not_final_acceptance: true
+
+artifact_manifest:
+  bundle_ref: "local verifier run for PR #22"
+  retention: "repo docs keep compact refs only; raw logs stay out of repo docs."
+  items:
+    - {id: "verifier-script-gate", kind: "summary", executor_role: "pr_verifier", path: "scripts/agent_context_budget_check.py", sha256: "", description: "Required context-budget and py_compile checks passed."}
+    - {id: "verifier-packet-review", kind: "summary", executor_role: "pr_verifier", path: "docs/agents/evidence/pr-22.yaml", sha256: "", description: "Packet records PR #22, commit 213d2991ee3d8553675914e67cf2142c1180e7eb, and the no-linked-local-issue-packet limitation."}
+
+compact_summary:
+  outcome: "PR #22 is documented for release_worker merge-eligibility review."
+  automated_checks: "python3 scripts/agent_context_budget_check.py passed; python3 -m py_compile scripts/agent_context_budget_check.py passed; no raw logs recorded."
+  manual_qa: "Template/example parity checked; no linked local issue packet was found."
+  risks_or_limitations: ["No linked local issue packet was found, so issue_number is intentionally empty and this packet is PR-scoped only.", "Verifier evidence is compact command-summary only; raw logs remain outside repo docs."]
+
+next_recommended_step: "Have release_worker evaluate PR #22 against this packet."

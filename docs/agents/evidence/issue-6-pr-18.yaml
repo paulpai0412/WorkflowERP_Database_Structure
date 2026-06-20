@@ -1,0 +1,56 @@
+schema_version: "1.0"
+kind: evidence_packet
+line_cap: 60
+raw_evidence_policy: index_only_manifest_no_raw_logs_or_traces
+subject:
+  type: "issue_pr"
+  issue_number: "6"
+  pr_number: "18"
+  phase: ""
+  branch: "agent/issue-6-published-dashboard-link-runtime"
+  sha: "8d753fa42f0509719364465d7ba3bf249ea293a2"
+verifier:
+  actor: "Sisyphus-Junior"
+  actor_role: "pr_verifier"
+  verifier_session_id: "pr18-verify-2026-05-07T07:34:31Z"
+  started_at: "2026-05-07T07:27:00Z"
+  completed_at: "2026-05-07T07:34:31Z"
+proof_of_separation:
+  worker_result_ref: "docs/agents/worker-results/issue-6.yaml"
+  worker_actor: "Sisyphus-Junior(issue_worker_repair)"
+  worker_session_id: "worker-result:issue-6@8d753fa"
+  verifier_actor: "Sisyphus-Junior(pr_verifier)"
+  verifier_session_id: "pr18-verify-2026-05-07T07:34:31Z"
+  verifier_is_distinct_from_worker: true
+  verifier_read_worker_result_only: true
+status: "pass"
+acceptance_criteria_matrix:
+  - {ac_id: "AC1", status: "pass", evidence_ref: "verifier-local:manual-library-driver", note: "Opaque 43-char token observed and remained scoped to dashboard-1/version 1."}
+  - {ac_id: "AC2", status: "pass", evidence_ref: "verifier-local:manual-library-driver", note: "Valid token rendered status=ok, view_only=true, empty authoring actions, and published payload."}
+  - {ac_id: "AC3", status: "pass", evidence_ref: "verifier-local:pytest-dashboard-publish+manual-library-driver", note: "Malformed, malformed-expiration, revoked, expired, and unpublished cases denied with dashboard/data null."}
+  - {ac_id: "AC4", status: "pass", evidence_ref: "verifier-local:manual-library-driver", note: "View and refresh both hit the read-only source; bounded 300s refresh returned fresh data."}
+  - {ac_id: "AC5", status: "pass", evidence_ref: "verifier-local:pytest-dashboard-publish+manual-library-driver", note: "59s/3601s refresh intervals raised policy errors and refresh failure preserved stale data with safe stale_error state."}
+  - {ac_id: "AC6", status: "pass", evidence_ref: "verifier-local:pytest-dashboard-publish+manual-library-driver", note: "Creation, malformed denial, revocation, expiration denial, view failure, and refresh failure audit events stayed stable."}
+gates:
+  diagnostics_and_build_gate: {status: "pass", evidence_ref: "verifier-local:lsp-py-compile-pytest"}
+  surface_qa_gate: {status: "pass", evidence_ref: "verifier-local:manual-library-driver"}
+  review_gate: {status: "pass", evidence_ref: "verifier-local:lightweight-review"}
+  security_gate: {status: "pass", evidence_ref: "verifier-local:focused-security-review"}
+role_boundary:
+  acceptance_qa_owner: "pr_verifier"
+  main_agent_ran_issue_qa: false
+  worker_self_checks_are_not_final_acceptance: true
+artifact_manifest:
+  bundle_ref: "local-verifier:issue-6-pr-18@8d753fa"
+  retention: "Local verifier transcript only; repo stores compact refs without raw logs."
+  items:
+    - {id: "verifier-local:lsp-py-compile-pytest", kind: "summary", executor_role: "pr_verifier", path: "local verifier command summaries", sha256: "", description: "LSP diagnostics clean; py_compile passed; focused pytest passed 13/13."}
+    - {id: "verifier-local:manual-library-driver", kind: "summary", executor_role: "pr_verifier", path: "local inline Python driver", sha256: "", description: "Happy path, denial paths, bounded refresh, view failure, and refresh failure exercised through the public library surface."}
+    - {id: "verifier-local:lightweight-review", kind: "summary", executor_role: "pr_verifier", path: "local diff+AC review", sha256: "", description: "Goal/diff review found current HEAD satisfies AC1-AC6 without blocking quality concerns."}
+    - {id: "verifier-local:focused-security-review", kind: "summary", executor_role: "pr_verifier", path: "local code and surface review", sha256: "", description: "No secrets, write-SQL, network expansion, or denial-path data leak observed in the current diff."}
+compact_summary:
+  outcome: "Fresh verifier run on PR #18 HEAD 8d753fa passes all issue #6 acceptance criteria and required gates."
+  automated_checks: "python3 -m py_compile changed files passed; python3 -m pytest tests/skill_scripts/test_dashboard_publish.py -q passed 13/13; lsp_diagnostics clean on changed Python files."
+  manual_qa: "Public library driver confirmed happy path, bounded refresh, malformed/revoked/expired/unpublished denials, safe initial view failure, and safe refresh stale_error behavior."
+  risks_or_limitations: ["Bearer-token links remain intentionally out of scope for authenticated RBAC/browser UI."]
+next_recommended_step: "Human reviewer may review and merge PR #18 if no additional non-verifier concerns remain."

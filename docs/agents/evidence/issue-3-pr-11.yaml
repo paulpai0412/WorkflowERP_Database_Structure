@@ -1,0 +1,96 @@
+schema_version: "1.0"
+kind: evidence_packet
+
+subject:
+  type: "issue_pr"
+  issue_number: "3"
+  pr_number: "11"
+  phase: "dashboard-builder-mvp"
+  branch: "agent/issue-3-chart-spec-authoring-and-validation"
+  sha: "104a171"
+
+legacy_note:
+  pre_enforcement: true
+  not_proof_of_fresh_verifier_separation: true
+  reason: "Created before the P0 autonomous workflow role-separation packet requirements were enforced."
+
+verifier:
+  actor: "historical-verifier-summary"
+  started_at: "2026-05-06T00:00:00+08:00"
+  completed_at: "2026-05-06T00:00:00+08:00"
+
+status: "pass"
+
+acceptance_criteria_matrix:
+  - ac_id: "AC1"
+    status: "pass"
+    evidence_ref: "test_table_chart_spec_requires_approved_query_result"
+    note: "Approved GovernedQueryResult is accepted and unapproved input is rejected."
+  - ac_id: "AC2"
+    status: "pass"
+    evidence_ref: "tests/skill_scripts/test_chart_spec.py"
+    note: "Public authoring payloads cover table, KPI card, bar, and line chart types."
+  - ac_id: "AC3"
+    status: "pass"
+    evidence_ref: "tests/skill_scripts/test_chart_spec.py"
+    note: "Validation covers chart type, mappings, sorting, title, color, number format, and date format."
+  - ac_id: "AC4"
+    status: "pass"
+    evidence_ref: "test_invalid_mappings_are_rejected_with_clear_errors"
+    note: "Invalid mappings and direct public ChartSpec revalidation paths are rejected with clear errors."
+  - ac_id: "AC5"
+    status: "pass"
+    evidence_ref: "manual-library-driver:chart-preview"
+    note: "Preview rendering returns table rows, KPI value/label, and ordered bar/line data."
+  - ac_id: "AC6"
+    status: "pass"
+    evidence_ref: "command:pytest-chart-spec"
+    note: "Focused chart spec tests passed for valid and invalid MVP specs."
+
+gates:
+  diagnostics_and_build_gate:
+    status: "pass"
+    evidence_ref: "command:py-compile-and-lsp"
+  surface_qa_gate:
+    status: "pass"
+    evidence_ref: "manual-library-driver:chart-preview"
+  review_gate:
+    status: "pass"
+    evidence_ref: "pr:https://github.com/paulpai0412/wferp/pull/11"
+  security_gate:
+    status: "pass"
+    evidence_ref: "diff-review:no-secrets-or-write-sql-surface"
+
+artifact_manifest:
+  bundle_ref: "local-session-evidence:commit-104a171"
+  retention: "historical summary retained in repo; raw session output not duplicated in main agent context"
+  items:
+    - id: "command:py-compile-and-lsp"
+      kind: "summary"
+      path: "docs/agents/handoffs/issue-3.yaml"
+      sha256: ""
+      description: "Changed-file diagnostics and py_compile passed."
+    - id: "command:pytest-chart-spec"
+      kind: "summary"
+      path: "docs/agents/handoffs/issue-3.yaml"
+      sha256: ""
+      description: "Focused chart spec pytest run passed with 9 tests."
+    - id: "command:pytest-skill-scripts"
+      kind: "summary"
+      path: "docs/agents/handoffs/issue-3.yaml"
+      sha256: ""
+      description: "Relevant skill_scripts suite passed with 74 tests."
+    - id: "manual-library-driver:chart-preview"
+      kind: "driver-output"
+      path: "docs/agents/handoffs/issue-3.yaml"
+      sha256: ""
+      description: "Library driver exercised chart authoring, preview rendering, and refusal paths."
+
+compact_summary:
+  outcome: "Issue #3 chart spec authoring and validation passed all recorded acceptance criteria."
+  automated_checks: "LSP diagnostics, py_compile, focused chart spec tests, and relevant skill_scripts tests passed."
+  manual_qa: "Library driver rendered all four chart types and observed expected refusal paths."
+  risks_or_limitations:
+    - "Library-only MVP surface; dashboard UI and persistence were out of scope."
+
+next_recommended_step: "Use PR #11 as completed historical evidence and keep future raw logs in artifact bundles."

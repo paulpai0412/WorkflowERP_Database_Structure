@@ -1,0 +1,29 @@
+{
+  "kind": "checkpoint",
+  "title": "費用分析查詢確認",
+  "step": "sql_review",
+  "sqlReview": {
+    "title": "SQL 查詢審核",
+    "sql": "SELECT TA004 AS 部門, TB017 AS 會計科目, SUM(TB013) AS 未稅金額, SUM(TB014) AS 稅額 FROM [DSCSYS].[dbo].[ACPTA] JOIN [DSCSYS].[dbo].[ACPTB] ON TA001 = TB001 AND TA002 = TB002 WHERE TA003 >= '20260101' AND TA003 <= '20260331' AND TA018 <> 'Y' AND TA024 = 'Y' GROUP BY TA004, TB017",
+    "validation": {
+      "readonly": true,
+      "blockedKeywords": [],
+      "executionStatus": "not_executed"
+    }
+  },
+  "dataPreview": {
+    "rowCount": 6,
+    "columns": ["部門", "會計科目", "未稅金額", "稅額", "總額", "占比"],
+    "rows": [
+      { "部門": "D002", "會計科目": "6201", "未稅金額": 36000, "稅額": 1800, "總額": 37800, "占比": "27.69%" },
+      { "部門": "D001", "會計科目": "6251", "未稅金額": 28000, "稅額": 1400, "總額": 29400, "占比": "21.54%" },
+      { "部門": "D003", "會計科目": "6204", "未稅金額": 24000, "稅額": 1200, "總額": 25200, "占比": "18.46%" }
+    ]
+  },
+  "reportTypes": [
+    { "id": "financial-control", "label": "財務控管", "description": "聚焦預算、憑證狀態與異常費用追蹤。" },
+    { "id": "executive-summary", "label": "主管摘要", "description": "提供高階主管快速掌握費用結構與趨勢。" },
+    { "id": "exception-audit", "label": "例外稽核", "description": "突出需複核的科目、部門與交易明細。" }
+  ],
+  "actions": ["同意查詢", "調整需求"]
+}

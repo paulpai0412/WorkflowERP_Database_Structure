@@ -1,0 +1,122 @@
+schema_version: "1.0"
+kind: evidence_packet
+legacy_note:
+  pre_enforcement: true
+  limitation: "Fresh verifier separation was recorded, but this full-form evidence packet predates compact line-cap enforcement and is retained as historical detail."
+
+subject:
+  type: "issue_pr"
+  issue_number: "4"
+  pr_number: "13"
+  phase: "dashboard-builder-mvp"
+  branch: "agent/issue-4-design-template-catalog-and-selection"
+  sha: "828e87a"
+
+verifier:
+  actor: "pr_verifier (fresh post-enforcement session)"
+  actor_role: "pr_verifier"
+  verifier_session_id: "opencode-session-pr13-verify-2026-05-07"
+  started_at: "2026-05-07T00:00:00+08:00"
+  completed_at: "2026-05-07T00:00:00+08:00"
+
+proof_of_separation:
+  worker_result_ref: "docs/agents/evidence/issue-4-pr-13.yaml"
+  worker_actor: "Hephaestus (pre-enforcement worker)"
+  worker_session_id: "pre-enforcement-worker-pr13"
+  verifier_actor: "pr_verifier (fresh post-enforcement session)"
+  verifier_session_id: "opencode-session-pr13-verify-2026-05-07"
+  verifier_is_distinct_from_worker: true
+  verifier_read_worker_result_only: true
+
+status: "pass"
+
+acceptance_criteria_matrix:
+  - ac_id: "AC1"
+    status: "pass"
+    evidence_ref: "test_catalog_presents_deterministic_generic_design_template_options PASSED; list_design_template_options() returns 3 curated templates with DESIGN.md-style tokens"
+    note: "Three generic templates (executive_contrast, soft_operations, ledger_focus) confirmed deterministic across two calls."
+  - ac_id: "AC2"
+    status: "pass"
+    evidence_ref: "test_catalog_options_do_not_use_source_brand_names_as_official_names PASSED; checked against {apple,stripe,linear,notion,vercel,shopify,slack,github,voltagent}"
+    note: "No source brand names appear in any official template name."
+  - ac_id: "AC3"
+    status: "pass"
+    evidence_ref: "test_allowed_design_template_can_be_selected_for_dashboard_preview PASSED; test_invalid_design_template_selection_is_refused_with_clear_error PASSED; manual driver refusal check PASSED"
+    note: "select_design_template() returns DesignTemplateSelection; invalid IDs raise DESIGN_TEMPLATE_NOT_ALLOWED."
+  - ac_id: "AC4"
+    status: "pass"
+    evidence_ref: "test_allowed_design_template_can_be_selected_for_dashboard_preview PASSED; apply_design_template_to_canvas_preview() returns {template, canvas}; manual driver apply check PASSED"
+    note: "Template payload and canvas payload both present in preview output."
+  - ac_id: "AC5"
+    status: "pass"
+    evidence_ref: "test_switching_design_templates_replaces_the_active_template PASSED; executive_contrast absent from preview after switch to ledger_focus"
+    note: "Switching replaces; no blending observed."
+  - ac_id: "AC6"
+    status: "pass"
+    evidence_ref: "7/7 tests in tests/skill_scripts/test_design_template_catalog.py PASSED; covers determinism, brand-name exclusion, selection, apply, switching, invalid refusal, dict-refusal, canonicalization"
+    note: "All required behavioral dimensions covered by dedicated test file."
+
+gates:
+  diagnostics_and_build_gate:
+    status: "pass"
+    evidence_ref: "py_compile PASS on skill_scripts/design_template_catalog.py and test file; pytest import succeeded; 89/89 tests executed without import error; LSP server unavailable but py_compile + runtime import + full pytest suite constitute sufficient build evidence for a pure-Python library-only slice"
+  surface_qa_gate:
+    status: "pass"
+    evidence_ref: "manual public API driver: 6/6 checks PASSED (list options, select+apply, switch, invalid-id refusal, dict-selection refusal, forged-selection canonicalization); isolated worktree /tmp/opencode/pr13-verify"
+  review_gate:
+    status: "pass"
+    evidence_ref: "diff reviewed: 4 new files only (design_template_catalog.py, test_design_template_catalog.py, evidence yaml, handoff yaml); no modifications to existing files; PR #14 merge-base check confirms zero file overlap; GitHub mergeable=MERGEABLE"
+  security_gate:
+    status: "pass"
+    evidence_ref: "new module imports only dataclasses and dashboard_canvas; no exec/eval/subprocess/os/open/network calls; frozen dataclasses prevent mutation; no secrets or user-controlled code execution paths"
+
+role_boundary:
+  acceptance_qa_owner: "pr_verifier"
+  main_agent_ran_issue_qa: false
+  worker_self_checks_are_not_final_acceptance: true
+
+artifact_manifest:
+  bundle_ref: "local/isolated-worktree:/tmp/opencode/pr13-verify (removed after verification)"
+  retention: "session-only; worktree removed post-verification"
+  items:
+    - id: "design-template-catalog-module"
+      kind: "other"
+      executor_role: "pr_verifier"
+      path: "skill_scripts/design_template_catalog.py"
+      sha256: ""
+      description: "New library module: DesignTemplate + DesignTemplateSelection dataclasses, 3 catalog entries, 4 public functions"
+    - id: "design-template-catalog-tests"
+      kind: "junit"
+      executor_role: "pr_verifier"
+      path: "tests/skill_scripts/test_design_template_catalog.py"
+      sha256: ""
+      description: "7 tests covering all AC6 behavioral dimensions; 7/7 PASSED"
+    - id: "full-suite-run"
+      kind: "summary"
+      executor_role: "pr_verifier"
+      path: "tests/skill_scripts/"
+      sha256: ""
+      description: "89/89 tests PASSED across full skill_scripts suite in isolated worktree"
+    - id: "manual-driver-output"
+      kind: "driver-output"
+      executor_role: "pr_verifier"
+      path: "local/manual-driver-session"
+      sha256: ""
+      description: "6/6 public API happy and refusal path checks PASSED via inline Python driver"
+    - id: "worker-evidence-ref"
+      kind: "other"
+      executor_role: "pr_verifier"
+      path: "docs/agents/evidence/issue-4-pr-13.yaml"
+      sha256: ""
+      description: "Pre-enforcement worker evidence; read as context only, not as acceptance proof"
+
+compact_summary:
+  outcome: "PR #13 passes all issue #4 ACs; library-only slice is correct, tested, and safe to merge."
+  automated_checks: "89/89 pytest PASSED (full suite); 7/7 design template tests PASSED; py_compile PASS on both new files."
+  manual_qa: "6/6 public API driver checks PASSED covering happy paths, refusal paths, and canonicalization."
+  risks_or_limitations:
+    - "LSP server unavailable in verifier session; mitigated by py_compile + runtime import + full pytest suite."
+    - "PR branch is 2 commits behind main (PR #14) but has zero file overlap; GitHub confirms MERGEABLE; no rebase required."
+    - "Browser/CLI integration is out of scope for issue #4 per issue spec; not a gap."
+
+next_recommended_step: "Main agent may merge PR #13, close issue #4, and select issue #5 for the next worker session."

@@ -1,0 +1,55 @@
+schema_version: "1.0"
+kind: worker_result
+line_cap: 80
+raw_evidence_policy: index_only_refs_no_raw_logs_or_transcripts
+issue: {number: "33", title: "E2E: Query Analyst Approval gate before Chart Spec", url: "https://github.com/paulpai0412/wferp/issues/33"}
+branch: "agent/issue-33-e2e-query-analyst-approval-gate-before-chart-spe"
+status: "success"
+failure_classification: {kind: "none", retryable: false, routed_to: "pr_verifier", root_cause_signature: "none"}
+summary:
+  objective: "Materialize E2E-003 for the current CLI/library Dashboard Builder surface by proving Chart Spec creation is gated on Analyst Approval for the governed 2026 engineering-budget query result."
+  outcome: "Verified the branch adds an additive E2E-003 library test that refuses both Chart Spec authoring entry points before Analyst Approval and succeeds after approval with MK006 as the bar-value field; worker self-checks passed on HEAD 0200368 and PR #37 is ready for fresh verifier review."
+files_changed:
+  - {path: "tests/skill_scripts/test_query_approval_chart_spec_e2e.py", summary: "Adds the focused E2E-003 target case covering governed-query creation, refusal before approval, and success after approval using MK006 in the bar chart payload."}
+  - {path: "docs/agents/e2e/test-case-catalog.yaml", summary: "Registers E2E-003 as in-progress for issue #33 so orchestrator/verifier flows can reference the issue-scoped test case."}
+  - {path: "docs/agents/worker-results/issue-33.yaml", summary: "Stores the compact worker result for issue #33 without making a final acceptance claim."}
+test_case_repair:
+  applies: true
+  test_case_id: "E2E-003"
+  attempted_target_case: true
+  repaired_categories: ["test"]
+  failure_signature: "none"
+  assertion_changed: false
+  expected_outcome_changed: false
+verification:
+  note: "Worker self-checks support implementation feedback only; final acceptance comes from the verifier evidence packet."
+  gates: {tdd_gate: "pass", implementation_self_check_gate: "pass", git_gate: "pass"}
+  implementation_self_checks:
+    - command: "python3 -m pytest tests/skill_scripts/test_query_approval_chart_spec_e2e.py -q"
+      result: "pass"
+      evidence_ref: "local-worker:self-check-issue-33-target-case-0200368"
+      summary: "Target case passed 2/2 covering governed-query creation, refusal before approval, and approval-unlocked MK006 bar Chart Spec authoring."
+    - command: "python3 -m pytest tests/skill_scripts/test_governed_query.py tests/skill_scripts/test_chart_spec.py tests/skill_scripts/test_dashboard_canvas.py -q"
+      result: "pass"
+      evidence_ref: "local-worker:self-check-issue-33-regression-bucket-0200368"
+      summary: "Focused dashboard-builder regression bucket passed 25/25 without weakening governed-query, Chart Spec, or Dashboard Canvas assertions."
+    - command: "python3 -m py_compile tests/skill_scripts/test_query_approval_chart_spec_e2e.py"
+      result: "pass"
+      evidence_ref: "local-worker:self-check-issue-33-py-compile-0200368"
+      summary: "Changed Python target-case test compiled cleanly."
+    - command: "lsp_diagnostics severity=error on changed files"
+      result: "pass"
+      evidence_ref: "local-worker:self-check-issue-33-lsp-0200368"
+      summary: "Changed test file and updated catalog YAML reported no error-level diagnostics."
+  final_acceptance_claim: false
+evidence_packet_refs:
+  worker_artifact_bundle: "docs/agents/worker-results/issue-33.yaml"
+  verifier_packet: "docs/agents/evidence/issue-33-pr-37.yaml"
+  raw_evidence_policy: "stored_outside_main_agent_context"
+role_boundary: {actor_role: "issue_worker", may_execute_implementation_self_checks: true, may_execute_final_acceptance_qa: false, may_emit_final_verification: false, verifier_packet_required_for_completion: true}
+pr: {number: "37", url: "https://github.com/paulpai0412/wferp/pull/37", ready_for_review: true}
+blockers:
+  - "Fresh verifier evidence for PR #37 is still required before issue #33 can be claimed as accepted."
+next_recommended_step: "Validate this worker result schema, then spawn a fresh pr_verifier for PR #37 to rerun E2E-003 and the focused dashboard-builder regression bucket."
+handoff: {repo_path: "docs/agents/handoffs/issue-33.yaml", github_summary_posted: false}
+metadata: {worker: "Sisyphus-issue_worker", worker_session_id: "worker:issue-33-20260510-2310", completed_at: "2026-05-10T23:10:02+08:00"}

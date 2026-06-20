@@ -1,0 +1,101 @@
+schema_version: "1.0"
+kind: evidence_packet
+
+subject:
+  type: "issue_pr"
+  issue_number: "7"
+  pr_number: "12"
+  phase: "dashboard-builder-mvp"
+  branch: "agent/issue-7-dashboard-canvas-layout-persistence"
+  sha: "d5e17d1"
+
+legacy_note:
+  pre_enforcement: true
+  not_proof_of_fresh_verifier_separation: true
+  reason: "Created before the P0 autonomous workflow role-separation packet requirements were enforced."
+
+verifier:
+  actor: "historical-verifier-summary"
+  started_at: "2026-05-07T00:00:00+08:00"
+  completed_at: "2026-05-07T00:00:00+08:00"
+
+status: "pass"
+
+acceptance_criteria_matrix:
+  - ac_id: "AC1"
+    status: "pass"
+    evidence_ref: "test_approved_chart_draft_can_be_added_to_dashboard_canvas"
+    note: "Approved chart draft placement succeeds and invalid raw/manual/unapproved drafts are refused."
+  - ac_id: "AC2"
+    status: "pass"
+    evidence_ref: "test_chart_can_be_moved_and_resized_without_losing_identity"
+    note: "Move and resize preserve chart identity through the public DashboardCanvas API."
+  - ac_id: "AC3"
+    status: "pass"
+    evidence_ref: "test_layout_persistence_round_trips_coordinates_dimensions_and_chart_payloads"
+    note: "Serialized layouts include chart identity, coordinates, dimensions, and chart payloads."
+  - ac_id: "AC4"
+    status: "pass"
+    evidence_ref: "test_layout_persistence_round_trips_coordinates_dimensions_and_chart_payloads"
+    note: "Persisted layouts reload and replay to matching rendered layout payloads."
+  - ac_id: "AC5"
+    status: "pass"
+    evidence_ref: "test_overlap_and_bounds_violations_are_rejected_deterministically"
+    note: "Overlap, bounds, fractional grid, and malformed chart metadata are rejected deterministically."
+  - ac_id: "AC6"
+    status: "pass"
+    evidence_ref: "command:pytest-dashboard-canvas"
+    note: "Focused dashboard canvas tests passed for add, move, resize, serialization, replay, and refusal paths."
+
+gates:
+  diagnostics_and_build_gate:
+    status: "pass"
+    evidence_ref: "command:py-compile-lsp-and-pytest"
+  surface_qa_gate:
+    status: "pass"
+    evidence_ref: "manual-library-driver:dashboard-canvas"
+  review_gate:
+    status: "pass"
+    evidence_ref: "oracle-review:focused-re-review-pass"
+  security_gate:
+    status: "pass"
+    evidence_ref: "diff-review:no-secrets-or-write-sql-surface"
+
+artifact_manifest:
+  bundle_ref: "local-session-evidence:commit-d5e17d1"
+  retention: "historical summary retained in repo; raw session output not duplicated in main agent context"
+  items:
+    - id: "command:py-compile-lsp-and-pytest"
+      kind: "summary"
+      path: "docs/agents/handoffs/issue-7.yaml"
+      sha256: ""
+      description: "Changed-file diagnostics, py_compile, focused tests, and full skill_scripts tests passed."
+    - id: "command:pytest-dashboard-canvas"
+      kind: "summary"
+      path: "docs/agents/handoffs/issue-7.yaml"
+      sha256: ""
+      description: "Focused dashboard canvas pytest run passed with 8 tests."
+    - id: "command:pytest-skill-scripts"
+      kind: "summary"
+      path: "docs/agents/handoffs/issue-7.yaml"
+      sha256: ""
+      description: "Relevant skill_scripts suite passed with 82 tests."
+    - id: "manual-library-driver:dashboard-canvas"
+      kind: "driver-output"
+      path: "docs/agents/handoffs/issue-7.yaml"
+      sha256: ""
+      description: "Library driver exercised placement, movement, resizing, persistence, replay, and invalid-input refusal paths."
+    - id: "oracle-review:focused-re-review-pass"
+      kind: "summary"
+      path: "docs/agents/handoffs/issue-7.yaml"
+      sha256: ""
+      description: "Focused Oracle re-review passed before PR #12 handoff."
+
+compact_summary:
+  outcome: "Issue #7 dashboard canvas layout persistence passed all recorded acceptance criteria."
+  automated_checks: "LSP diagnostics, py_compile, focused dashboard canvas tests, and relevant skill_scripts tests passed."
+  manual_qa: "Library driver exercised add, move, resize, serialize, reload, and invalid-input refusal paths."
+  risks_or_limitations:
+    - "Library-only tracer bullet; browser UI was out of scope."
+
+next_recommended_step: "After PR #12 human review/merge, continue with the next dependency-ready issue."

@@ -1,0 +1,76 @@
+schema_version: "1.0"
+kind: worker_result
+line_cap: 80
+raw_evidence_policy: index_only_refs_no_raw_logs_or_transcripts
+
+issue:
+  number: "6"
+  title: "Published Dashboard Link and view-only runtime"
+  url: "https://github.com/paulpai0412/wferp/issues/6"
+
+branch: "agent/issue-6-published-dashboard-link-runtime"
+status: "success"
+
+summary:
+  objective: "Repair review findings for Published Dashboard Link runtime safety."
+  outcome: "Added public-interface coverage and surgical runtime handling so initial view data-source failures return a safe error state and malformed link expiration strings are denied without payload leaks or crashes."
+
+files_changed:
+  - path: "skill_scripts/dashboard_publish.py"
+    summary: "Catches view-time read failures as DASHBOARD_VIEW_FAILED and denies malformed expires_at values as LINK_EXPIRATION_MALFORMED before data-source access."
+  - path: "tests/skill_scripts/test_dashboard_publish.py"
+    summary: "Added TDD public-interface tests for safe initial view failure and malformed expires_at denial."
+  - path: "docs/agents/handoffs/issue-6.yaml"
+    summary: "Updated handoff to reflect PR #18, post-review fixes, and need for fresh verifier acceptance."
+  - path: "docs/agents/worker-results/issue-6.yaml"
+    summary: "Updated worker result packet for the repaired branch state."
+  - path: "docs/agents/evidence/issue-6.yaml"
+    summary: "Added PR #18 traceability while marking prior verifier evidence stale after new code changes."
+
+verification:
+  note: "Worker self-checks support implementation feedback only; final acceptance requires a fresh verifier packet because this worker changed code after the prior verifier evidence."
+  gates:
+    tdd_gate: "pass"
+    implementation_self_check_gate: "pass"
+    git_gate: "pass"
+  implementation_self_checks:
+    - command: "python3 -m pytest tests/skill_scripts/test_dashboard_publish.py -q"
+      result: "pass"
+      evidence_ref: "local-worker-repair:pytest-dashboard-publish"
+      summary: "Focused public-interface dashboard publish/runtime tests passed 13/13 after the two fixes."
+    - command: "python3 -m py_compile skill_scripts/dashboard_publish.py tests/skill_scripts/test_dashboard_publish.py"
+      result: "pass"
+      evidence_ref: "local-worker-repair:py-compile-dashboard-publish"
+      summary: "Changed Python files compiled successfully."
+    - command: "lsp_diagnostics changed Python files"
+      result: "pass"
+      evidence_ref: "local-worker-repair:lsp-dashboard-publish"
+      summary: "No diagnostics found for changed Python files."
+  final_acceptance_claim: false
+
+evidence_packet_refs:
+  worker_artifact_bundle: "docs/agents/worker-results/issue-6.yaml"
+  prior_verifier_packet: "docs/agents/evidence/issue-6.yaml"
+  prior_verifier_status: "stale_after_worker_repair"
+  required_fresh_verifier_packet: "pending fresh PR #18 verifier packet after repaired branch publication"
+  raw_evidence_policy: "stored_outside_main_agent_context"
+
+role_boundary:
+  actor_role: "issue_worker_repair"
+  may_execute_implementation_self_checks: true
+  may_execute_final_acceptance_qa: false
+  may_emit_final_verification: false
+  verifier_packet_required_for_completion: true
+
+pr:
+  number: "18"
+  url: "https://github.com/paulpai0412/wferp/pull/18"
+  ready_for_review: true
+
+blockers: ["Fresh verifier acceptance is required after these post-verifier code changes."]
+
+next_recommended_step: "Spawn a fresh PR #18 verifier to rerun issue #6 acceptance checks on the published repair branch state."
+
+handoff:
+  repo_path: "docs/agents/handoffs/issue-6.yaml"
+  github_summary_posted: true

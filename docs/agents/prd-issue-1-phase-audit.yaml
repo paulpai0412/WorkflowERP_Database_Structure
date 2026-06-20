@@ -1,0 +1,37 @@
+schema_version: "1.0"
+kind: prd_phase_audit
+line_cap: 80
+raw_evidence_policy: index_only_refs_no_raw_logs_or_transcripts
+
+prd:
+  issue_number: "1"
+  title: "PRD: Workflow ERP Dashboard Builder"
+  url: "https://github.com/paulpai0412/wferp/issues/1"
+  phase: "dashboard-builder-mvp"
+
+audit_summary:
+  status: "pass"
+  audit_scope: "issue coverage and user-story completeness before E2E test case issue materialization"
+  completed_issue_slices: ["2", "3", "4", "5", "6", "7", "20"]
+  missing_ready_for_agent_slices: []
+  dependency_gaps: []
+  e2e_test_case_issue_follow_up_required: ["AC17"]
+
+coverage_refs:
+  issue_2: "docs/agents/handoffs/issue-2.yaml + docs/agents/evidence/issue-2-pr-8.yaml"
+  issue_20: "docs/agents/handoffs/issue-20.yaml + docs/agents/evidence/issue-20-pr-21.yaml"
+  prd_issue_comment: "https://github.com/paulpai0412/wferp/issues/1#issuecomment-4396712209"
+
+acceptance_criteria_review:
+  - {ac_range: "AC1-AC6", status: "pass", evidence_ref: "issue_2", note: "Governed query generation, validation, execution evidence, and approval gating are traceable through reconstructed issue #2 refs."}
+  - {ac_range: "AC6-AC8", status: "pass", evidence_ref: "https://github.com/paulpai0412/wferp/issues/3 + https://github.com/paulpai0412/wferp/issues/4", note: "Chart authoring, validation, and Design Template selection are covered by closed tracer-bullet slices."}
+  - {ac_range: "AC7-AC10", status: "pass", evidence_ref: "https://github.com/paulpai0412/wferp/issues/5 + https://github.com/paulpai0412/wferp/issues/7", note: "Dashboard canvas persistence, final approval, and immutable publish flow are covered by closed slices."}
+  - {ac_range: "AC11-AC16", status: "pass", evidence_ref: "https://github.com/paulpai0412/wferp/issues/6", note: "Published Dashboard token runtime, revocation, refresh bounds, denial paths, and audit events are covered by the closed runtime slice."}
+  - {ac_range: "AC17", status: "follow_up_e2e_test_case_issues", evidence_ref: "docs/agents/e2e/test-case-issue-loop.md", note: "End-to-end MVP journey verification is handled through E2E test case issues, not a separate phase_full_e2e_and_qa phase."}
+
+compact_verification_summary:
+  ordering_check: "Workflow order is issue slices -> prd_phase_completeness_audit -> e2e_test_case_issue_loop -> phase_refactor."
+  coverage_result: "PRD #1 issue coverage is sufficient to leave issue generation and enter e2e_test_case_issue_loop before phase_refactor."
+  limitations: ["This audit does not claim AC17 is already satisfied; it records AC17 as the required E2E test case issue verification target."]
+
+next_recommended_step: "Convert E2E intents to GitHub issues via e2e_test_case_issue_loop, then proceed to phase_refactor after all test case issues pass."

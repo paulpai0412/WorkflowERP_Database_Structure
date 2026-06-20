@@ -1,0 +1,26 @@
+{
+  "checkpoint": "excel_field_formula_confirmation",
+  "status": "ready_for_review",
+  "source_files": [
+    "input.xlsx"
+  ],
+  "detected_fields": [
+    {
+      "name": "OrderDate",
+      "role": "dimension",
+      "source": "pivot_cache"
+    },
+    {
+      "name": "CustomerName",
+      "role": "dimension",
+      "source": "pivot_cache"
+    },
+    {
+      "name": "OrderAmount",
+      "role": "measure",
+      "source": "pivot_cache"
+    }
+  ],
+  "formula_notes": [],
+  "questions": []
+}

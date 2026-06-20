@@ -1,0 +1,44 @@
+schema_version: "1.0"
+kind: worker_result
+line_cap: 80
+raw_evidence_policy: index_only_refs_no_raw_logs_or_transcripts
+issue: {number: "28", title: "E2E: Validate dashboard builder MVP journey", url: "https://github.com/paulpai0412/wferp/issues/28"}
+branch: "agent/issue-28-ac17-e2e-test-case"
+status: "success"
+summary:
+  objective: "Materialize PRD #1 AC17 as one executable E2E target case for the Dashboard Builder MVP journey."
+  outcome: "Added one focused CLI/library pytest target case for E2E-001, then recorded compact worker artifacts after focused dashboard-builder self-checks passed and PR #29 was opened."
+files_changed:
+  - {path: "tests/skill_scripts/test_dashboard_builder_e2e.py", summary: "Covers the AC17 prompt-to-published-dashboard MVP journey and refusal gates before charting and publishing."}
+  - {path: "docs/agents/issue-packets/issue-28.yaml", summary: "Preserves the orchestrator-issued E2E issue packet on the branch."}
+  - {path: "docs/agents/e2e/test-case-catalog.yaml", summary: "Advances E2E-001 metadata to the active PR #29 worker state."}
+  - {path: "docs/agents/runtime/context-checkpoint.yaml", summary: "Points the workflow handoff at the issue #28 worker result and pending PR #29 verifier step."}
+  - {path: "docs/agents/worker-results/issue-28.yaml", summary: "Stores the structured worker result for the issue #28 E2E worker."}
+  - {path: "docs/agents/handoffs/issue-28.yaml", summary: "Provides the compact issue handoff for the orchestrator and fresh verifier."}
+test_case_repair:
+  applies: true
+  test_case_id: "E2E-001"
+  attempted_target_case: true
+  repaired_categories: ["test"]
+  failure_signature: "none"
+  assertion_changed: false
+  expected_outcome_changed: false
+verification:
+  note: "Worker self-checks support implementation feedback only; final acceptance comes from the verifier evidence packet."
+  gates: {tdd_gate: "pass", implementation_self_check_gate: "pass", git_gate: "pass"}
+  implementation_self_checks:
+    - command: "python3 -m pytest tests/skill_scripts/test_dashboard_builder_e2e.py tests/skill_scripts/test_governed_query.py tests/skill_scripts/test_chart_spec.py tests/skill_scripts/test_dashboard_canvas.py tests/skill_scripts/test_design_template_catalog.py tests/skill_scripts/test_dashboard_publish.py -q"
+      result: "pass"
+      evidence_ref: "local-worker:self-check-e2e-001-regression"
+      summary: "Target case plus the required regression bucket passed 46/46."
+  final_acceptance_claim: false
+evidence_packet_refs:
+  worker_artifact_bundle: "docs/agents/worker-results/issue-28.yaml"
+  verifier_packet: "docs/agents/evidence/issue-28-pr-29.yaml"
+  raw_evidence_policy: "stored_outside_main_agent_context"
+role_boundary: {actor_role: "issue_worker", may_execute_implementation_self_checks: true, may_execute_final_acceptance_qa: false, may_emit_final_verification: false, verifier_packet_required_for_completion: true}
+pr: {number: "29", url: "https://github.com/paulpai0412/wferp/pull/29", ready_for_review: true}
+blockers: ["Fresh verifier evidence for PR #29 is still required before AC17 can be claimed as passed for issue #28."]
+next_recommended_step: "Validate this worker result schema, then spawn a distinct verifier for PR #29 to rerun E2E-001 and its regression bucket."
+handoff: {repo_path: "docs/agents/handoffs/issue-28.yaml", github_summary_posted: false}
+metadata: {worker: "Sisyphus-Junior", worker_session_id: "worker-result:issue-28", completed_at: "2026-05-09T17:10:17+08:00"}

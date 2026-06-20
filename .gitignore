@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.playwright-mcp/
+prompt.txt
+
+# Local portable tool payloads and downloads. Keep small wrappers/scripts only.
+.tools/git/
+.tools/gh/
+.tools/downloads/
+
+# Local downloads, caches, and generated report runs.
+.download_wferp_*/
+.download_wferp_skill_*/
+.opencode/
+.pytest-tmp/
+.tmp/
+.wferp-llm-temp/
+pytest-cache-files-*/
+wferp-report-runs/
+
+# Runtime artifacts.
+*.sqlite3
+*.db
+*.log

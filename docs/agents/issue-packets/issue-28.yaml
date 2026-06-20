@@ -1,0 +1,62 @@
+schema_version: "1.0"
+kind: issue_packet
+line_cap: 80
+raw_evidence_policy: index_only_refs_no_raw_logs_or_transcripts
+
+issue:
+  number: "28"
+  title: "E2E: Validate dashboard builder MVP journey"
+  url: "https://github.com/paulpai0412/wferp/issues/28"
+  labels: [ready-for-agent, e2e-test-case]
+  parent: {type: "prd", reference: "https://github.com/paulpai0412/wferp/issues/1#AC17"}
+
+branch: {name: "agent/issue-28-ac17-e2e-test-case", base: "main"}
+objective: "Materialize PRD #1 AC17 as one executable E2E target case for the Dashboard Builder MVP journey."
+
+acceptance_criteria:
+  - {id: "AC1", text: "The repo contains or reuses one focused executable AC17 E2E target case that covers prompt to validated SQL, approved result, chart creation, canvas layout, template selection, final approval, token publication/viewing, bounded refresh, and revocation.", evidence_hint: "Verifier reruns the target case and records target_case_result."}
+  - {id: "AC2", text: "The target case checks at least one validation/refusal gate before charting or publishing, not only the happy path.", evidence_hint: "Verifier confirms pre-approval charting or pre-final-approval publishing is blocked."}
+  - {id: "AC3", text: "Worker result records test_case_repair for E2E-001 without claiming final acceptance or inlining raw logs.", evidence_hint: "Verifier reads docs/agents/worker-results/issue-28.yaml."}
+  - {id: "AC4", text: "Fresh verifier evidence records target case and regression bucket status with proof of separation.", evidence_hint: "Verifier writes docs/agents/evidence/issue-28-pr-<pr>.yaml."}
+
+test_case:
+  applies: true
+  id: "E2E-001"
+  source: {type: "prd_ac", ref: "#1 AC17"}
+  surface: "cli"
+  scenario: "Prompt-to-published-dashboard MVP journey through existing CLI/library surfaces."
+  expected_outcome: "Journey completes without bypassing validation gates; revoked token access is denied."
+  regression_bucket: ["test_governed_query", "test_chart_spec", "test_dashboard_canvas", "test_design_template_catalog", "test_dashboard_publish"]
+
+scope:
+  in: ["tests/skill_scripts", "skill_scripts", "docs/agents/e2e/test-case-catalog.yaml", "docs/agents/worker-results/issue-28.yaml"]
+  out: ["Browser UI implementation", "Changing AC17 expected behavior", "Pasting raw logs or traces into repo docs"]
+
+bootstrap_context:
+  required_reads: ["AGENTS.md", "docs/agents/autonomous-development-workflow.yaml", "docs/agents/e2e/test-case-issue-loop.md", "docs/prds/2026-05-06-workflow-erp-dashboard-builder.md"]
+  relevant_paths: ["skill_scripts/governed_query.py", "skill_scripts/chart_spec.py", "skill_scripts/dashboard_canvas.py", "skill_scripts/design_template_catalog.py", "skill_scripts/dashboard_publish.py", "tests/skill_scripts"]
+  prior_handoff: "docs/agents/evidence/phase-dashboard-builder-mvp.yaml"
+  context_budget: {checkpoint_warning_at_percent: 45, stop_and_rotate_at_percent: 50}
+
+implementation_notes:
+  constraints:
+    - "Issue worker may run target checks for implementation feedback only; final acceptance belongs to a fresh verifier."
+    - "Do not weaken assertions or change expected outcomes without opening/linking a spec repair issue."
+    - "Keep raw evidence index-only; no full logs, screenshots, SQL execution logs, or transcripts in repo docs/comments."
+    - "Use GIT_MASTER=1 prefix for git commands."
+  risks: ["Current MVP surface is CLI/library-based, not a browser authoring UI."]
+  dependencies: ["PRD #1 slice coverage passed; AC17 now requires E2E test case issue verification."]
+
+verification_plan:
+  worker_self_checks:
+    - {command: "python3 -m pytest tests/skill_scripts/test_governed_query.py tests/skill_scripts/test_chart_spec.py tests/skill_scripts/test_dashboard_canvas.py tests/skill_scripts/test_design_template_catalog.py tests/skill_scripts/test_dashboard_publish.py -q", purpose: "implementation feedback only", success_criteria: "Target case and focused regression bucket pass before worker returns."}
+  verifier_acceptance_checks:
+    required_gates: ["diagnostics_and_build_gate", "surface_qa_gate", "review_gate"]
+    automated_checks:
+      - {command: "rerun target E2E-001 case and regression bucket", success_criteria: "Verifier observes target_case=pass and regression_bucket=pass."}
+  verifier_manual_qa: {owner: "pr_verifier", surface: "cli", happy_path: "Run AC17 target journey", refusal_or_error_path: "Confirm a pre-approval gate blocks invalid order."}
+
+handoff_contract: {repo_path: "docs/agents/handoffs/issue-28.yaml", github_summary_required: true}
+result_contract: {template_path: "docs/agents/worker-result-template.yaml", verifier_template_path: "docs/agents/evidence-packet-template.yaml", allowed_statuses: [success, blocked, failed]}
+role_boundary: {orchestrator_may_validate_contract_only: true, worker_may_emit_final_acceptance: false, verifier_packet_required_for_completion: true}
+prepared_by: {actor: "Hephaestus", prepared_at: "2026-05-09T15:25:00+08:00"}

@@ -1,0 +1,58 @@
+schema_version: "1.0"
+kind: evidence_packet
+line_cap: 60
+raw_evidence_policy: index_only_manifest_no_raw_logs_or_traces
+
+subject:
+  type: issue_pr
+  issue_number: "16"
+  pr_number: "17"
+  phase: ""
+  branch: agent/issue-16-context-budget-release-worker
+
+verifier:
+  role: pr_verifier
+  session: fresh_verifier_not_worker_session
+  worker_session_excluded: ses_1fedd217cffeul2do36cJT0HPe
+
+proof_of_separation:
+  verifier_is_not_worker: true
+  worker_session_id: ses_1fedd217cffeul2do36cJT0HPe
+  verifier_session: fresh_pr_verifier
+  main_agent_ran_no_qa: true
+
+status: pass
+
+acceptance_criteria_matrix:
+  - {ac_id: "AC1", status: pass, evidence_ref: "scripts/agent_context_budget_check.py + docs/agents/runtime/context-checkpoint.yaml", note: "45/50 gates and checkpoint-only resume confirmed in workflow and checkpoint template; script gate passes."}
+  - {ac_id: "AC2", status: pass, evidence_ref: "docs/agents/autonomous-development-workflow.yaml#release_worker_policy + docs/agents/issue-tracker.md", note: "release_worker_policy defines verifier-pass, mergeability, required-checks, and human-approval gates; issue-tracker.md references release_worker and human merge approval."}
+  - {ac_id: "AC3", status: pass, evidence_ref: "scripts/agent_context_budget_check.py line-cap checks", note: "All 6 artifact files within declared caps (65/80, 64/80, 58/60, 41/80, 67/80, 35/35); index-only raw evidence policy present in workflow and templates."}
+  - {ac_id: "AC4", status: pass, evidence_ref: "scripts/agent_context_budget_check.py", note: "py_compile pass; script gate pass (6 caps + 3 policy files checked); script reads only text/line counts, no raw logs."}
+  - {ac_id: "AC5", status: pass, evidence_ref: "docs/agents/autonomous-development-workflow.yaml#priority_bridge + #main_agent_contract_validation_only", note: "main_agent_contract_validation_only and main_agent_direct_issue_or_phase_qa forbidden list remain explicit and unchanged."}
+
+gates:
+  diagnostics_and_build_gate: {status: pass, evidence_ref: "py_compile scripts/agent_context_budget_check.py — pass"}
+  surface_qa_gate: {status: pass, evidence_ref: "python3 scripts/agent_context_budget_check.py — context budget gate: pass"}
+  review_gate: {status: pass, evidence_ref: "policy doc review — all required text strings present"}
+  security_gate: {status: not_applicable, evidence_ref: "doc/script only; no secrets, credentials, or external calls"}
+
+role_boundary:
+  acceptance_qa_owner: pr_verifier
+  main_agent_ran_qa: false
+  worker_self_checks_are_not_final: true
+
+artifact_manifest:
+  bundle_ref: "local verifier run — no CI artifact bundle"
+  retention: ""
+  items:
+    - {id: "script-gate-run", kind: "summary", executor_role: "pr_verifier", path: "scripts/agent_context_budget_check.py", sha256: "", description: "Verifier ran py_compile and script gate; both pass"}
+    - {id: "line-cap-check", kind: "summary", executor_role: "pr_verifier", path: "docs/agents/evidence/issue-16-pr-17.yaml", sha256: "", description: "wc -l confirmed all 6 artifacts within declared caps"}
+    - {id: "policy-text-check", kind: "summary", executor_role: "pr_verifier", path: "docs/agents/autonomous-development-workflow.yaml", sha256: "", description: "grep confirmed all 8 required policy strings present"}
+
+compact_summary:
+  outcome: "All AC1-AC5 pass; PR #17 is ready for human review and merge."
+  automated_checks: "py_compile pass; script gate pass (6 caps, 3 policy files); all required policy strings confirmed present."
+  manual_qa: "Doc policy review confirms release_worker, checkpoint, and main-agent boundary policies are correctly defined and consistent."
+  risks_or_limitations: ["evidence-packet line count is 58/60 — within cap but close; future additions should trim."]
+
+next_recommended_step: "Main agent validates this evidence packet schema/refs, then spawns a release_worker to merge PR #17 and close issue #16 after human merge approval."

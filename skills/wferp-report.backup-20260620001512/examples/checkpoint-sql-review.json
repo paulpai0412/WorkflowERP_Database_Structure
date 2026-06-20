@@ -1,0 +1,11 @@
+{
+  "checkpoint": "sql_review",
+  "status": "approved_for_select_only_execution",
+  "sql_kind": "SELECT",
+  "source_object": "[CHD].[dbo].[View_Customer]",
+  "forbidden_tokens_found": [],
+  "review_notes": [
+    "Only SELECT is allowed against production."
+  ],
+  "smoke_test_sql": "SELECT TOP 1 1 AS connection_test"
+}

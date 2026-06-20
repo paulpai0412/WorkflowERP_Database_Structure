@@ -1,0 +1,48 @@
+{
+  "reason": "legacy_static_html_artifacts_quarantine",
+  "moved_at": "2026-06-18T04:53:44.280850+00:00",
+  "entries": [
+    {
+      "source": "index.html",
+      "destination": "legacy_static_docs/index.html",
+      "status": "moved",
+      "reason": "legacy_static_html_artifacts_quarantine",
+      "moved_at": "2026-06-18T04:53:44.280850+00:00"
+    },
+    {
+      "source": "df_style.css",
+      "destination": "legacy_static_docs/df_style.css",
+      "status": "moved",
+      "reason": "legacy_static_html_artifacts_quarantine",
+      "moved_at": "2026-06-18T04:53:44.280850+00:00"
+    },
+    {
+      "source": "HTML",
+      "destination": "legacy_static_docs/HTML",
+      "status": "moved",
+      "reason": "legacy_static_html_artifacts_quarantine",
+      "moved_at": "2026-06-18T04:53:44.280850+00:00"
+    },
+    {
+      "source": "_Source/3_CreateIndexHtml.py",
+      "destination": "legacy_static_docs/_Source/3_CreateIndexHtml.py",
+      "status": "moved",
+      "reason": "legacy_static_html_artifacts_quarantine",
+      "moved_at": "2026-06-18T04:53:44.280850+00:00"
+    },
+    {
+      "source": "_Source/4_CreateTableStructureHtml.py",
+      "destination": "legacy_static_docs/_Source/4_CreateTableStructureHtml.py",
+      "status": "moved",
+      "reason": "legacy_static_html_artifacts_quarantine",
+      "moved_at": "2026-06-18T04:53:44.280850+00:00"
+    },
+    {
+      "source": "_Source/5_CreateTableStructureSQL.py",
+      "destination": "legacy_static_docs/_Source/5_CreateTableStructureSQL.py",
+      "status": "moved",
+      "reason": "legacy_static_html_artifacts_quarantine",
+      "moved_at": "2026-06-18T04:53:44.280850+00:00"
+    }
+  ]
+}

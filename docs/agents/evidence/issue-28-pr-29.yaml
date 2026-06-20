@@ -1,0 +1,51 @@
+schema_version: "1.0"
+kind: evidence_packet
+line_cap: 60
+raw_evidence_policy: index_only_manifest_no_raw_logs_or_traces
+
+subject: {type: "issue_pr", issue_number: "28", pr_number: "29", branch: "agent/issue-28-ac17-e2e-test-case", sha: "0b31b289c633f8a80c144a7dd435ebf754df05fa"}
+verifier: {actor: "Sisyphus-Junior", actor_role: "pr_verifier", verifier_session_id: "pr-verifier:issue-28-pr-29-2026-05-09", started_at: "2026-05-09T17:20:00+08:00", completed_at: "2026-05-09T17:20:00+08:00"}
+
+proof_of_separation:
+  worker_result_ref: "docs/agents/worker-results/issue-28.yaml"
+  worker_actor: "Sisyphus-Junior"
+  worker_session_id: "worker-result:issue-28"
+  verifier_actor: "Sisyphus-Junior"
+  verifier_session_id: "pr-verifier:issue-28-pr-29-2026-05-09"
+  verifier_is_distinct_from_worker: true
+  verifier_read_worker_result_only: true
+
+status: "pass"
+
+test_case_verification:
+  applies: true
+  test_case_id: "E2E-001"
+  target_case: "pass"
+  regression_bucket: "pass"
+  failure_signature: "none"
+  artifact_manifest_ref: "docs/agents/evidence/issue-28-pr-29.yaml#artifact_manifest"
+  proof_of_separation_required: true
+
+gates:
+  diagnostics_and_build_gate: {status: "pass", evidence_ref: "verifier:python3 -m pytest tests/skill_scripts/test_dashboard_builder_e2e.py tests/skill_scripts/test_governed_query.py tests/skill_scripts/test_chart_spec.py tests/skill_scripts/test_dashboard_canvas.py tests/skill_scripts/test_design_template_catalog.py tests/skill_scripts/test_dashboard_publish.py -q"}
+  surface_qa_gate: {status: "pass", evidence_ref: "verifier reran E2E-001 on the CLI/library surface and confirmed query-approval + final-approval refusal gates in tests/skill_scripts/test_dashboard_builder_e2e.py"}
+  review_gate: {status: "pass", evidence_ref: "verifier reviewed PR #29 diff against issue #28 AC1-AC4 and found no goal, security, or role-boundary violations"}
+  security_gate: {status: "pass", evidence_ref: "verifier grep confirmed no pyright/type-ignore/@ts-ignore/@ts-expect-error/as any patterns in tests/skill_scripts/test_dashboard_builder_e2e.py"}
+
+role_boundary: {acceptance_qa_owner: "pr_verifier", main_agent_ran_issue_qa: false, worker_self_checks_are_not_final_acceptance: true}
+
+artifact_manifest:
+  bundle_ref: "local verifier run for PR #29"
+  retention: "Repo docs stay index-only; raw pytest output remains outside repo docs/comments."
+  items:
+    - {id: "compact-refs", kind: "summary", executor_role: "pr_verifier", path: "docs/agents/issue-packets/issue-28.yaml + docs/agents/worker-results/issue-28.yaml + docs/agents/handoffs/issue-28.yaml + docs/agents/e2e/test-case-catalog.yaml", sha256: "", description: "Compact workflow refs and role boundaries validated without importing worker transcripts."}
+    - {id: "target-case", kind: "summary", executor_role: "pr_verifier", path: "tests/skill_scripts/test_dashboard_builder_e2e.py", sha256: "", description: "AC17 target case covers prompt -> publish -> revoke and includes pre-approval refusal assertions."}
+    - {id: "pr-review", kind: "summary", executor_role: "pr_verifier", path: "https://github.com/paulpai0412/wferp/pull/29", sha256: "", description: "PR metadata/diff reviewed; verifier-owned artifacts only were updated after acceptance rerun passed 46/46."}
+
+compact_summary:
+  outcome: "PR #29 passes fresh verifier acceptance for issue #28; E2E-001 and its required regression bucket reran cleanly on the declared CLI/library surface."
+  automated_checks: "Verifier-owned pytest bucket passed 46/46; target test still contains query-approval and final-approval refusal gates with no new type-suppression patterns."
+  manual_qa: "Compact refs and PR diff confirm AC1-AC4 coverage, compact-doc policy compliance, and preserved worker/verifier role separation."
+  risks_or_limitations: ["This packet claims CLI/library acceptance only; it does not claim browser UI coverage."]
+
+next_recommended_step: "Hand PR #29 to release_worker or human merge review for mergeability/approval-policy evaluation; do not merge from this verifier step."

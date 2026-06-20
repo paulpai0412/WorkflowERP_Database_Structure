@@ -1,0 +1,57 @@
+schema_version: "1.0"
+kind: issue_packet
+line_cap: 80
+
+issue:
+  number: "20"
+  title: "Reconstruct governed query traceability artifacts"
+  url: "https://github.com/paulpai0412/wferp/issues/20"
+  labels: [ready-for-agent]
+  parent: {type: "prd", reference: "https://github.com/paulpai0412/wferp/issues/1"}
+
+branch: {name: "agent/issue-20-reconstruct-governed-query-traceability", base: "main"}
+objective: "Rebuild compact autonomous-workflow artifacts for issue #2 / PR #8 so PRD #1 coverage can be audited without missing traceability."
+
+acceptance_criteria:
+  - {id: "AC1", text: "Add a compact issue packet for retrospective traceability repair of issue #2 that points to merged PR #8 and stays within artifact caps.", evidence_hint: "Verifier reads docs/agents/issue-packets/issue-20.yaml and confirms compact scope and refs."}
+  - {id: "AC2", text: "Add a compact handoff for issue #2 that maps acceptance criteria to durable evidence refs without raw logs.", evidence_hint: "Verifier reads docs/agents/handoffs/issue-2.yaml and checks AC mapping + compact refs."}
+  - {id: "AC3", text: "Add a compact evidence packet for issue #2 / PR #8 with status, AC coverage, gates, artifact refs, and proof-of-separation fields, while calling out historical limitations.", evidence_hint: "Verifier reads docs/agents/evidence/issue-2-pr-8.yaml and confirms schema + historical-note language."}
+  - {id: "AC4", text: "Update runtime checkpoint and/or phase audit summary so PRD #1 coverage review can reference issue #2 artifacts.", evidence_hint: "Verifier reads docs/agents/runtime/context-checkpoint.yaml and any new audit summary for issue #20 continuation state."}
+  - {id: "AC5", text: "Keep raw logs, traces, and transcripts outside repo docs; store only compact refs.", evidence_hint: "Verifier checks artifact text for index-only refs and absence of raw logs."}
+
+scope:
+  in: ["docs/agents/issue-packets/issue-20.yaml", "docs/agents/handoffs/issue-2.yaml", "docs/agents/evidence/issue-2-pr-8.yaml", "docs/agents/runtime/context-checkpoint.yaml", "compact audit summary if needed"]
+  out: ["Re-implementing governed query product code", "Running final product QA as main agent", "Pasting raw test logs or full transcripts into repo docs"]
+
+bootstrap_context:
+  required_reads: ["AGENTS.md", "docs/agents/autonomous-development-workflow.yaml", "docs/prds/2026-05-06-workflow-erp-dashboard-builder.md", "docs/agents/runtime/context-checkpoint.yaml", "docs/agents/evidence/issue-3-pr-11.yaml", "docs/agents/evidence/issue-5-pr-15.yaml", "docs/agents/evidence/issue-6-pr-18.yaml"]
+  relevant_paths: ["docs/agents", "docs/prds", "skill_scripts/governed_query.py", "tests/skill_scripts/test_governed_query.py"]
+  prior_handoff: "docs/agents/handoffs/issue-6.yaml"
+  context_budget: {checkpoint_warning_at_percent: 45, stop_and_rotate_at_percent: 50}
+
+implementation_notes:
+  constraints:
+    - "This is workflow self-repair only; rebuild traceability artifacts from existing issue #2 / PR #8 evidence sources."
+    - "Do not claim fresh product verification that did not happen; clearly label retrospective or historical evidence where needed."
+    - "Keep artifact payloads compact and index-only; no raw logs, screenshots, or full transcripts."
+    - "Use GIT_MASTER=1 prefix for git commands."
+  risks: ["Historical PR #8 verification lived in GitHub PR text rather than repo-local evidence packet, so retrospective packets must be explicit about limitations."]
+  dependencies: ["Closed: issue #2 Governed query evidence path merged via PR #8."]
+
+verification_plan:
+  worker_self_checks:
+    - {command: "python3 scripts/agent_context_budget_check.py", purpose: "implementation feedback only", success_criteria: "Updated workflow artifacts stay within declared caps and required fields remain present."}
+  verifier_acceptance_checks:
+    required_gates: ["diagnostics_and_build_gate", "surface_qa_gate", "review_gate"]
+    automated_checks:
+      - {command: "python3 scripts/agent_context_budget_check.py", success_criteria: "Verifier observes pass after issue #20 artifacts are written."}
+  verifier_manual_qa:
+    owner: "pr_verifier"
+    surface: "docs-script"
+    happy_path: "Read issue #20 packet plus issue #2 handoff/evidence and confirm PRD audit can map AC1-AC5 to issue #2 refs."
+    refusal_or_error_path: "Confirm no raw logs were inlined and any historical limitations are explicitly disclosed rather than hidden."
+
+handoff_contract: {repo_path: "docs/agents/handoffs/issue-20.yaml", github_summary_required: true}
+result_contract: {template_path: "docs/agents/worker-result-template.yaml", verifier_template_path: "docs/agents/evidence-packet-template.yaml", allowed_statuses: [success, blocked, failed]}
+role_boundary: {orchestrator_may_validate_contract_only: true, worker_may_emit_final_acceptance: false, verifier_packet_required_for_completion: true}
+prepared_by: {actor: "Hephaestus", prepared_at: "2026-05-07T18:00:00+08:00"}

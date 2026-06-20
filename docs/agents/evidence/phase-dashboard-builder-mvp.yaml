@@ -1,0 +1,45 @@
+schema_version: "1.0"
+kind: evidence_packet
+line_cap: 60
+raw_evidence_policy: index_only_manifest_no_raw_logs_or_traces
+
+subject: {type: "phase", issue_number: "", pr_number: "", phase: "dashboard-builder-mvp", branch: "agent/issue-continuation-runner", sha: "b2a3c5d36965f8c026354eca65135dfce48067a2"}
+verifier: {actor: "OpenCode", actor_role: "phase_verifier", verifier_session_id: "phase-verifier:dashboard-builder-mvp-ac17-2026-05-08", started_at: "2026-05-08T23:01:03+08:00", completed_at: "2026-05-08T23:01:03+08:00"}
+
+proof_of_separation:
+  worker_result_ref: "docs/agents/runtime/context-checkpoint.yaml + docs/agents/worker-results/issue-6.yaml"
+  worker_actor: "Hephaestus/main_orchestrator + prior issue workers"
+  worker_session_id: "checkpoint-only-resume"
+  verifier_actor: "OpenCode"
+  verifier_session_id: "phase-verifier:dashboard-builder-mvp-ac17-2026-05-08"
+  verifier_is_distinct_from_worker: true
+  verifier_read_worker_result_only: false
+
+status: "pass"
+
+acceptance_criteria_matrix:
+  - {ac_id: "AC17", status: "pass", evidence_ref: "docs/agents/handoffs/issue-2.yaml + docs/agents/handoffs/issue-3.yaml + docs/agents/handoffs/issue-4.yaml + docs/agents/handoffs/issue-5.yaml + docs/agents/handoffs/issue-6.yaml + phase verifier real CLI/API run", note: "Fresh phase verification observed prompt -> validated SQL -> approved result -> chart creation -> grid canvas -> Design Template selection -> final approval -> publish -> token view -> bounded refresh -> revoke, while pre-approval chart creation and pre-approval publish remained blocked."}
+
+gates:
+  diagnostics_and_build_gate: {status: "pass", evidence_ref: "pytest tests/skill_scripts/{test_governed_query,test_chart_spec,test_dashboard_canvas,test_design_template_catalog,test_dashboard_publish}.py -q (45 passed) + py_compile selected skill_scripts modules + docker start/seed wferp-mssql-test"}
+  surface_qa_gate: {status: "pass", evidence_ref: "python3 -m skill_scripts.cli_generate_select --governed-query-json against test DB + fresh phase verifier public API driver"}
+  review_gate: {status: "pass", evidence_ref: "phase verifier scope review against PRD #1 AC17 and completed slice handoffs"}
+  security_gate: {status: "pass", evidence_ref: "read-only test DB execution only; no repo secrets added; revoked token denial observed"}
+
+role_boundary: {acceptance_qa_owner: "phase_verifier", main_agent_ran_issue_qa: false, worker_self_checks_are_not_final_acceptance: true}
+
+artifact_manifest:
+  bundle_ref: "local phase verifier run 2026-05-08"
+  retention: "Repo docs keep compact refs only; raw command output stays outside repo docs."
+  items:
+    - {id: "phase-cli-governed-query", kind: "summary", executor_role: "phase_verifier", path: "python3 -m skill_scripts.cli_generate_select", sha256: "", description: "Real test-DB governed query CLI returned ACTMK 2026 budget evidence with required columns and aggregate check."}
+    - {id: "phase-public-api-driver", kind: "summary", executor_role: "phase_verifier", path: "python3 inline phase driver", sha256: "", description: "Fresh verifier chained approval gating, chart drafts, canvas placement, template selection, publish, token view, bounded refresh, and revoked-link denial."}
+    - {id: "phase-regression-suite", kind: "summary", executor_role: "phase_verifier", path: "tests/skill_scripts/test_governed_query.py + test_chart_spec.py + test_dashboard_canvas.py + test_design_template_catalog.py + test_dashboard_publish.py", sha256: "", description: "Cross-issue MVP regression suite passed 45/45."}
+
+compact_summary:
+  outcome: "AC17 passes for the current dashboard-builder-mvp MVP surfaces."
+  automated_checks: "Cross-issue regression tests passed 45/45, selected modules compiled, the SQL Server test container was started/seeded, and the governed-query CLI executed against the real test DB."
+  manual_qa: "Fresh phase verification completed the full prompt-to-published-dashboard journey and confirmed both chart-before-approval and publish-before-final-approval gates."
+  risks_or_limitations: ["Current MVP verification surface is CLI/library-based rather than a browser authoring UI; this packet does not claim a separate web UI E2E flow."]
+
+next_recommended_step: "Main orchestrator should record AC17 as satisfied, then proceed to phase_refactor or documentation_and_tracker_update."

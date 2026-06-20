@@ -1,0 +1,35 @@
+schema_version: "1.0"
+kind: issue_handoff
+line_cap: 35
+issue_identity:
+  number: "6"
+  title: "Published Dashboard Link and view-only runtime"
+  url: "https://github.com/paulpai0412/wferp/issues/6"
+  branch: "agent/issue-6-published-dashboard-link-runtime"
+  pr: "https://github.com/paulpai0412/wferp/pull/18"
+acceptance_criteria_evidence:
+  - {ac_id: "AC1", status: pass, evidence_ref: "docs/agents/evidence/issue-6-pr-18.yaml#AC1", note: "Fresh verifier observed opaque token scoped to dashboard-1/version 1."}
+  - {ac_id: "AC2", status: pass, evidence_ref: "docs/agents/evidence/issue-6-pr-18.yaml#AC2", note: "Fresh verifier rendered a valid link as view-only with no authoring controls."}
+  - {ac_id: "AC3", status: pass, evidence_ref: "docs/agents/evidence/issue-6-pr-18.yaml#AC3", note: "Fresh verifier observed safe denial for malformed, malformed-expiration, revoked, expired, and unpublished cases."}
+  - {ac_id: "AC4", status: pass, evidence_ref: "docs/agents/evidence/issue-6-pr-18.yaml#AC4", note: "Fresh verifier observed read-only view/refresh calls and bounded refresh success."}
+  - {ac_id: "AC5", status: pass, evidence_ref: "docs/agents/evidence/issue-6-pr-18.yaml#AC5", note: "Fresh verifier observed too-fast/too-slow interval refusal plus safe stale_error refresh handling."}
+  - {ac_id: "AC6", status: pass, evidence_ref: "docs/agents/evidence/issue-6-pr-18.yaml#AC6", note: "Fresh verifier confirmed stable audit events for create, deny, revoke, expire, and refresh/view failures."}
+compact_verification_summary:
+  status: pass
+  diagnostics_and_build_gate: "pass: py_compile, focused pytest (13/13), and lsp_diagnostics were clean on the current PR head."
+  surface_qa_gate: "pass: public library driver covered happy path, denial/error path, bounded refresh, and stale_error handling on HEAD 8d753fa."
+  review_gate: "pass: lightweight verifier review and focused security review found no blocking merge concerns."
+evidence_packet_refs:
+  verifier_packet: "docs/agents/evidence/issue-6-pr-18.yaml"
+  verifier_session_id: "pr18-verify-2026-05-07T07:34:31Z"
+  worker_result: "docs/agents/worker-results/issue-6.yaml"
+  superseded_prior_packet: "docs/agents/evidence/issue-6.yaml"
+  raw_evidence_policy: "Raw verifier logs stay outside repo docs; only compact refs are kept here."
+files_changed_summary:
+  - {path: "skill_scripts/dashboard_publish.py", summary: "Published-link runtime adds safe denial, view failure, bounded refresh, and audit behavior."}
+  - {path: "tests/skill_scripts/test_dashboard_publish.py", summary: "Focused public-interface tests cover all issue #6 link/runtime acceptance paths."}
+  - {path: "docs/agents/evidence/issue-6-pr-18.yaml", summary: "Fresh verifier-owned acceptance evidence for PR #18 on HEAD 8d753fa."}
+  - {path: "docs/agents/evidence/issue-6.yaml", summary: "Prior stale verifier packet retained only as superseded history."}
+blockers_or_risks:
+  - "Bearer-token links remain intentionally out of scope for authenticated RBAC and browser UI."
+next_recommended_step: "Human reviewer may use docs/agents/evidence/issue-6-pr-18.yaml for merge review of PR #18."
