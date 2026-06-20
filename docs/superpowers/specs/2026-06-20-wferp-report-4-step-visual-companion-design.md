@@ -30,6 +30,10 @@ This is a UI and workflow presentation redesign, not a replacement for the origi
 
 When these capabilities are available, they are mandatory for their ownership areas. If unavailable, the agent must stop and ask before falling back. It must not silently hand-roll a static checkpoint page, generic JSON viewer, fake Excel preview, or fake `.xlsx` delivery.
 
+Visual Companion UI and final HTML report UI must be dynamically designed and implemented with `Build Web Apps` plus `Build Web Data Visualization` when those plugin capabilities are available. The WFERP skill may provide structured payloads and safety gates, but it must not hand-roll static checkpoint HTML, generic JSON pages, fake charts, or fake report previews as a substitute.
+
+Dynamic UI generation must preserve the original harness contract: current-run routing, POST confirmation, prompt-based repair, selectedOptions, confirmation identity checks, and `wait-confirmation` compatibility.
+
 ## Internal 13 Phases
 
 The internal harness remains:
@@ -230,6 +234,9 @@ The companion may render an Excel-like preview, but final Excel delivery must be
 
 - Use Traditional Chinese user-facing labels.
 - Default view shows report content, data previews, and workbook previews.
+- Visual Companion pages must be generated as dynamic web UI from current-run structured payloads. Static HTML mocks, stale screenshots, generic JSON viewers, and hardcoded sample screens are invalid.
+- Use `Build Web Apps` for user interaction structure, responsive layout, prompt repair controls, confirmation actions, and final HTML app shell when available.
+- Use `Build Web Data Visualization` for real-data KPI, chart, table, pivot-like preview, and report visualization design when available.
 - JSON and technical evidence are hidden behind expandable details.
 - Tables support at least 50-row preview, horizontal scrolling, sticky headers, and clear source labels.
 - Charts and KPI blocks must use real current-run data once Step 3 is reached.
@@ -241,6 +248,9 @@ The companion may render an Excel-like preview, but final Excel delivery must be
 
 The UI is simplified; validators are not simplified away.
 
+- Validators must keep the original subagent/fresh reviewer design.
+- The main agent may orchestrate, route, and summarize validator results, but must not self-certify validator pass.
+- Each required validator must be produced by a fresh reviewer/subagent invocation and must record reviewer identity, input artifact paths, checked scope, timestamp, status, findings, required fixes, and residual risks.
 - Validators still run at their technical gates.
 - Validator evidence is grouped by 4 user steps for readability.
 - A user step cannot advance if any required validator for its internal phase coverage is `fail` or `blocked`.
