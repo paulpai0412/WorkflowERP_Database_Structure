@@ -45,6 +45,10 @@ def test_creates_run_directory_with_state_json(tmp_path: Path):
     assert persisted["prompt"] == "請產出費用分析"
     assert persisted["input_files"] == ["需求.xlsx"]
     assert state["user_confirmations"] == {}
+    assert persisted["current_user_step"] == 1
+    assert persisted["current_internal_phase"] == 0
+    assert persisted["delivery_status"] == "not_ready"
+    assert persisted["allowed_next_actions"] == ["prepare_source_logic"]
 
 
 def test_create_report_run_rejects_existing_run_id(tmp_path: Path):

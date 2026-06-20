@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from skill_scripts.harness_state_machine import initialize_state_machine
+
 
 CHECKPOINT_DEFINITIONS: dict[str, dict[str, Any]] = {
     "excel_confirmation": {
@@ -146,6 +148,7 @@ def create_report_run(
         "created_at": _now(),
         "updated_at": _now(),
     }
+    state = initialize_state_machine(state)
     _write_json(_state_path(run_dir), state)
     return state
 
