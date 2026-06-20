@@ -76,6 +76,18 @@ pytest tests/skill_scripts/ -v
 pytest tests/skill_scripts/test_schema_loader.py -v
 ```
 
+## Pytest on Windows
+- Keep `pytest.ini` with `addopts = -p no:cacheprovider`. On this workstation, pytest's cache provider can create unreadable `pytest-cache-files-*` temp directories because of Windows/domain ACL behavior.
+- Keep the Windows workaround in `tests/conftest.py`. Pytest's built-in `tmp_path` flow calls `Path.mkdir(mode=0o700)` for `--basetemp` and per-test temp folders; on this machine that mode creates directories the current user cannot scan or delete, causing `WinError 5` during fixture setup or session cleanup.
+- Do not "fix" pytest by deleting or bypassing `tmp_path` tests. The repo-level fix converts Windows-only `mode=0o700` temp mkdir calls to `0o777` during tests.
+- Prefer running pytest through the bundled/runtime Python already used by Codex when PATH is uncertain.
+- If stale `.pytest-*`, `.pytest_cache`, `pytest-tmp-*`, `pytest-cache-files-*`, or `python-temp-check` directories are unreadable, first verify the resolved absolute target path is inside the current worktree, then reset ownership/ACL and remove only those temp directories. Never run broad recursive cleanup outside the verified worktree.
+- A clean representative check is:
+
+```bash
+python -m pytest tests/skill_scripts/test_report_harness_state.py::test_creates_run_directory_with_state_json tests/skill_scripts/test_excel_workbook_exporter.py tests/skill_scripts/test_validator_contracts.py -q --basetemp .pytest-fixed-check
+```
+
 ## Production Database Safety
 - The current workstation database connection points at the production database.
 - Treat `C:/Users/ivychi/util/test/css04 CHD View_Customer.odc` and any local Workflow ERP database connection as production unless the user explicitly provides a verified test connection.
