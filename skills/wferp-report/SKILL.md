@@ -14,7 +14,7 @@ explicitly provides a verified test database.
 Canonical production connection evidence:
 
 - ODC attachment: `C:/Users/ivychi/util/test/css04 CHD View_Customer.odc`
-- Excel attachment: `C:/Users/ivychi/util/test/1 ??_????????_CHD.XLSX`
+- Excel attachment: user-provided workbook attachment for the current run
 - Provider: `SQLOLEDB.1`
 - Authentication: `Integrated Security=SSPI`
 - User ID in the workbook connection string: `IRO`
@@ -45,6 +45,107 @@ non-production environment.
 Excel 在本 skill 中可能同時是來源資料欄位、lookup 對照表、公式邏輯、舊管理報表模板、人工加工痕跡與格式提示。預設不逐格複製 Excel；除非使用者明確要求，Excel 公式是理解報表語意的來源，而不是最終必須逐格重現的交付目標。
 
 最終交付預設包含：single-file HTML 管理報告、Excel-like summary/template view、read-only SQL、data preview、SQLite enrichment evidence、validator evidence、residual risks 與可重播的 report payload。
+
+---
+
+## Beautiful-Article Style Harness Contract
+
+本 skill 參考 `beautiful-article` 的 harness 作法：**檔案是長期記憶、checkpoint 是硬停點、使用者決策不可靜默代選、reviewer / validator 不可由主 agent 自評取代**。WFERP 報表仍維持本文件的 13 個 phase；「簡化」只能簡化使用者看到的互動負擔，不能刪除 phase、evidence、validator、Visual Companion 的確認/修改機制或 SQL safety gate。
+
+### 不可再犯的紅旗
+
+以下任一情況都必須停止並修正，不得繼續往下跑：
+
+- 把 13 phase 改成 4 phase，或未經使用者明確批准合併 / 刪除 gate。
+- 用靜態 HTML、舊 run 頁面、截圖或文字摘要取代 Visual Companion 的互動 checkpoint。
+- Visual Companion 只有展示，沒有 `confirm / request changes` POST、comments、selectedOptions、checkpoint history 與 persisted confirmation。
+- 開啟的 companion URL 不是目前 run / current checkpoint，或沿用舊 confirmation。
+- 欄位很多時只顯示部分欄位，卻未提供完整欄位表、橫向捲動、欄位分類與公式 lineage。
+- 有公式、lookup、manual-only、format-only 或 unresolved 欄位，卻沒有在 HTML checkpoint 以中文說明來源、邏輯與處理方式。
+- data preview 只有 JSON 路徑或摘要，沒有表格顯示至少數筆資料、欄位名、row count、source summary。
+- validator 由主 agent 自己宣稱通過，未以 reviewer/subagent artifact 寫入 `review/validators/`。
+- validator fail / blocked 仍推進下一 phase，或一次性等到最後才驗證全部。
+- 中文 prompt / workbook path / payload 經 PowerShell command-line argument 傳遞造成亂碼；大量中文內容必須透過 UTF-8 檔案或 structured payload 傳遞。
+- Production DB 查詢前未完成 SQL Review checkpoint、SQL safety validator、schema mapping validator 與使用者同意。
+- 對 production DB 執行任何非 `SELECT` SQL，包含 DML、DDL、stored procedure、transaction-changing command。
+- Checkpoint、validator、gating、report design 或測試資料寫死特定 business domain、customer、database、table、view 或欄位，而不是從使用者 prompt、uploaded files、Normalized Report Plan 與 schema evidence 讀取。
+
+### Phase 推進規則
+
+每一個 phase 只能在自己的 gate 完成後推進。不得「先做後補」checkpoint 或 validator。
+
+| 節點 | 推進條件 | 不得取代 |
+|---|---|---|
+| Phase 1/2 -> Phase 3 | source / Excel / schema / chart planning artifacts 已落地；required validators pass | 聊天摘要、口頭理解 |
+| Phase 3 -> Phase 4 | Visual Companion current checkpoint 已顯示；使用者 POST 確認；confirmation mtime 屬於目前 checkpoint | 舊頁面、舊 confirmation、文字說「已按」但沒有檔案 |
+| Phase 4 -> Phase 5 | SQL 為單一 SELECT；sql safety + schema mapping validators pass；使用者同意查詢 | smoke test、主 agent 自評 |
+| Phase 5 -> Phase 6 | DB execution evidence、raw rows、columns、row count、duration、SQLite raw table 已落地；db validator pass | 空資料、mock、只存 SQL |
+| Phase 6 -> Phase 7 | Raw/enriched data preview table 已顯示；aggregate/lookup/formula checks 已揭露；data validators pass；使用者確認 | JSON-only preview、只顯示欄位清單 |
+| Phase 7 -> Phase 8 | 使用者選定 report type/design/chart/table/layout options；report design validators pass | 預設代選、只存 JSON、不渲染選項 |
+| Phase 8/9 -> Phase 10 | report payload、sections、Excel-like view、SQL/data lineage 完整 | 手工拼 HTML、無 lineage 數字 |
+| Phase 10 -> Phase 12 | report content、visual、React technical、delivery validators pass；必要時有桌面/手機視覺證據 | 主 agent 肉眼說看起來可 |
+| Phase 12 -> 完成 | Final Visual Companion 顯示 HTML、evidence、validator status、residual risks；使用者接受 | 未確認即交付 |
+
+### Checkpoint 問題必須拆開
+
+每個 checkpoint 可推薦選項，但不可把多個決策包成一個「OK」。若工具支援選項，使用獨立問題；若只能用 HTML companion，頁面上也必須用獨立區塊與欄位保存答案。
+
+- Phase 3 至少拆成：欄位/來源理解、公式與 lookup 邏輯、manual/unresolved 欄位處置、初步 report type、chart/layout 初稿、residual risk。
+- Phase 4 至少拆成：是否同意此 SELECT、DB target 是否正確、filters/joins/aggregates 是否符合需求、哪些 formula/enrichment 不下推 SQL、SQL residual risk。
+- Phase 6 至少拆成：raw table preview 是否正確、enriched/SQLite preview 是否正確、aggregate/lookup/formula check 是否正確、缺值或異常是否接受。
+- Phase 7 至少拆成：report type、design style、chart set、table behavior、Excel-like view、章節順序。
+- Phase 12 至少拆成：final HTML 接受與否、warning/residual risk 接受與否、SQLite retention 選擇、是否需要再修正。
+
+### Visual Companion 最低契約
+
+Visual Companion 是互動工作台，不是展示檔。必須保留原本可直接回給 Codex agent 的確認與修改機制：
+
+- 使用目前 run 的 current checkpoint URL；不得開舊 run。
+- 頁面可 POST `confirmed` / `changes_requested`、comments、selectedOptions 與 timestamp。
+- Confirmation 必須同時比對 `run_id`、`checkpoint_id`、`payload_hash`、`confirmation_id`、`created_at`、`confirmed_at`；任一不符即視為未確認。
+- 頁面顯示中文使用者導向內容，JSON 預設隱藏到 technical details。
+- 欄位、資料與設計選項要真正渲染成 table / chart / block preview；不可只列 JSON 或欄位名稱。
+- 欄位超過畫面時使用完整表格、sticky header、橫向捲動與搜尋/篩選，不得截斷成少數欄位。
+- 公式欄位必須顯示公式語意、依賴欄位、是否下推 SQL、是否改由 SQLite/enrichment/report 層處理。
+- Data preview 至少顯示數筆資料列、欄位名、row count、source / enriched 標籤、lookup miss 與 aggregate check。
+- Report design checkpoint 必須依使用者 prompt 即時渲染候選報表區塊、圖表與表格樣貌，而不是讓使用者讀 JSON。
+- Visual Companion 功能變更後必須做 smoke test：current checkpoint URL、POST confirm、POST request changes、comments、selectedOptions、confirmation persistence 全部可用。
+
+### Validator 執行規則
+
+Validator 是逐 gate 的獨立 reviewer，不是最後一次總審，也不是主 agent 自評。
+
+- Required validator 必須在對應 phase 完成後立即跑；pass 才能推進下一 phase。
+- Reviewer / subagent 產物必須寫入 `review/validators/*.json`，格式符合本文件的 validator JSON contract。
+- Reviewer 必須是 fresh reviewer/subagent invocation，並在 evidence 中記錄 reviewer identity、input artifact paths、timestamp 與 checked scope；主 agent 只能彙整結果，不能把自己的判斷寫成 validator pass。
+- 可合併 reviewer 只有在使用者明確批准，且輸出仍需分 gate、分 status、分 required_fixes；不得因此跳過任何 gate。
+- `warning` 可進入下一個可逆準備步驟，但 final delivery 前必須在 Visual Companion 明確讓使用者接受 residual risk。
+- `fail` / `blocked` 只能進 Phase 11 repair；repair 後只重跑受影響 validator 與必要下游 validator。
+- 內容、資料、SQL 或 HTML 在 validator 後有任何變更，受影響 validator 即失效，必須重跑。
+
+### 中文與工具契約
+
+- 回覆使用者、checkpoint、report UI 預設使用繁體中文。
+- 不在 PowerShell command-line argument 中塞大型中文 prompt、workbook 摘要、JSON payload 或 HTML；改用 UTF-8 檔案輸入。
+- 檔案必須以 UTF-8 寫入；validator/final-review/manifest JSON 必須能 parse，且不得含 mojibake、連續問號替代中文字。
+- 亂碼零容忍掃描範圍至少包含 checkpoint payload、report payload、HTML、validator JSON、manifest、SQL readable labels、檔名顯示、chart/table labels 與 final review。
+- 進 repo 後先啟用 `.tools/activate.ps1`，確保 portable `git`、`gh`、`python`、`pytest` 可用。
+
+### Domain-Agnostic Gate Rule
+
+本 skill 是通用 WFERP 報表 harness，不可把 validator、gating、checkpoint、chart/table defaults 或 UAT scenario 寫死成特定 business domain。即使目前範例是財務、訂單、CHD、View_Customer，正式流程也必須從當次 `source/source-inventory.json`、`plan/normalized-report-plan.json`、schema evidence、SQL evidence 與使用者 prompt 取得 domain context。
+
+禁止項目：
+
+- 在 validator 內硬編 `財務`、`訂單`、`CHD`、`View_Customer`、特定欄位或特定公司名稱作為 pass/fail 條件。
+- 在 Visual Companion 或 report design 中硬套固定業務格式，導致其他 WFERP 場景無法使用。
+- 在測試或 UAT 中只驗證單一 domain，卻宣稱 generic harness 通過。
+
+允許項目：
+
+- 使用當次 workbook / SQL / schema evidence 中實際出現的 domain label。
+- 在範例文件中標示為 sample，但不得讓 sample 影響 gate logic。
+- 針對某個使用者任務產出 domain-specific report；但 harness 本身與 validator 必須保持 generic。
 
 ---
 

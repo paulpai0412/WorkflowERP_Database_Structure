@@ -1643,6 +1643,61 @@ def test_cli_sqlite_enrichment_flow_writes_raw_and_enriched_checkpoints(tmp_path
     assert imported.returncode == 0, imported.stderr
     imported_payload = json.loads(imported.stdout)
     assert imported_payload["imported_row_count"] == 1
+    assert imported_payload["ignored_row_count"] == 5
+    lookup_table = imported_payload["table_name"]
+    state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+    assert state["sqlite_manifest"]["lookup_row_counts"] == {lookup_table: 1}
+    assert state["sqlite_manifest"]["ignored_lookup_rows"][lookup_table][0]["reason"] == "header_or_metadata"
+
+    raw_rows = tmp_path / "raw-rows.json"
+    raw_rows.write_text('[{"account_code":"6111","amount":100}]', encoding="utf-8")
+    raw = _run_cli(["write-raw-table", "--run-dir", str(run_dir), "--rows", str(raw_rows)], cwd=Path.cwd())
+    assert raw.returncode == 0, raw.stderr
+
+    raw_preview = _run_cli(["write-raw-preview", "--run-dir", str(run_dir)], cwd=Path.cwd())
+    assert raw_preview.returncode == 0, raw_preview.stderr
+    raw_payload = json.loads(raw_preview.stdout)
+    assert raw_payload["checkpoint"] == "raw_data_preview"
+    assert raw_payload["payload"]["row_count"] == 1
+    assert raw_payload["payload"]["columns"] == ["account_code", "amount"]
+
+    enriched = _run_cli(
+        [
+            "run-sqlite-enrichment",
+            "--run-dir",
+            str(run_dir),
+            "--computed-columns",
+            '[{"name":"amount_twice","expression":"raw.\\"amount\\" * 2"}]',
+            "--lookup-columns",
+            (
+                '[{"name":"expense_category","lookup_table":"'
+                + lookup_table
+                + '","raw_key":"account_code","lookup_key":"account_code","lookup_value":"expense_category"}]'
+            ),
+        ],
+        cwd=Path.cwd(),
+    )
+    assert enriched.returncode == 0, enriched.stderr
+
+    enriched_preview = _run_cli(["write-enriched-preview", "--run-dir", str(run_dir)], cwd=Path.cwd())
+    assert enriched_preview.returncode == 0, enriched_preview.stderr
+    enriched_payload = json.loads(enriched_preview.stdout)
+    assert enriched_payload["checkpoint"] == "enriched_data_preview"
+    assert enriched_payload["payload"]["sample_rows"] == [
+        {
+            "account_code": "6111",
+            "amount": 100,
+            "expense_category": "8.租金支出",
+            "amount_twice": 200,
+        }
+    ]
+
+    retention = _run_cli(["write-sqlite-retention", "--run-dir", str(run_dir)], cwd=Path.cwd())
+    assert retention.returncode == 0, retention.stderr
+    retention_payload = json.loads(retention.stdout)
+    assert retention_payload["checkpoint"] == "sqlite_retention"
+    table_names = {item["table_name"] for item in retention_payload["payload"]["tables"]}
+    assert lookup_table in table_names
 
 
 def test_cli_classify_workbook_accepts_current_session_payload(tmp_path: Path):
