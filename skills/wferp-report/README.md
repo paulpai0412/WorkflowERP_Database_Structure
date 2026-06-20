@@ -1,5 +1,20 @@
 # wferp-report
 
+## 13-Phase Engine, 4-Step Visual Companion
+
+The technical harness still has 13 phases. The user-facing Visual Companion is simplified to 4 steps only:
+
+1. Source-to-Output Logic
+2. SQL Query
+3. Data Result and Report Design
+4. Final Delivery
+
+This simplification is UI-only. It does not remove SQL safety, SQLite enrichment, lookup tables, validators, repair flow, state gates, Visual Companion confirmation/modify controls, or delivery evidence.
+
+## True Excel Output
+
+When Excel output is requested, generate a real `.xlsx` workbook and evidence. Use the spreadsheets skill and `@oai/artifact-tool`; do not default to `openpyxl`. The workbook export must update `state.json` with `final_xlsx_path` and `excel_workbook_evidence`.
+
 `wferp-report` 是 Workflow ERP / WFERP 的 LLM-driven report harness。它把使用者 prompt、uploaded files、Excel 欄位與公式、WFERP schema/relationship、read-only SQL、DB execution、SQLite enrichment、data preview、report type/design/options、React renderer、single-file HTML 與 subagent validator evidence 串成一條可驗證流程。
 
 執行本 skill 就是執行 harness flow。不要只產出一段 SQL 後停止；必須建立 run、產生 checkpoint、等待 user confirmation、保存資料預覽與 validator evidence，最後才 delivery。

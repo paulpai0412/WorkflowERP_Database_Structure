@@ -38,6 +38,30 @@ Read `references/db-config.md` before any DB-backed phase. If a requested SQL
 operation is not SELECT-only, stop and ask the user for a verified
 non-production environment.
 
+## 13-Phase Engine, 4-Step User UI
+
+The internal harness keeps the 13 technical phases. The Visual Companion exposes only 4 user-facing steps:
+
+1. Source-to-Output Logic
+2. SQL Query
+3. Data Result and Report Design
+4. Final Delivery
+
+The user-facing 4 steps do not remove technical phases, validators, SQLite enrichment, lookup handling, SQL safety, repair, or delivery evidence. Each 4-step page is an aggregation over current-run artifacts and `state.json`, not a replacement for the harness.
+
+Step 3 must render real current-run raw and enriched data tables. The default visible preview is 50 rows, with total row count and source labels still shown.
+
+## Required Capability Ownership
+
+- Use Build Web Apps for Visual Companion UI, prompt repair controls, confirmation UX, responsive layout, and final HTML app shell when available.
+- Use Build Web Data Visualization for real-data KPI, chart, table, pivot-like preview, and report visualization when available.
+- Use spreadsheets for true `.xlsx` generation and workbook verification when Excel output is requested. The current implementation routes through `@oai/artifact-tool` rather than `openpyxl`.
+- If a required capability is unavailable, stop and ask before falling back.
+
+## State-Gated Progression
+
+`state.json` is the workflow source of truth. The harness must not advance from chat memory, stale files, stale confirmations, or file presence alone. Confirmation identity must match the current `run_id`, `checkpoint_id`, and `payload_hash`.
+
 ## 背景原則
 
 `wferp-report` 是 **LLM-driven report generation harness**，不是 deterministic SQL 工具。主 agent / LLM 負責讀懂使用者 prompt、uploaded files、Excel 欄位與公式、WFERP schema 與 relationships、報表需求、chart/layout 偏好，並生成 SQL、資料語意、React report payload 與 single-file HTML 報告。Harness 負責 checkpoint、evidence、user confirmation、repair loop 與 gating。Subagent validators 負責獨立審查，不能用主 agent 自己的摘要取代。

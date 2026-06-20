@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 
 from skill_scripts.dynamic_design_brief import build_design_brief, validate_design_brief
 from skill_scripts.report_harness import ReportHarness, ReportHarnessError
-from skill_scripts.report_harness_state import write_confirmation
+from skill_scripts.report_harness_state import CHECKPOINT_DEFINITIONS, write_confirmation
 from skill_scripts.validator_contracts import REQUIRED_VALIDATORS
 from skill_scripts.visual_checkpoint import build_visual_checkpoint_payload
 
@@ -41,6 +42,10 @@ def _validator_result(role: str, status: str = "pass") -> dict[str, object]:
     return {
         "role": role,
         "status": status,
+        "reviewer_identity": {"kind": "subagent", "id": f"{role}-agent"},
+        "checked_scope": ["run-dir"],
+        "input_artifact_paths": ["checkpoints/current.json"],
+        "reviewed_at": "2026-06-20T00:00:00Z",
         "evidence": evidence,
         "findings": [] if status == "pass" else [f"{role} failed"],
         "requiredFixes": [] if status == "pass" else [f"repair {role}"],
@@ -51,6 +56,13 @@ def _validator_result(role: str, status: str = "pass") -> dict[str, object]:
 def _all_validator_results(status_overrides: dict[str, str] | None = None) -> list[dict[str, object]]:
     overrides = status_overrides or {}
     return [_validator_result(role, overrides.get(role, "pass")) for role in REQUIRED_VALIDATORS]
+
+
+def _sql_gate_validator_results() -> list[dict[str, object]]:
+    return [
+        _validator_result("sql_safety_reviewer"),
+        _validator_result("schema_mapping_reviewer"),
+    ]
 
 
 def _valid_design_brief(harness: ReportHarness) -> dict[str, object]:
@@ -104,6 +116,7 @@ def test_rejects_state_transition_without_required_confirmation(tmp_path: Path):
 def test_confirmed_sql_allows_data_preview_checkpoint(tmp_path: Path):
     harness = ReportHarness.create(tmp_path, run_id="demo-run", prompt="請查詢費用")
     harness.write_sql_review("SELECT * FROM ACPTA")
+    harness.update_state(validator_results=_sql_gate_validator_results())
     harness.confirm("sql_review", "同意查詢")
 
     checkpoint = harness.write_data_preview({"rows": [{"部門": "D001"}], "row_count": 1})
@@ -113,9 +126,44 @@ def test_confirmed_sql_allows_data_preview_checkpoint(tmp_path: Path):
     assert checkpoint["payload"]["row_count"] == 1
 
 
+def test_state_gate_blocks_data_preview_when_confirmation_identity_is_missing(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="demo-run", prompt="請查詢費用")
+    harness.write_sql_review("SELECT * FROM ACPTA")
+    harness.update_state(
+        artifact_status={
+            "sql/query.sql": "complete",
+            "checkpoints/02_sql_review.json": "complete",
+        },
+        validator_results=_sql_gate_validator_results(),
+        user_confirmations={"sql_review": "同意查詢"},
+    )
+
+    with pytest.raises(ReportHarnessError, match="confirmation_identity"):
+        harness.write_data_preview({"rows": [{"部門": "D001"}], "row_count": 1})
+
+
+def test_rewriting_sql_review_invalidates_confirmation_identity(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="demo-run", prompt="請查詢費用")
+    harness.write_sql_review("SELECT 1")
+    harness.update_state(validator_results=_sql_gate_validator_results())
+    harness.confirm("sql_review", "同意查詢")
+    old_identity = harness.state()["confirmation_identity"]["sql_review"]
+
+    harness.write_sql_review("SELECT 2")
+    harness.update_state(
+        validator_results=_sql_gate_validator_results(),
+        user_confirmations={"sql_review": "同意查詢"},
+        confirmation_identity={"sql_review": old_identity},
+    )
+
+    with pytest.raises(ReportHarnessError, match="confirmation_identity"):
+        harness.write_data_preview({"rows": [{"部門": "D001"}], "row_count": 1})
+
+
 def test_rewriting_sql_review_requires_reconfirmation(tmp_path: Path):
     harness = ReportHarness.create(tmp_path, run_id="demo-run", prompt="請查詢費用")
     harness.write_sql_review("SELECT 1")
+    harness.update_state(validator_results=_sql_gate_validator_results())
     harness.confirm("sql_review", "同意查詢")
     harness.write_sql_review("SELECT 2")
 
@@ -126,6 +174,7 @@ def test_rewriting_sql_review_requires_reconfirmation(tmp_path: Path):
 def test_rewriting_sql_review_clears_downstream_state_and_checkpoints(tmp_path: Path):
     harness = ReportHarness.create(tmp_path, run_id="demo-run", prompt="請查詢費用")
     harness.write_sql_review("SELECT 1")
+    harness.update_state(validator_results=_sql_gate_validator_results())
     harness.confirm("sql_review", "同意查詢")
     harness.write_data_preview({"rows": [{"部門": "D001"}], "row_count": 1})
     harness.write_report_selection(
@@ -143,6 +192,30 @@ def test_rewriting_sql_review_clears_downstream_state_and_checkpoints(tmp_path: 
     assert state["report_type"] is None
     assert state["report_design"] is None
     assert state["report_options"] == {}
+
+
+def test_prompt_repair_blocks_forward_progress_until_cleared(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="build report")
+    harness.write_sql_review("SELECT * FROM ACPTA", {"status": "pass"})
+    repair_action = CHECKPOINT_DEFINITIONS["sql_review"]["actions"][1]
+
+    harness.confirm(
+        "sql_review",
+        repair_action,
+        selected_options={
+            "changeScope": "sql_conditions",
+            "targetUserStep": 2,
+            "requiresRerender": True,
+            "prompt": "add date condition",
+        },
+        comment="add date condition",
+    )
+
+    state = harness.state()
+    assert state["blocking_repair_request"]["changeScope"] == "sql_conditions"
+    assert state["blocking_repair_request"]["comment"] == "add date condition"
+    assert state["allowed_next_actions"] == ["repair_current_step"]
+    assert "execute_select" not in state["allowed_next_actions"]
     assert [checkpoint["checkpoint"] for checkpoint in state["checkpoints"]] == ["sql_review"]
     assert not (harness.run_dir / "checkpoints" / "03_data_preview.json").exists()
     assert not (harness.run_dir / "checkpoints" / "04_report_selection.json").exists()
@@ -366,11 +439,18 @@ def test_can_deliver_reads_final_confirmation_file_when_state_options_are_empty(
         }
     )
     harness.confirm("final_review", "完成")
+    checkpoint_payload = json.loads(
+        (harness.run_dir / "checkpoints" / "06_final_review.json").read_text(encoding="utf-8")
+    )
     write_confirmation(
         harness.run_dir,
         "final_review",
         {
             "action": "完成",
+            "run_id": checkpoint_payload["run_id"],
+            "checkpoint_id": checkpoint_payload["checkpoint_id"],
+            "payload_hash": checkpoint_payload["payload_hash"],
+            "confirmation_id": "confirm-final-risk",
             "selectedOptions": {
                 "acceptedResidualRisks": [
                     "visual_taste_reviewer: accepted risk for visual_taste_reviewer"
@@ -420,7 +500,7 @@ def test_write_design_brief_records_checkpoint_and_clears_downstream_state(tmp_p
     _confirm_visual_design(harness)
     harness.write_report_draft({"sections": ["摘要"]})
     harness.update_state(
-        validator_results=[{"role": "visual_taste_reviewer", "status": "pass"}],
+        validator_results=[_validator_result("visual_taste_reviewer")],
         visual_design_checkpoint={"status": "ready"},
     )
 
@@ -498,7 +578,7 @@ def test_changed_report_selection_clears_design_brief_and_future_checkpoints(tmp
     _confirm_design_brief(harness)
     harness.update_state(
         visual_design_checkpoint={"status": "ready"},
-        validator_results=[{"role": "visual_taste_reviewer", "status": "pass"}],
+        validator_results=[_validator_result("visual_taste_reviewer")],
     )
 
     harness.write_report_selection(

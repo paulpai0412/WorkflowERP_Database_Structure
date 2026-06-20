@@ -15,12 +15,13 @@ from skill_scripts.report_harness_state import (
     CHECKPOINT_DEFINITIONS,
     append_audit_event,
     load_run_state,
-    write_confirmation,
 )
+from skill_scripts.user_step_payload import build_user_step_payload
 
 
 MAX_REQUEST_BYTES = 65536
-MAX_TABLE_ROWS = 100
+MAX_DRAIN_BYTES = 1048576
+MAX_TABLE_ROWS = 50
 CHART_TYPE_OPTIONS = [
     ("combo", "Combo：實際 / 預算 / 差異"),
     ("bar", "Bar：排行與比較"),
@@ -762,8 +763,154 @@ def _render_progress(state: Mapping[str, Any], current: str, run_id: str) -> str
     return "<ol class=\"progress\">" + "".join(items) + "</ol>"
 
 
+def _current_user_step(state: Mapping[str, Any], checkpoint: str) -> int:
+    checkpoint_steps = {
+        "excel_confirmation": 1,
+        "field_formula_classification": 1,
+        "sql_review": 2,
+        "data_preview": 3,
+        "raw_data_preview": 3,
+        "enriched_data_preview": 3,
+        "sqlite_retention": 3,
+        "report_selection": 3,
+        "design_brief": 3,
+        "visual_design": 3,
+        "report_draft": 4,
+        "final_review": 4,
+    }
+    explicit = state.get("current_user_step")
+    if isinstance(explicit, int) and explicit in {2, 3, 4}:
+        return explicit
+    return checkpoint_steps.get(checkpoint, 1)
+
+
+def _render_user_step_nav(current_step: int) -> str:
+    labels = {
+        1: "來源到產出邏輯",
+        2: "SQL 查詢",
+        3: "資料結果與報表設計",
+        4: "最終交付",
+    }
+    items = []
+    for step, label in labels.items():
+        css = "step user-step"
+        if step < current_step:
+            css += " done"
+        elif step == current_step:
+            css += " current"
+        items.append(
+            f"<li class=\"{css}\" data-user-step=\"{step}\">"
+            f"<div class=\"step-disabled\"><span class=\"step-index\">{step}</span>"
+            f"<strong>{escape(label)}</strong></div></li>"
+        )
+    return "<ol class=\"progress user-step-nav\">" + "".join(items) + "</ol>"
+
+
+def _render_checkpoint_history(state: Mapping[str, Any], current: str, run_id: str) -> str:
+    return (
+        "<details class=\"checkpoint-history\" open>"
+        "<summary>技術 checkpoint 歷史</summary>"
+        + _render_progress(state, current, run_id)
+        + "</details>"
+    )
+
+
+def _render_source_to_output_logic(payload: Mapping[str, Any]) -> str:
+    matrix = payload.get("source_to_output_matrix")
+    inventory = payload.get("source_inventory")
+    formulas = payload.get("formula_semantics")
+    return (
+        "<section class=\"panel user-step-panel\">"
+        "<h2>來源到產出邏輯</h2>"
+        "<h3>產出如何由來源資料形成</h3>"
+        + _render_table(matrix if isinstance(matrix, list) else [])
+        + "<h3>資料來源</h3>"
+        + _render_table(inventory if isinstance(inventory, list) else [])
+        + "<h3>公式與計算邏輯</h3>"
+        + _render_table(formulas if isinstance(formulas, list) else [])
+        + "</section>"
+    )
+
+
+def _render_excel_workbook_preview(payload: Mapping[str, Any]) -> str:
+    sheets = payload.get("sheets")
+    if not isinstance(sheets, list) or not sheets:
+        return "<p class=\"muted\">尚未產生 Excel Workbook Preview。</p>"
+    parts = ["<div class=\"workbook-preview\"><h3>Excel Workbook Preview</h3>"]
+    for sheet in sheets:
+        if not isinstance(sheet, Mapping):
+            continue
+        rows = sheet.get("sample_rows")
+        columns = sheet.get("columns")
+        parts.append(
+            "<article class=\"sheet-preview nested-card\">"
+            f"<h4>{escape(str(sheet.get('name') or 'Sheet'))}</h4>"
+            f"<p class=\"muted\">公式策略：{escape(str(sheet.get('formula_strategy') or 'hybrid'))}</p>"
+            + _render_table(
+                rows if isinstance(rows, list) else [],
+                columns if isinstance(columns, list) else None,
+            )
+            + "</article>"
+        )
+    parts.append("</div>")
+    return "".join(parts)
+
+
+def _render_data_result_and_design(payload: Mapping[str, Any]) -> str:
+    raw = payload.get("raw_preview") if isinstance(payload.get("raw_preview"), Mapping) else {}
+    enriched = payload.get("enriched_preview") if isinstance(payload.get("enriched_preview"), Mapping) else {}
+    excel_preview = (
+        payload.get("excel_workbook_preview")
+        if isinstance(payload.get("excel_workbook_preview"), Mapping)
+        else {}
+    )
+    return (
+        "<section class=\"panel user-step-panel\">"
+        "<h2>資料結果與報表設計</h2>"
+        "<h3>DB 原始資料預覽，最多 50 筆</h3>"
+        + _render_table(
+            raw.get("sample_rows", []),
+            raw.get("columns") if isinstance(raw.get("columns"), list) else None,
+        )
+        + "<h3>SQLite 補欄後資料預覽，最多 50 筆</h3>"
+        + _render_table(
+            enriched.get("sample_rows", []),
+            enriched.get("columns") if isinstance(enriched.get("columns"), list) else None,
+        )
+        + _render_excel_workbook_preview(excel_preview)
+        + "</section>"
+    )
+
+
+def _truncate_preview_payload(value: Any, *, limit: int = 50) -> Any:
+    if isinstance(value, Mapping):
+        result: dict[str, Any] = {}
+        for key, item in value.items():
+            if key in {"rows", "sample_rows", "embedded_rows"} and isinstance(item, list):
+                result[key] = item[:limit]
+                if len(item) > limit:
+                    result[f"{key}_truncated_to"] = limit
+                    result[f"{key}_total_count"] = len(item)
+            else:
+                result[key] = _truncate_preview_payload(item, limit=limit)
+        return result
+    if isinstance(value, list):
+        return [_truncate_preview_payload(item, limit=limit) for item in value[:limit]]
+    return value
+
+
+def _render_technical_evidence(checkpoint: str, payload: Mapping[str, Any]) -> str:
+    evidence_payload = _truncate_preview_payload(dict(payload))
+    return (
+        "<details class=\"technical-evidence panel\"><summary>Technical evidence</summary>"
+        + _render_payload_sections(checkpoint, evidence_payload if isinstance(evidence_payload, dict) else {})
+        + "</details>"
+    )
+
+
 def _render_checkpoint_page(
     *,
+    run_path: Path,
     run_id: str,
     checkpoint: str,
     definition: Mapping[str, Any],
@@ -772,6 +919,15 @@ def _render_checkpoint_page(
 ) -> str:
     payload = checkpoint_payload.get("payload")
     payload_dict = payload if isinstance(payload, dict) else {}
+    current_user_step = _current_user_step(state, checkpoint)
+    user_step_payload = build_user_step_payload(run_path, current_user_step)
+    if current_user_step == 1:
+        user_step_body = _render_source_to_output_logic(user_step_payload)
+    elif current_user_step == 3:
+        user_step_body = _render_data_result_and_design(user_step_payload)
+    else:
+        user_step_body = _render_payload_sections(checkpoint, payload_dict)
+    script_checkpoint_payload = _truncate_preview_payload(dict(checkpoint_payload))
     confirm_url = f"/api/runs/{run_id}/checkpoints/{checkpoint}/confirm"
     actions = "".join(
         f"<button type=\"button\" class=\"action-button\" data-action=\"{escape(action)}\">"
@@ -803,27 +959,43 @@ def _render_checkpoint_page(
             "</header>",
             "<main class=\"shell\">",
             "<aside class=\"side-rail\">",
-            _render_progress(state, checkpoint, run_id),
+            _render_user_step_nav(current_user_step),
+            _render_checkpoint_history(state, checkpoint, run_id),
             "</aside>",
             f"<section class=\"content\" data-confirm-url=\"{escape(confirm_url)}\" "
-            f"data-checkpoint=\"{escape(checkpoint)}\">",
+            f"data-checkpoint=\"{escape(checkpoint)}\" "
+            f"data-user-step=\"{current_user_step}\">",
             "<div class=\"hero panel\">",
-            f"<p class=\"eyebrow\">Current checkpoint</p><h2>{escape(str(checkpoint_payload.get('title') or definition['title']))}</h2>",
+            f"<p class=\"eyebrow\">Visual Companion Step {current_user_step}</p>"
+            f"<h2>{escape(str(user_step_payload.get('title') or checkpoint_payload.get('title') or definition['title']))}</h2>",
             f"<p class=\"subtitle\">{escape(str(payload_dict.get('summary') or '請檢查此 checkpoint 的資料、證據與風險後再確認。'))}</p>",
             f"<div id=\"confirmation-status\" class=\"status-line\">"
             f"{'已確認：' + escape(confirmed_action) if confirmed_action else '尚未確認'}</div>",
             "</div>",
-            _render_payload_sections(checkpoint, payload_dict),
+            user_step_body,
+            _render_technical_evidence(checkpoint, payload_dict),
             "<section class=\"panel sticky-actions\">",
             "<h2>確認動作</h2>",
             "<label class=\"comment-label\">補充意見</label>",
             "<textarea id=\"confirmation-comment\" placeholder=\"可留空；若需修正請描述條件或欄位。\"></textarea>",
+            "<label class=\"comment-label\" for=\"change-scope\">修正範圍</label>",
+            "<select id=\"change-scope\">",
+            "<option value=\"\">不指定修正範圍</option>",
+            "<option value=\"source_logic\">來源與產出邏輯</option>",
+            "<option value=\"formula_logic\">公式與計算邏輯</option>",
+            "<option value=\"sql_conditions\">SQL 條件</option>",
+            "<option value=\"data_result\">資料結果</option>",
+            "<option value=\"html_design\">HTML 報表設計</option>",
+            "<option value=\"excel_design\">Excel 報表設計</option>",
+            "<option value=\"visual_style\">視覺樣式</option>",
+            "<option value=\"delivery\">交付內容</option>",
+            "</select>",
             f"<div class=\"actions\">{actions}</div>",
             "</section>",
             "</section>",
             "</main>",
             "<script>",
-            f"window.__CHECKPOINT_PAYLOAD__ = {_json_script_payload(dict(checkpoint_payload))};",
+            f"window.__CHECKPOINT_PAYLOAD__ = {_json_script_payload(script_checkpoint_payload)};",
             _COMPANION_JS,
             "</script>",
             "</body>",
@@ -843,6 +1015,7 @@ _COMPANION_CSS += """
 .control-field span{font-size:12px;font-weight:800;color:#475467}
 .control-field input,.control-field select{border:1px solid #cbd5e1;border-radius:7px;background:#fff;padding:8px;font:inherit}
 .hidden-control{display:none}
+.sticky-actions select{width:100%;border:1px solid #d0d5dd;border-radius:8px;padding:10px;font:inherit;background:#fff}
 .chart-render-note{font-size:12px;color:#475467;background:#eef6f6;border:1px solid #d1e3e4;border-radius:7px;padding:7px;margin:8px 0}
 """
 
@@ -935,6 +1108,12 @@ function selectedOptions(){
   const visualSelection = readVisualSelection();
   if (visualSelection.layoutMode) {
     options.visualSelection = visualSelection;
+  }
+  const scope = document.getElementById('change-scope')?.value || '';
+  if (scope) {
+    options.changeScope = scope;
+    options.requiresRerender = true;
+    options.targetUserStep = Number(document.querySelector('[data-user-step]')?.dataset.userStep || 0);
   }
   const acceptedRisks = Array.from(document.querySelectorAll('[data-risk]:checked')).map((el) => {
     const risk = el.getAttribute('data-risk') || '';
@@ -1036,6 +1215,7 @@ class CheckpointCompanionServer:
                     return None
 
                 if content_length > MAX_REQUEST_BYTES:
+                    self.rfile.read(min(content_length, MAX_DRAIN_BYTES))
                     self._json(413, {"status": "request_too_large"})
                     return None
 
@@ -1095,6 +1275,7 @@ class CheckpointCompanionServer:
                 self._html(
                     200,
                     _render_checkpoint_page(
+                        run_path=run_path,
                         run_id=run_id,
                         checkpoint=checkpoint,
                         definition=definition,
@@ -1135,8 +1316,13 @@ class CheckpointCompanionServer:
                         checkpoint,
                         action,
                         selected_options=selected_options if isinstance(selected_options, dict) else None,
+                        comment=str(payload.get("comment", "")),
                     )
-                    confirmation = write_confirmation(run_path, checkpoint, payload)
+                    definition = CHECKPOINT_DEFINITIONS[checkpoint]
+                    confirmation_path = run_path / "checkpoints" / definition["file"].replace(
+                        ".json", ".confirmation.json"
+                    )
+                    confirmation = json.loads(confirmation_path.read_text(encoding="utf-8"))
                     append_audit_event(
                         run_path,
                         "checkpoint_confirmed",

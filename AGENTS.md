@@ -76,6 +76,18 @@ pytest tests/skill_scripts/ -v
 pytest tests/skill_scripts/test_schema_loader.py -v
 ```
 
+## Pytest on Windows
+- Keep `pytest.ini` with `addopts = -p no:cacheprovider`. On this workstation, pytest's cache provider can create unreadable `pytest-cache-files-*` temp directories because of Windows/domain ACL behavior.
+- Keep the Windows workaround in `tests/conftest.py`. Pytest's built-in `tmp_path` flow calls `Path.mkdir(mode=0o700)` for `--basetemp` and per-test temp folders; on this machine that mode creates directories the current user cannot scan or delete, causing `WinError 5` during fixture setup or session cleanup.
+- Do not "fix" pytest by deleting or bypassing `tmp_path` tests. The repo-level fix converts Windows-only `mode=0o700` temp mkdir calls to `0o777` during tests.
+- Prefer running pytest through the bundled/runtime Python already used by Codex when PATH is uncertain.
+- If stale `.pytest-*`, `.pytest_cache`, `pytest-tmp-*`, `pytest-cache-files-*`, or `python-temp-check` directories are unreadable, first verify the resolved absolute target path is inside the current worktree, then reset ownership/ACL and remove only those temp directories. Never run broad recursive cleanup outside the verified worktree.
+- A clean representative check is:
+
+```bash
+python -m pytest tests/skill_scripts/test_report_harness_state.py::test_creates_run_directory_with_state_json tests/skill_scripts/test_excel_workbook_exporter.py tests/skill_scripts/test_validator_contracts.py -q --basetemp .pytest-fixed-check
+```
+
 ## Production Database Safety
 - The current workstation database connection points at the production database.
 - Treat `C:/Users/ivychi/util/test/css04 CHD View_Customer.odc` and any local Workflow ERP database connection as production unless the user explicitly provides a verified test connection.
@@ -154,6 +166,17 @@ python -m skill_scripts.cli_report_harness check-delivery-artifacts --run-dir <r
 ```
 
 - If companion serving, user confirmation, or validator execution is blocked, stop and report the blocker instead of continuing.
+
+## WFERP Report 4-Step Visual Companion
+- Preserve the internal 13-phase harness. Only simplify the user-facing Visual Companion into 4 steps: Source-to-Output Logic, SQL Query, Data Result and Report Design, Final Delivery.
+- `state.json` controls all progression. Do not advance from chat memory, stale browser tabs, stale confirmation files, or artifact presence alone.
+- Visual Companion confirmations must match the current `run_id`, `checkpoint_id`, and `payload_hash`.
+- Step 1 must render source-to-output logic from prompt and/or Excel to final HTML/Excel outputs, including formulas, lookup tables, SQLite enrichment, and unresolved assumptions.
+- Step 3 must render real current-run table previews, with default preview capped at 50 rows. JSON-only preview or column-only preview is not enough.
+- Use Build Web Apps for Visual Companion/final HTML UI and Build Web Data Visualization for KPI/chart/table/report visualization when available.
+- Use the spreadsheets skill and `@oai/artifact-tool` for true `.xlsx` generation and workbook verification. Do not use `openpyxl` as the default path.
+- Required validators must be fresh reviewer/subagent artifacts with reviewer identity, checked scope, input artifacts, timestamp, findings, and evidence. The main agent cannot self-approve validator gates.
+- Validator/gating logic must remain generic and must not hardcode any customer, database, table, field, report type, or business domain.
 
 ## Repo-Specific Gotchas
 - Preserve UTF-8 when editing Chinese/Vietnamese text or generated JSON/HTML.

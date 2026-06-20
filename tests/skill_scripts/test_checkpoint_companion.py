@@ -8,6 +8,7 @@ from urllib.request import Request, urlopen
 from skill_scripts.checkpoint_companion import CheckpointCompanionServer
 from skill_scripts.dynamic_design_brief import build_design_brief, validate_design_brief
 from skill_scripts.report_harness import ReportHarness
+from skill_scripts.report_harness_state import CHECKPOINT_DEFINITIONS
 from skill_scripts.validator_contracts import REQUIRED_VALIDATORS
 from skill_scripts.visual_checkpoint import build_visual_checkpoint_payload
 
@@ -42,6 +43,10 @@ def _validator_result(role: str, status: str = "pass") -> dict[str, object]:
     return {
         "role": role,
         "status": status,
+        "reviewer_identity": {"kind": "subagent", "id": f"{role}-agent"},
+        "checked_scope": ["run-dir"],
+        "input_artifact_paths": ["checkpoints/current.json"],
+        "reviewed_at": "2026-06-20T00:00:00Z",
         "evidence": evidence,
         "findings": [] if status == "pass" else [f"{role} failed"],
         "requiredFixes": [] if status == "pass" else [f"repair {role}"],
@@ -52,6 +57,13 @@ def _validator_result(role: str, status: str = "pass") -> dict[str, object]:
 def _all_validator_results(status_overrides: dict[str, str] | None = None) -> list[dict[str, object]]:
     overrides = status_overrides or {}
     return [_validator_result(role, overrides.get(role, "pass")) for role in REQUIRED_VALIDATORS]
+
+
+def _sql_gate_validator_results() -> list[dict[str, object]]:
+    return [
+        _validator_result("sql_safety_reviewer"),
+        _validator_result("schema_mapping_reviewer"),
+    ]
 
 
 def _confirm_design_brief(harness: ReportHarness) -> None:
@@ -145,6 +157,33 @@ def test_confirmation_post_writes_confirmation_and_audit(tmp_path: Path):
     assert json.loads(audit_lines[0])["event"] == "checkpoint_confirmed"
 
 
+def test_companion_prompt_repair_posts_changes_requested_with_scope(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="query expenses")
+    harness.write_sql_review("SELECT department, amount FROM expenses", {"status": "pass"})
+    repair_action = CHECKPOINT_DEFINITIONS["sql_review"]["actions"][1]
+
+    with CheckpointCompanionServer.serve(tmp_path / "run-001") as server:
+        result = post_json(
+            f"{server.base_url}/api/runs/run-001/checkpoints/sql_review/confirm",
+            {
+                "action": repair_action,
+                "checkpointId": "sql_review",
+                "comment": "add date condition",
+                "selectedOptions": {
+                    "changeScope": "sql_conditions",
+                    "targetUserStep": 2,
+                    "requiresRerender": True,
+                },
+            },
+        )
+
+    assert result["status"] == "confirmed"
+    state = harness.state()
+    assert state["blocking_repair_request"]["comment"] == "add date condition"
+    assert state["blocking_repair_request"]["changeScope"] == "sql_conditions"
+    assert state["allowed_next_actions"] == ["repair_current_step"]
+
+
 def test_companion_server_uses_daemon_request_threads(tmp_path: Path):
     ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
 
@@ -208,6 +247,7 @@ def test_current_checkpoint_page_returns_html_with_confirm_url(tmp_path: Path):
 def test_current_checkpoint_page_renders_data_preview_payload(tmp_path: Path):
     harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
     harness.write_sql_review("SELECT department, amount FROM expenses", {"status": "pass"})
+    harness.update_state(validator_results=_sql_gate_validator_results())
     harness.confirm("sql_review", "同意查詢")
     harness.write_data_preview(
         {
@@ -236,6 +276,7 @@ def test_current_checkpoint_page_renders_data_preview_payload(tmp_path: Path):
 def test_data_preview_page_renders_sample_rows_as_table(tmp_path: Path):
     harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢訂單專案")
     harness.write_sql_review("SELECT project_code, order_no FROM orders", {"status": "pass"})
+    harness.update_state(validator_results=_sql_gate_validator_results())
     harness.confirm("sql_review", "同意查詢")
     harness.write_data_preview(
         {
@@ -481,6 +522,7 @@ def test_report_draft_page_renders_report_preview_with_actual_table_data(tmp_pat
 def test_current_checkpoint_page_links_to_available_checkpoint_history(tmp_path: Path):
     harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
     harness.write_sql_review("SELECT department, amount FROM expenses", {"status": "pass"})
+    harness.update_state(validator_results=_sql_gate_validator_results())
     harness.confirm("sql_review", "同意查詢")
     harness.write_data_preview(
         {
@@ -502,6 +544,7 @@ def test_current_checkpoint_page_links_to_available_checkpoint_history(tmp_path:
 def test_specific_checkpoint_history_page_renders_requested_payload(tmp_path: Path):
     harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="查詢費用")
     harness.write_sql_review("SELECT department, amount FROM expenses", {"status": "pass"})
+    harness.update_state(validator_results=_sql_gate_validator_results())
     harness.confirm("sql_review", "同意查詢")
     harness.write_data_preview(
         {

@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
+import uuid
+
+from skill_scripts.harness_state_machine import GATE_DEFINITIONS, evaluate_gate, initialize_state_machine
 
 
 CHECKPOINT_DEFINITIONS: dict[str, dict[str, Any]] = {
@@ -96,6 +100,39 @@ def _write_json(path: Path, data: Any) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _payload_hash(payload: dict[str, Any]) -> str:
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _checkpoint_artifact_path(checkpoint: str) -> str:
+    return f"checkpoints/{CHECKPOINT_DEFINITIONS[checkpoint]['file']}"
+
+
+def _confirmation_path(run_dir: str | Path, checkpoint: str) -> Path:
+    definition = CHECKPOINT_DEFINITIONS[checkpoint]
+    return Path(run_dir) / "checkpoints" / definition["file"].replace(".json", ".confirmation.json")
+
+
+def _gate_for_confirmation_checkpoint(checkpoint: str) -> str | None:
+    for gate, definition in GATE_DEFINITIONS.items():
+        if definition["confirmation_checkpoint"] == checkpoint:
+            return gate
+    return None
+
+
+def _refresh_gate_status(state: dict[str, Any], *gates: str) -> dict[str, Any]:
+    gate_status = state.setdefault("gate_status", {})
+    for gate in gates:
+        gate_status[gate] = evaluate_gate(state, gate)
+    state["phase_status"] = {
+        gate: entry["status"] for gate, entry in gate_status.items() if isinstance(entry, dict)
+    }
+    return state
+
+
 def create_report_run(
     run_root: str | Path,
     *,
@@ -146,6 +183,7 @@ def create_report_run(
         "created_at": _now(),
         "updated_at": _now(),
     }
+    state = initialize_state_machine(state)
     _write_json(_state_path(run_dir), state)
     return state
 
@@ -165,24 +203,41 @@ def record_checkpoint(run_dir: str | Path, checkpoint: str, payload: dict[str, A
     if checkpoint not in CHECKPOINT_DEFINITIONS:
         raise ValueError(f"Unknown checkpoint: {checkpoint}")
     definition = CHECKPOINT_DEFINITIONS[checkpoint]
+    run_path = Path(run_dir)
+    state = initialize_state_machine(load_run_state(run_path))
+    payload_hash = _payload_hash(payload)
     checkpoint_payload = {
         "checkpoint": checkpoint,
+        "checkpoint_id": checkpoint,
+        "run_id": state["run_id"],
         "title": definition["title"],
         "actions": definition["actions"],
         "payload": payload,
+        "payload_hash": payload_hash,
         "created_at": _now(),
     }
-    run_path = Path(run_dir)
     _write_json(run_path / "checkpoints" / definition["file"], checkpoint_payload)
 
-    state = load_run_state(run_path)
     entry = {
         "checkpoint": checkpoint,
+        "checkpoint_id": checkpoint,
         "file": f"checkpoints/{definition['file']}",
+        "payload_hash": payload_hash,
         "created_at": checkpoint_payload["created_at"],
     }
     state["checkpoints"] = [item for item in state["checkpoints"] if item["checkpoint"] != checkpoint]
     state["checkpoints"].append(entry)
+    state.setdefault("artifact_status", {})[_checkpoint_artifact_path(checkpoint)] = "complete"
+    state.setdefault("confirmation_identity", {}).pop(checkpoint, None)
+    state.setdefault("user_confirmations", {}).pop(checkpoint, None)
+    state.setdefault("user_confirmation_options", {}).pop(checkpoint, None)
+    _confirmation_path(run_path, checkpoint).unlink(missing_ok=True)
+    gate = _gate_for_confirmation_checkpoint(checkpoint)
+    if gate:
+        gate_entry = evaluate_gate(state, gate)
+        gate_entry["confirmation"]["payload_hash"] = payload_hash
+        state.setdefault("gate_status", {})[gate] = gate_entry
+        state["phase_status"][gate] = gate_entry["status"]
     save_run_state(run_path, state)
     return checkpoint_payload
 
@@ -199,14 +254,42 @@ def append_audit_event(run_dir: str | Path, event: str, payload: dict[str, Any])
 def write_confirmation(run_dir: str | Path, checkpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
     if checkpoint not in CHECKPOINT_DEFINITIONS:
         raise ValueError(f"Unknown checkpoint: {checkpoint}")
-    definition = CHECKPOINT_DEFINITIONS[checkpoint]
+    run_path = Path(run_dir)
+    state = initialize_state_machine(load_run_state(run_path))
+    checkpoint_path = run_path / "checkpoints" / CHECKPOINT_DEFINITIONS[checkpoint]["file"]
+    if not checkpoint_path.exists():
+        raise ValueError(f"Checkpoint payload does not exist: {checkpoint}")
+    checkpoint_payload = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    expected_hash = str(checkpoint_payload.get("payload_hash") or "")
+    run_id = payload.get("run_id")
+    checkpoint_id = payload.get("checkpoint_id") or payload.get("checkpointId")
+    payload_hash = payload.get("payload_hash")
+    if run_id != state.get("run_id") or checkpoint_id != checkpoint or payload_hash != expected_hash:
+        raise ValueError("confirmation identity does not match current checkpoint")
+
     confirmation = {
+        "run_id": run_id,
         "checkpoint": checkpoint,
+        "checkpoint_id": checkpoint,
         "action": payload["action"],
         "comment": payload.get("comment", ""),
         "selectedOptions": payload.get("selectedOptions", {}),
+        "payload_hash": payload_hash,
+        "confirmation_id": payload.get("confirmation_id") or str(uuid.uuid4()),
         "created_at": _now(),
     }
-    filename = definition["file"].replace(".json", ".confirmation.json")
-    _write_json(Path(run_dir) / "checkpoints" / filename, confirmation)
+    _write_json(_confirmation_path(run_path, checkpoint), confirmation)
+    state.setdefault("confirmation_identity", {})[checkpoint] = {
+        "status": "matched",
+        "checkpoint_id": checkpoint,
+        "payload_hash": payload_hash,
+        "confirmation_id": confirmation["confirmation_id"],
+        "action": confirmation["action"],
+        "created_at": confirmation["created_at"],
+        "confirmed_at": confirmation["created_at"],
+    }
+    gate = _gate_for_confirmation_checkpoint(checkpoint)
+    if gate:
+        _refresh_gate_status(state, gate)
+    save_run_state(run_path, state)
     return confirmation

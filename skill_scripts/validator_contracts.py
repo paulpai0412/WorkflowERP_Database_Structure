@@ -23,6 +23,10 @@ VALIDATOR_STATUSES = {"pass", "fail", "warning", "blocked"}
 REQUIRED_PACKET_FIELDS = [
     "role",
     "status",
+    "reviewer_identity",
+    "checked_scope",
+    "input_artifact_paths",
+    "reviewed_at",
     "evidence",
     "findings",
     "requiredFixes",
@@ -48,6 +52,10 @@ class ValidatorResult:
             {
                 "role": self.role,
                 "status": self.status,
+                "reviewer_identity": {"kind": "subagent", "id": f"{self.role}-agent"},
+                "checked_scope": ["run-dir"],
+                "input_artifact_paths": ["checkpoints/current.json"],
+                "reviewed_at": "1970-01-01T00:00:00Z",
                 "evidence": self.evidence,
                 "findings": self.findings,
                 "requiredFixes": self.requiredFixes,
@@ -140,6 +148,15 @@ def validate_evidence_packet(packet: dict[str, Any]) -> dict[str, Any]:
 
     _require(packet["role"] in REQUIRED_VALIDATORS, f"Unknown validator role: {packet['role']}")
     _require(packet["status"] in VALIDATOR_STATUSES, "Invalid validator status")
+    reviewer_identity = packet["reviewer_identity"]
+    _require(isinstance(reviewer_identity, dict), "reviewer_identity must be an object")
+    _require(bool(str(reviewer_identity.get("kind", "")).strip()), "reviewer_identity.kind is required")
+    _require(bool(str(reviewer_identity.get("id", "")).strip()), "reviewer_identity.id is required")
+    _require_string_list(packet["checked_scope"], "checked_scope")
+    _require(packet["checked_scope"], "checked_scope is required")
+    _require_string_list(packet["input_artifact_paths"], "input_artifact_paths")
+    _require(packet["input_artifact_paths"], "input_artifact_paths is required")
+    _require(isinstance(packet["reviewed_at"], str) and bool(packet["reviewed_at"].strip()), "reviewed_at is required")
     _require(isinstance(packet["evidence"], list), "evidence must be a list")
     _require(all(isinstance(item, dict) for item in packet["evidence"]), "evidence must contain objects")
     for item in packet["evidence"]:

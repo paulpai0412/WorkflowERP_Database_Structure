@@ -11,6 +11,17 @@ from skill_scripts.validator_contracts import (
 )
 
 
+def _with_fresh_reviewer(packet: dict[str, object]) -> dict[str, object]:
+    role = str(packet.get("role", "validator"))
+    return {
+        "reviewer_identity": {"kind": "subagent", "id": f"{role}-agent"},
+        "checked_scope": ["run-dir"],
+        "input_artifact_paths": ["checkpoints/current.json"],
+        "reviewed_at": "2026-06-20T00:00:00Z",
+        **packet,
+    }
+
+
 def test_validator_contracts_include_required_roles():
     assert REQUIRED_VALIDATORS == [
         "source_requirement_reviewer",
@@ -46,11 +57,29 @@ def test_validator_result_requires_evidence_and_repair_fields():
         "valid": True,
         "role": "sql_safety_reviewer",
         "status": "fail",
+        "reviewer_identity": {"kind": "subagent", "id": "sql_safety_reviewer-agent"},
+        "checked_scope": ["run-dir"],
+        "input_artifact_paths": ["checkpoints/current.json"],
+        "reviewed_at": "1970-01-01T00:00:00Z",
         "evidence": [{"command": "python3 -m skill_scripts.cli_report_harness validate-sql"}],
         "findings": ["SELECT INTO is blocked"],
         "requiredFixes": ["Remove SELECT INTO"],
         "residualRisks": [],
     }
+
+
+def test_validator_contract_requires_fresh_reviewer_metadata():
+    packet = {
+        "role": "sql_safety_reviewer",
+        "status": "pass",
+        "evidence": [{"type": "file", "path": "sql/query.sql"}],
+        "findings": [],
+        "requiredFixes": [],
+        "residualRisks": [],
+    }
+
+    with pytest.raises(ValidatorContractError, match="reviewer_identity"):
+        validate_evidence_packet(packet)
 
 
 def test_validator_contract_requires_status_evidence_findings_and_repair_fields():
@@ -63,9 +92,21 @@ def test_validator_contract_requires_status_evidence_findings_and_repair_fields(
         "residualRisks": [],
     }
 
+    packet = _with_fresh_reviewer(packet)
     assert validate_evidence_packet(packet) == {"valid": True, **packet}
 
-    for field in ("role", "status", "evidence", "findings", "requiredFixes", "residualRisks"):
+    for field in (
+        "role",
+        "status",
+        "reviewer_identity",
+        "checked_scope",
+        "input_artifact_paths",
+        "reviewed_at",
+        "evidence",
+        "findings",
+        "requiredFixes",
+        "residualRisks",
+    ):
         incomplete = dict(packet)
         incomplete.pop(field)
         with pytest.raises(ValidatorContractError, match=field):
@@ -91,6 +132,7 @@ def test_validator_contract_accepts_structured_evidence_types():
         "residualRisks": [],
     }
 
+    packet = _with_fresh_reviewer(packet)
     assert validate_evidence_packet(packet) == {"valid": True, **packet}
 
 
@@ -112,6 +154,7 @@ def test_excel_classification_reviewer_requires_file_metrics_and_metadata_inspec
         "residualRisks": [],
     }
 
+    packet = _with_fresh_reviewer(packet)
     assert validate_evidence_packet(packet)["valid"] is True
 
     for evidence_index, expected_message in [
@@ -149,6 +192,7 @@ def test_sqlite_enrichment_reviewer_requires_manifest_and_row_counts():
         "residualRisks": [],
     }
 
+    packet = _with_fresh_reviewer(packet)
     result = validate_evidence_packet(packet)
 
     assert result["valid"] is True
@@ -168,6 +212,7 @@ def test_sqlite_enrichment_metrics_must_be_non_negative_numbers():
         "requiredFixes": [],
         "residualRisks": [],
     }
+    packet = _with_fresh_reviewer(packet)
 
     for bad_value in ("2", None, False, -1):
         invalid = dict(packet)
@@ -188,7 +233,7 @@ def test_validator_contract_rejects_missing_quantitative_checks_for_data_validat
     }
 
     with pytest.raises(ValidatorContractError, match="quantitative"):
-        validate_evidence_packet(packet)
+        validate_evidence_packet(_with_fresh_reviewer(packet))
 
 
 def test_data_preview_quantitative_checks_require_numeric_metrics():
@@ -208,9 +253,10 @@ def test_data_preview_quantitative_checks_require_numeric_metrics():
     }
 
     with pytest.raises(ValidatorContractError, match="quantitative"):
-        validate_evidence_packet(packet)
+        validate_evidence_packet(_with_fresh_reviewer(packet))
 
     packet["evidence"][0]["metrics"] = {"row_count": 10, "column_count": 4}
+    packet = _with_fresh_reviewer(packet)
     assert validate_evidence_packet(packet) == {"valid": True, **packet}
 
 
@@ -243,14 +289,16 @@ def test_report_final_review_requires_all_validators_pass_or_explicit_user_accep
                 {"type": "inspection", "name": "metadata_readability", "status": "pass"},
             ]
         packets.append(
-            {
-                "role": validator,
-                "status": "pass",
-                "evidence": evidence,
-                "findings": [],
-                "requiredFixes": [],
-                "residualRisks": [],
-            }
+            _with_fresh_reviewer(
+                {
+                    "role": validator,
+                    "status": "pass",
+                    "evidence": evidence,
+                    "findings": [],
+                    "requiredFixes": [],
+                    "residualRisks": [],
+                }
+            )
         )
 
     assert build_final_review_gate(packets)["allowed"] is True
@@ -275,14 +323,16 @@ def test_report_final_review_requires_all_validators_pass_or_explicit_user_accep
 
 
 def test_report_final_review_blocks_missing_validator_roles():
-    packet = {
-        "role": "source_requirement_reviewer",
-        "status": "pass",
-        "evidence": [{"command": "review source inputs"}],
-        "findings": [],
-        "requiredFixes": [],
-        "residualRisks": [],
-    }
+    packet = _with_fresh_reviewer(
+        {
+            "role": "source_requirement_reviewer",
+            "status": "pass",
+            "evidence": [{"command": "review source inputs"}],
+            "findings": [],
+            "requiredFixes": [],
+            "residualRisks": [],
+        }
+    )
 
     gate = build_final_review_gate([packet])
 
