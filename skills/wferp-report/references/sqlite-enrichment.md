@@ -30,3 +30,16 @@
 - formula 欄位有 translation status；無法轉譯時已通知使用者並列入 unresolved。
 - lookup hit/miss 有統計，未命中資料不能默默填空。
 - retention decision 已保存，cleanup 有 evidence。
+## Visual Companion Presentation
+
+SQLite remains part of the technical design. Production database reads are SELECT-only, then raw results are copied into the run-local SQLite workspace for enrichment, lookup joins, formula parity checks, and report preview.
+
+Step 1 must disclose whether any output field depends on SQLite enrichment or local lookup tables.
+
+Step 3 must render current-run data, not mock data:
+
+- raw SELECT preview with columns, row count, source SQL evidence, and up to 50 sample rows.
+- enriched SQLite preview with table name, row count, lookup hit/miss summary, formula status, and up to 50 sample rows.
+- aggregate checks that tie report numbers back to raw/enriched rows.
+
+If SQLite is unavailable or not yet initialized, Step 3 must say so and block downstream report generation when enrichment is required.

@@ -137,3 +137,16 @@ files_to_review:
 - 缺少任一必備 validator 時不可交付，不能用使用者確認覆蓋。
 
 交付訊息必須列出 `blocking_validators` 與 `accepted_residual_risks`，讓使用者知道是通過、被擋下，或是帶風險接受。
+## Fresh Reviewer Metadata
+
+Required validators must be fresh reviewer or subagent artifacts. Main-agent self-review cannot pass a gate.
+
+Each validator JSON must include:
+
+- `reviewer_identity`: object with `kind` and `id`; `kind` should be `subagent` when a subagent was used.
+- `checked_scope`: non-empty list of artifacts or surfaces reviewed.
+- `input_artifact_paths`: non-empty list of run files, SQL files, HTML files, screenshots, or evidence packets read by the reviewer.
+- `reviewed_at`: timestamp of the review.
+- `evidence`: concrete proof such as row counts, rendered URLs, screenshots, command outputs, or file paths.
+
+Validators must stay generic. Do not hardcode a customer, company, database, table, field, report type, or business domain into pass/fail logic. Domain context must come from the current run's prompt, source inventory, schema evidence, normalized report plan, SQL evidence, and data preview.

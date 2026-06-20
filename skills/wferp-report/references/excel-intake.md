@@ -29,3 +29,15 @@ Excel workbook 必須解析 `需求欄位`、`自訂公式`、`lookup 對照表`
 - 哪些欄位需人工確認。
 - 每個 DB 欄位的 readable field name / description。
 - 每個公式欄位的處理狀態：`translated`、`lookup_join`、`manual_required`、`unresolved`。
+## Source-to-Output Matrix
+
+When Excel is provided as either source data or target report format, Step 1 must explain how source fields become report outputs. The matrix must identify:
+
+- source type: prompt, Excel sheet, DB field, lookup table, SQLite enrichment, formula, or manual input.
+- output target: HTML block, chart, table, KPI, Excel worksheet, Excel formula, or hidden evidence.
+- transformation logic: direct copy, aggregation, lookup, formula, filter, grouping, formatting, or unresolved assumption.
+- formula parity: whether Excel formula output must be reproduced as values, formulas, or both.
+
+The goal is not to show every internal JSON field. The Visual Companion must render this as user-readable tables and labels in Traditional Chinese or the user's requested language.
+
+True workbook generation uses the spreadsheets skill and `@oai/artifact-tool`; do not use `openpyxl` as the default path.

@@ -86,6 +86,65 @@ def test_records_sql_review_checkpoint(tmp_path: Path):
     assert checkpoint["actions"] == ["同意查詢", "調整需求"]
 
 
+def test_checkpoint_records_payload_hash_and_checkpoint_id(tmp_path: Path):
+    create_report_run(tmp_path, run_id="demo-run", prompt="prompt")
+
+    checkpoint = record_checkpoint(tmp_path / "demo-run", "sql_review", {"sql": "SELECT 1"})
+    persisted = json.loads(
+        (tmp_path / "demo-run" / "checkpoints" / "02_sql_review.json").read_text(encoding="utf-8")
+    )
+
+    assert checkpoint["run_id"] == "demo-run"
+    assert checkpoint["checkpoint"] == "sql_review"
+    assert checkpoint["checkpoint_id"] == "sql_review"
+    assert len(checkpoint["payload_hash"]) == 64
+    assert persisted["payload_hash"] == checkpoint["payload_hash"]
+    state = load_run_state(tmp_path / "demo-run")
+    assert state["gate_status"]["phase_4_sql_review"]["confirmation"]["payload_hash"] == checkpoint["payload_hash"]
+
+
+def test_write_confirmation_requires_matching_identity(tmp_path: Path):
+    create_report_run(tmp_path, run_id="demo-run", prompt="prompt")
+    checkpoint = record_checkpoint(tmp_path / "demo-run", "sql_review", {"sql": "SELECT 1"})
+
+    confirmation = write_confirmation(
+        tmp_path / "demo-run",
+        "sql_review",
+        {
+            "action": "同意查詢",
+            "run_id": "demo-run",
+            "checkpoint_id": "sql_review",
+            "payload_hash": checkpoint["payload_hash"],
+            "confirmation_id": "confirm-001",
+        },
+    )
+
+    assert confirmation["run_id"] == "demo-run"
+    assert confirmation["checkpoint_id"] == "sql_review"
+    assert confirmation["payload_hash"] == checkpoint["payload_hash"]
+    assert confirmation["confirmation_id"] == "confirm-001"
+    state = load_run_state(tmp_path / "demo-run")
+    assert state["confirmation_identity"]["sql_review"]["confirmation_id"] == "confirm-001"
+
+
+def test_write_confirmation_rejects_stale_payload_hash(tmp_path: Path):
+    create_report_run(tmp_path, run_id="demo-run", prompt="prompt")
+    record_checkpoint(tmp_path / "demo-run", "sql_review", {"sql": "SELECT 1"})
+
+    with pytest.raises(ValueError, match="confirmation identity"):
+        write_confirmation(
+            tmp_path / "demo-run",
+            "sql_review",
+            {
+                "action": "同意查詢",
+                "run_id": "demo-run",
+                "checkpoint_id": "sql_review",
+                "payload_hash": "0" * 64,
+                "confirmation_id": "confirm-stale",
+            },
+        )
+
+
 def test_records_data_preview_checkpoint(tmp_path: Path):
     create_report_run(tmp_path, run_id="demo-run", prompt="prompt")
 
@@ -194,6 +253,7 @@ def test_repeated_checkpoint_replaces_history_entry(tmp_path: Path):
 
 def test_write_confirmation_uses_checkpoint_filename_and_preserves_payload(tmp_path: Path):
     create_report_run(tmp_path, run_id="demo-run", prompt="prompt")
+    checkpoint = record_checkpoint(tmp_path / "demo-run", "sql_review", {"sql": "SELECT 1"})
 
     confirmation = write_confirmation(
         tmp_path / "demo-run",
@@ -202,6 +262,10 @@ def test_write_confirmation_uses_checkpoint_filename_and_preserves_payload(tmp_p
             "action": "同意查詢",
             "comment": "條件正確，可以查詢",
             "selectedOptions": {"view": "management"},
+            "run_id": "demo-run",
+            "checkpoint_id": "sql_review",
+            "payload_hash": checkpoint["payload_hash"],
+            "confirmation_id": "confirm-002",
         },
     )
 
@@ -212,6 +276,8 @@ def test_write_confirmation_uses_checkpoint_filename_and_preserves_payload(tmp_p
     assert persisted["action"] == "同意查詢"
     assert persisted["comment"] == "條件正確，可以查詢"
     assert persisted["selectedOptions"] == {"view": "management"}
+    assert persisted["payload_hash"] == checkpoint["payload_hash"]
+    assert persisted["confirmation_id"] == "confirm-002"
 
 
 def test_append_audit_event_writes_jsonl(tmp_path: Path):

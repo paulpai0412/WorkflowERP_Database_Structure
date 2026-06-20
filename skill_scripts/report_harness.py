@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from skill_scripts.harness_state_machine import GATE_DEFINITIONS, GateBlockedError, assert_can_advance, evaluate_gate
 from skill_scripts.validator_contracts import ValidatorContractError, build_final_review_gate
 from skill_scripts.report_harness_state import (
     CHECKPOINT_DEFINITIONS,
@@ -11,6 +12,7 @@ from skill_scripts.report_harness_state import (
     load_run_state,
     record_checkpoint,
     save_run_state,
+    write_confirmation,
 )
 
 
@@ -46,9 +48,12 @@ class ReportHarness:
         state = self.state()
         confirmations = state.setdefault("user_confirmations", {})
         confirmation_options = state.setdefault("user_confirmation_options", {})
+        confirmation_identity = state.setdefault("confirmation_identity", {})
         for checkpoint in checkpoints:
             confirmations.pop(checkpoint, None)
             confirmation_options.pop(checkpoint, None)
+            confirmation_identity.pop(checkpoint, None)
+            self._confirmation_file(checkpoint).unlink(missing_ok=True)
         return save_run_state(self.run_dir, state)
 
     def clear_downstream(self, checkpoints: list[str], **state_resets: Any) -> dict[str, Any]:
@@ -59,9 +64,12 @@ class ReportHarness:
         ]
         confirmations = state.setdefault("user_confirmations", {})
         confirmation_options = state.setdefault("user_confirmation_options", {})
+        confirmation_identity = state.setdefault("confirmation_identity", {})
         for checkpoint in checkpoints:
             confirmations.pop(checkpoint, None)
             confirmation_options.pop(checkpoint, None)
+            confirmation_identity.pop(checkpoint, None)
+            self._confirmation_file(checkpoint).unlink(missing_ok=True)
             definition = CHECKPOINT_DEFINITIONS.get(checkpoint)
             if definition:
                 (self.run_dir / "checkpoints" / definition["file"]).unlink(missing_ok=True)
@@ -70,12 +78,76 @@ class ReportHarness:
         state.update(state_resets)
         return save_run_state(self.run_dir, state)
 
+    def _confirmation_file(self, checkpoint: str) -> Path:
+        definition = CHECKPOINT_DEFINITIONS.get(checkpoint)
+        if not definition:
+            return self.run_dir / "checkpoints" / f"{checkpoint}.confirmation.json"
+        return self.run_dir / "checkpoints" / definition["file"].replace(".json", ".confirmation.json")
+
+    def _confirmation_identity_payload(
+        self,
+        checkpoint: str,
+        action: str,
+        selected_options: dict[str, Any] | None,
+        comment: str = "",
+    ) -> dict[str, Any]:
+        checkpoint_path = self.run_dir / "checkpoints" / CHECKPOINT_DEFINITIONS[checkpoint]["file"]
+        checkpoint_payload = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+        return {
+            "action": action,
+            "run_id": checkpoint_payload["run_id"],
+            "checkpoint_id": checkpoint_payload.get("checkpoint_id", checkpoint),
+            "payload_hash": checkpoint_payload["payload_hash"],
+            "comment": comment,
+            "selectedOptions": selected_options or {},
+        }
+
+    def _is_repair_confirmation(
+        self,
+        checkpoint: str,
+        action: str,
+        selected_options: dict[str, Any] | None,
+    ) -> bool:
+        actions = CHECKPOINT_DEFINITIONS[checkpoint]["actions"]
+        is_change_action = bool(actions) and action != actions[0]
+        options = selected_options or {}
+        return is_change_action or bool(options.get("changeScope")) or bool(options.get("requiresRerender"))
+
+    def record_prompt_repair(
+        self,
+        *,
+        checkpoint: str,
+        action: str,
+        comment: str,
+        selected_options: dict[str, Any],
+    ) -> dict[str, Any]:
+        state = self.state()
+        state["blocking_repair_request"] = {
+            "checkpoint": checkpoint,
+            "action": action,
+            "comment": comment,
+            "selectedOptions": selected_options,
+            "changeScope": selected_options.get("changeScope"),
+            "targetUserStep": selected_options.get("targetUserStep"),
+            "requiresRerender": bool(selected_options.get("requiresRerender")),
+        }
+        state["allowed_next_actions"] = ["repair_current_step"]
+        for gate in GATE_DEFINITIONS:
+            state.setdefault("gate_status", {})[gate] = evaluate_gate(state, gate)
+        state["phase_status"] = {
+            gate: entry["status"]
+            for gate, entry in state.get("gate_status", {}).items()
+            if isinstance(entry, dict)
+        }
+        return save_run_state(self.run_dir, state)
+
     def confirm(
         self,
         checkpoint: str,
         action: str,
         *,
         selected_options: dict[str, Any] | None = None,
+        comment: str = "",
     ) -> dict[str, Any]:
         state = self.state()
         if checkpoint not in CHECKPOINT_DEFINITIONS:
@@ -84,9 +156,23 @@ class ReportHarness:
             raise ReportHarnessError(f"Invalid checkpoint action for {checkpoint}: {action}")
         if checkpoint not in {item["checkpoint"] for item in state.get("checkpoints", [])}:
             raise ReportHarnessError(f"{checkpoint} checkpoint has not been created")
+        write_confirmation(
+            self.run_dir,
+            checkpoint,
+            self._confirmation_identity_payload(checkpoint, action, selected_options, comment),
+        )
+        state = self.state()
         state.setdefault("user_confirmations", {})[checkpoint] = action
         state.setdefault("user_confirmation_options", {})[checkpoint] = selected_options or {}
-        return save_run_state(self.run_dir, state)
+        state = save_run_state(self.run_dir, state)
+        if self._is_repair_confirmation(checkpoint, action, selected_options):
+            state = self.record_prompt_repair(
+                checkpoint=checkpoint,
+                action=action,
+                comment=comment,
+                selected_options=selected_options or {},
+            )
+        return state
 
     def write_excel_confirmation(self, payload: dict[str, Any]) -> dict[str, Any]:
         return record_checkpoint(self.run_dir, "excel_confirmation", payload)
@@ -116,7 +202,17 @@ class ReportHarness:
             validator_results=[],
         )
         self.invalidate_confirmations("sql_review")
-        self.update_state(sql_candidate=sql, sql_validation=validation or {"status": "pending_user_confirmation"})
+        sql_path = self.run_dir / "sql" / "query.sql"
+        sql_path.parent.mkdir(parents=True, exist_ok=True)
+        sql_path.write_text(sql, encoding="utf-8")
+        state = self.state()
+        artifact_status = state.setdefault("artifact_status", {})
+        artifact_status["sql/query.sql"] = "complete"
+        self.update_state(
+            sql_candidate=sql,
+            sql_validation=validation or {"status": "pending_user_confirmation"},
+            artifact_status=artifact_status,
+        )
         return record_checkpoint(self.run_dir, "sql_review", {"sql": sql, "validation": validation or {}})
 
     def write_field_formula_classification(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -130,8 +226,22 @@ class ReportHarness:
         return record_checkpoint(self.run_dir, "field_formula_classification", payload)
 
     def write_data_preview(self, payload: dict[str, Any]) -> dict[str, Any]:
-        if self.state().get("user_confirmations", {}).get("sql_review") != "同意查詢":
+        state = self.state()
+        sql_confirm_action = CHECKPOINT_DEFINITIONS["sql_review"]["actions"][0]
+        if state.get("user_confirmations", {}).get("sql_review") != sql_confirm_action:
             raise ReportHarnessError("SQL must be confirmed before writing data preview")
+        identity = state.get("confirmation_identity", {}).get("sql_review")
+        gate_confirmation = (
+            state.get("gate_status", {})
+            .get("phase_4_sql_review", {})
+            .get("confirmation", {})
+        )
+        if not isinstance(identity, dict) or identity.get("payload_hash") != gate_confirmation.get("payload_hash"):
+            raise ReportHarnessError("confirmation_identity does not match current sql_review checkpoint")
+        try:
+            assert_can_advance(state, "phase_4_sql_review")
+        except GateBlockedError as exc:
+            raise ReportHarnessError(f"confirmation_identity gate blocked: {exc}") from exc
         self.clear_downstream(
             ["report_selection", "design_brief", "visual_design", "report_draft", "final_review"],
             report_type=None,

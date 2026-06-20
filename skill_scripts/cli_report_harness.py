@@ -25,13 +25,13 @@ from skill_scripts.report_harness import ReportHarness
 from skill_scripts.report_harness import ReportHarnessError
 from skill_scripts.report_harness_state import load_run_state
 from skill_scripts.report_harness_state import CHECKPOINT_DEFINITIONS
-from skill_scripts.report_harness_state import write_confirmation
 from skill_scripts.report_scaffold import scaffold_report_workspace
 from skill_scripts.report_scaffold import validate_generated_report_section
 from skill_scripts.schema_loader import load_schema_bundle
 from skill_scripts.single_html_exporter import export_single_html_report
 from skill_scripts.sql_router import RoutingOptions, route_generate_sql
 from skill_scripts.style_replay import detect_replay_adjustments
+from skill_scripts.user_step_payload import build_user_step_payload
 from skill_scripts.visual_checkpoint import build_visual_checkpoint_payload
 from skill_scripts.visual_checkpoint import render_visual_checkpoint_html
 from skill_scripts.workbook_lookup_importer import import_lookup_sheet
@@ -276,6 +276,10 @@ def _wait_confirmation(argv: list[str]) -> int:
                         "action": confirmation.get("action", ""),
                         "comment": confirmation.get("comment", ""),
                         "selectedOptions": confirmation.get("selectedOptions", {}),
+                        "run_id": confirmation.get("run_id", ""),
+                        "checkpoint_id": confirmation.get("checkpoint_id", args.checkpoint),
+                        "payload_hash": confirmation.get("payload_hash", ""),
+                        "confirmation_id": confirmation.get("confirmation_id", ""),
                         "created_at": confirmation.get("created_at", ""),
                         "confirmation_file": str(path),
                     }
@@ -577,16 +581,15 @@ def _confirm(argv: list[str]) -> int:
         selected_options.update(_parse_selected_option_values(args.selected_option))
         if args.accepted_residual_risk:
             selected_options["acceptedResidualRisks"] = list(args.accepted_residual_risk)
-        state = harness.confirm(args.checkpoint, args.action, selected_options=selected_options)
-        write_confirmation(
-            harness.run_dir,
-            args.checkpoint,
-            {
-                "action": args.action,
-                "comment": args.comment,
-                "selectedOptions": selected_options,
-            },
-        )
+        state = harness.confirm(args.checkpoint, args.action, selected_options=selected_options, comment=args.comment)
+        confirmation_path = _confirmation_path(harness.run_dir, args.checkpoint)
+        confirmation = _read_confirmation_payload(confirmation_path)
+        if args.comment:
+            confirmation["comment"] = args.comment
+            confirmation_path.write_text(
+                json.dumps(confirmation, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
     except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError) as exc:
         return _json_error("confirmation_error", str(exc))
     _write_stdout_json(
@@ -595,6 +598,7 @@ def _confirm(argv: list[str]) -> int:
             "checkpoint": args.checkpoint,
             "action": args.action,
             "selectedOptions": selected_options,
+            "confirmation": confirmation,
             "state": state,
         }
     )
@@ -950,6 +954,8 @@ def _validate_single_html(argv: list[str]) -> int:
 
     try:
         result = validate_single_html_static(args.html)
+    except FileNotFoundError:
+        return _json_error("single_html_validation_error", f"HTML file not found: {args.html}")
     except OSError as exc:
         return _json_error("single_html_validation_error", str(exc))
     _write_stdout_json({"status": "validated", **result})
@@ -1106,6 +1112,47 @@ def _check_delivery_artifacts(argv: list[str]) -> int:
     return 0 if result["allowed"] else 2
 
 
+def _write_user_step_preview(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Write a 4-step Visual Companion payload.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--step", required=True, type=int, choices=[1, 2, 3, 4])
+    args = parser.parse_args(argv)
+
+    try:
+        run_dir = Path(args.run_dir)
+        payload = build_user_step_payload(run_dir, args.step)
+        _write_run_json(run_dir, f"checkpoints/user_step_{args.step}.json", payload)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return _json_error("user_step_preview_error", str(exc))
+    _write_stdout_json(payload)
+    return 0
+
+
+def _export_excel_workbook(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Export a real XLSX workbook and record harness evidence.")
+    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--payload", required=True)
+    parser.add_argument("--output", default="report/delivery/report.xlsx")
+    args = parser.parse_args(argv)
+
+    try:
+        from skill_scripts.excel_workbook_exporter import export_workbook
+
+        harness = _open_harness(args.run_dir)
+        payload = _payload_or_checkpoint_payload(_load_json_arg(args.payload))
+        output_path = harness.run_dir / args.output
+        result = export_workbook(
+            payload,
+            output_path,
+            evidence_path=harness.run_dir / "review" / "excel-workbook-evidence.json",
+        )
+        harness.update_state(final_xlsx_path=result["workbook_path"], excel_workbook_evidence=result)
+    except (FileNotFoundError, ReportHarnessError, ValueError, json.JSONDecodeError, OSError, RuntimeError) as exc:
+        return _json_error("excel_workbook_export_error", str(exc))
+    _write_stdout_json(result)
+    return 0
+
+
 COMMANDS = {
     "create-run": _create_run,
     "write-excel-confirmation": _write_excel_confirmation,
@@ -1135,6 +1182,8 @@ COMMANDS = {
     "write-final-review": _write_final_review,
     "can-deliver": _can_deliver,
     "check-delivery-artifacts": _check_delivery_artifacts,
+    "write-user-step-preview": _write_user_step_preview,
+    "export-excel-workbook": _export_excel_workbook,
     "serve-checkpoint": _serve_checkpoint,
     "wait-confirmation": _wait_confirmation,
 }

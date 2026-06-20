@@ -14,7 +14,7 @@ explicitly provides a verified test database.
 Canonical production connection evidence:
 
 - ODC attachment: `C:/Users/ivychi/util/test/css04 CHD View_Customer.odc`
-- Excel attachment: `C:/Users/ivychi/util/test/1 ??_????????_CHD.XLSX`
+- Excel attachment: `C:/Users/ivychi/util/test/1 財務_訂單報表即時分析_CHD.XLSX`
 - Provider: `SQLOLEDB.1`
 - Authentication: `Integrated Security=SSPI`
 - User ID in the workbook connection string: `IRO`
@@ -37,6 +37,30 @@ Production SQL rule:
 Read `references/db-config.md` before any DB-backed phase. If a requested SQL
 operation is not SELECT-only, stop and ask the user for a verified
 non-production environment.
+
+## 13-Phase Engine, 4-Step User UI
+
+The internal harness keeps the 13 technical phases. The Visual Companion exposes only 4 user-facing steps:
+
+1. Source-to-Output Logic
+2. SQL Query
+3. Data Result and Report Design
+4. Final Delivery
+
+The user-facing 4 steps do not remove technical phases, validators, SQLite enrichment, lookup handling, SQL safety, repair, or delivery evidence. Each 4-step page is an aggregation over current-run artifacts and `state.json`, not a replacement for the harness.
+
+Step 3 must render real current-run raw and enriched data tables. The default visible preview is 50 rows, with total row count and source labels still shown.
+
+## Required Capability Ownership
+
+- Use Build Web Apps for Visual Companion UI, prompt repair controls, confirmation UX, responsive layout, and final HTML app shell when available.
+- Use Build Web Data Visualization for real-data KPI, chart, table, pivot-like preview, and report visualization when available.
+- Use spreadsheets for true `.xlsx` generation and workbook verification when Excel output is requested. The current implementation routes through `@oai/artifact-tool` rather than `openpyxl`.
+- If a required capability is unavailable, stop and ask before falling back.
+
+## State-Gated Progression
+
+`state.json` is the workflow source of truth. The harness must not advance from chat memory, stale files, stale confirmations, or file presence alone. Confirmation identity must match the current `run_id`, `checkpoint_id`, and `payload_hash`.
 
 ## 背景原則
 

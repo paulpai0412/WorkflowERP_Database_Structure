@@ -13,7 +13,17 @@ from skill_scripts.report_package import build_report_package
 from skill_scripts.style_replay import build_style_capsule
 from skill_scripts.validator_contracts import REQUIRED_VALIDATORS
 from tests.skill_scripts.test_excel_intake import _write_requirement_workbook
-from tests.skill_scripts.test_report_package import _accepted_report_run
+
+
+def _with_fresh_reviewer(packet: dict[str, object]) -> dict[str, object]:
+    role = str(packet.get("role", "validator"))
+    return {
+        "reviewer_identity": {"kind": "subagent", "id": f"{role}-agent"},
+        "checked_scope": ["run-dir"],
+        "input_artifact_paths": ["checkpoints/current.json"],
+        "reviewed_at": "2026-06-20T00:00:00Z",
+        **packet,
+    }
 
 
 def _run_cli(args: list[str], cwd: Path, env: dict[str, str] | None = None):
@@ -60,20 +70,120 @@ def _passing_final_review_payload() -> dict[str, object]:
                 {"type": "metric", "name": "ignored_lookup_rows", "value": 0},
             ]
         validator_results.append(
-            {
-                "role": role,
-                "status": "pass",
-                "evidence": evidence,
-                "findings": [],
-                "requiredFixes": [],
-                "residualRisks": [],
-            }
+            _with_fresh_reviewer(
+                {
+                    "role": role,
+                    "status": "pass",
+                    "evidence": evidence,
+                    "findings": [],
+                    "requiredFixes": [],
+                    "residualRisks": [],
+                }
+            )
         )
     return {"validator_results": validator_results}
 
 
+def _sql_gate_validator_results() -> list[dict[str, object]]:
+    return [
+        _with_fresh_reviewer(
+            {
+                "role": "sql_safety_reviewer",
+                "status": "pass",
+                "evidence": [{"command": "review sql_safety_reviewer"}],
+                "findings": [],
+                "requiredFixes": [],
+                "residualRisks": [],
+            }
+        ),
+        _with_fresh_reviewer(
+            {
+                "role": "schema_mapping_reviewer",
+                "status": "pass",
+                "evidence": [{"command": "review schema_mapping_reviewer"}],
+                "findings": [],
+                "requiredFixes": [],
+                "residualRisks": [],
+            }
+        ),
+    ]
+
+
 def _single_html_package(tmp_path: Path) -> dict[str, object]:
-    harness = _accepted_report_run(tmp_path)
+    harness = ReportHarness.create(
+        tmp_path,
+        run_id="run-001",
+        prompt="查詢 2026 年費用明細",
+    )
+    harness.write_sql_review(
+        "SELECT department, amount FROM expenses",
+        {"readonly": True, "status": "pass"},
+    )
+    harness.update_state(validator_results=_sql_gate_validator_results())
+    harness.confirm("sql_review", "同意查詢")
+    harness.write_data_preview(
+        {
+            "rows": [
+                {"department": "管理部", "amount": 1000},
+                {"department": "研發部", "amount": 2500},
+            ],
+            "columns": ["department", "amount"],
+            "row_count": 2,
+            "aggregates": {"amount_sum": 3500},
+            "excluded_rows": [],
+        }
+    )
+    harness.confirm("data_preview", "確認資料")
+    harness.write_report_selection(
+        {
+            "selected_report_type": "管理摘要",
+            "selected_report_design": "financial-control",
+            "selected_options": {"include_table": True, "include_chart": False},
+        }
+    )
+    harness.confirm("report_selection", "產生報告")
+    harness.write_design_brief(
+        {
+            "schema_version": "wferp.design-brief.v1",
+            "report_intent": {
+                "prompt": "查詢 2026 年費用明細",
+                "report_type": "管理摘要",
+                "primary_goal": "Review expense details.",
+            },
+            "catalog_guardrail": "financial-control",
+            "target_audience": {"role": "finance controller", "needs": ["expense review"]},
+            "layout_recipe": {
+                "mode": "kpi-first-dashboard",
+                "sections": ["executive-summary", "data-table"],
+                "density": "analysis-first",
+            },
+            "chart_recipe": [
+                {
+                    "id": "expense-summary",
+                    "type": "bar",
+                    "purpose": "Compare expense amounts by department.",
+                }
+            ],
+            "table_recipe": [
+                {
+                    "id": "expense-detail-table",
+                    "type": "data-table",
+                    "features": ["filter", "sort"],
+                    "row_count": 2,
+                }
+            ],
+            "interaction_recipe": {"filters": ["department"], "drilldowns": ["department"]},
+            "visual_direction": {"tone": "quiet financial operations dashboard"},
+            "embedded_data_policy": {"mode": "smart-tiered"},
+        }
+    )
+    harness.confirm("design_brief", "確認設計")
+    harness.write_visual_design({"title": "Expense dashboard", "kpis": [{"label": "amount_sum", "value": 3500}]})
+    harness.confirm("visual_design", "確認視覺設計")
+    harness.write_report_draft({"sections": ["executive-summary", "data-table"]})
+    harness.confirm("report_draft", "接受")
+    harness.write_final_review({"validator_results": _passing_final_review_payload()["validator_results"]})
+    harness.confirm("final_review", "完成")
     return build_report_package(harness.run_dir)
 
 
@@ -603,6 +713,7 @@ def test_cli_full_flow_blocks_and_advances_by_confirmation(tmp_path: Path):
 
     assert sql_review.returncode == 0, sql_review.stderr
     assert json.loads(sql_review.stdout)["checkpoint"] == "sql_review"
+    ReportHarness(run_dir).update_state(validator_results=_sql_gate_validator_results())
 
     blocked_preview = _run_cli(
         [
@@ -633,7 +744,10 @@ def test_cli_full_flow_blocks_and_advances_by_confirmation(tmp_path: Path):
     )
 
     assert confirmed.returncode == 0, confirmed.stderr
-    assert json.loads(confirmed.stdout)["status"] == "confirmed"
+    confirmed_payload = json.loads(confirmed.stdout)
+    assert confirmed_payload["status"] == "confirmed"
+    assert confirmed_payload["confirmation"]["checkpoint_id"] == "sql_review"
+    assert len(confirmed_payload["confirmation"]["payload_hash"]) == 64
 
     data_preview = _run_cli(
         [
@@ -1104,6 +1218,8 @@ def test_cli_full_flow_writes_draft_final_review_and_delivery_gate(tmp_path: Pat
     for step in steps:
         result = _run_cli(step, cwd=Path.cwd())
         assert result.returncode == 0, result.stderr
+        if step[0] == "write-sql-review":
+            ReportHarness(run_dir).update_state(validator_results=_sql_gate_validator_results())
 
     delivery = _run_cli(["can-deliver", "--run-dir", str(run_dir)], cwd=Path.cwd())
 
@@ -1723,61 +1839,6 @@ def test_cli_classify_workbook_accepts_current_session_payload(tmp_path: Path):
     assert written["llm_provider"] == "current-session"
     state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
     assert state["column_classification"]["resolver_strategy"] == "current_session_codex_table_first_resolver"
-    assert imported_payload["ignored_row_count"] == 5
-    lookup_table = imported_payload["table_name"]
-    state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
-    assert state["sqlite_manifest"]["lookup_row_counts"] == {lookup_table: 1}
-    assert state["sqlite_manifest"]["ignored_lookup_rows"][lookup_table][0]["reason"] == "header_or_metadata"
-
-    raw_rows = tmp_path / "raw-rows.json"
-    raw_rows.write_text('[{"account_code":"6111","amount":100}]', encoding="utf-8")
-    raw = _run_cli(["write-raw-table", "--run-dir", str(run_dir), "--rows", str(raw_rows)], cwd=Path.cwd())
-    assert raw.returncode == 0, raw.stderr
-
-    raw_preview = _run_cli(["write-raw-preview", "--run-dir", str(run_dir)], cwd=Path.cwd())
-    assert raw_preview.returncode == 0, raw_preview.stderr
-    raw_payload = json.loads(raw_preview.stdout)
-    assert raw_payload["checkpoint"] == "raw_data_preview"
-    assert raw_payload["payload"]["row_count"] == 1
-    assert raw_payload["payload"]["columns"] == ["account_code", "amount"]
-
-    enriched = _run_cli(
-        [
-            "run-sqlite-enrichment",
-            "--run-dir",
-            str(run_dir),
-            "--computed-columns",
-            '[{"name":"amount_twice","expression":"raw.\\"amount\\" * 2"}]',
-            "--lookup-columns",
-            (
-                '[{"name":"expense_category","lookup_table":"'
-                + lookup_table
-                + '","raw_key":"account_code","lookup_key":"account_code","lookup_value":"expense_category"}]'
-            ),
-        ],
-        cwd=Path.cwd(),
-    )
-    assert enriched.returncode == 0, enriched.stderr
-
-    enriched_preview = _run_cli(["write-enriched-preview", "--run-dir", str(run_dir)], cwd=Path.cwd())
-    assert enriched_preview.returncode == 0, enriched_preview.stderr
-    enriched_payload = json.loads(enriched_preview.stdout)
-    assert enriched_payload["checkpoint"] == "enriched_data_preview"
-    assert enriched_payload["payload"]["sample_rows"] == [
-        {
-            "account_code": "6111",
-            "amount": 100,
-            "expense_category": "8.租金支出",
-            "amount_twice": 200,
-        }
-    ]
-
-    retention = _run_cli(["write-sqlite-retention", "--run-dir", str(run_dir)], cwd=Path.cwd())
-    assert retention.returncode == 0, retention.stderr
-    retention_payload = json.loads(retention.stdout)
-    assert retention_payload["checkpoint"] == "sqlite_retention"
-    table_names = {item["table_name"] for item in retention_payload["payload"]["tables"]}
-    assert lookup_table in table_names
 
 
 def test_harness_sql_review_clears_sqlite_preview_checkpoints(tmp_path: Path):

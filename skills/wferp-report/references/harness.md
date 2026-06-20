@@ -160,3 +160,19 @@ python3 -m skill_scripts.cli_report_harness wait-confirmation \
 - 任一 reviewer `fail` 或 `blocked`：停止該硬 gate，主 agent 依 `requiredFixes` 做最小 repair slice，修復後只重跑該 reviewer 與受影響下游 reviewer。
 - 任一 reviewer `warning`：可進入可逆下游工作，但 final delivery 前必須在 final checkpoint 由使用者接受 role-prefixed residual risk。
 - 可並行工作可先做，但不能越過依賴 gate。例如 SQL reviewer 執行中可準備 report plan 摘要，但不可執行 DB query。
+## 13-Phase Engine, 4-Step User Workbench
+
+The harness keeps all 13 technical phases. The Visual Companion groups them into 4 user-facing steps:
+
+| User Step | Technical Coverage | Required Evidence |
+|---|---|---|
+| 1. Source-to-Output Logic | Phase 0-3 | source inventory, Excel extraction, source-to-output matrix, formula semantics, schema mapping, chart/layout plan |
+| 2. SQL Query | Phase 4 | single SELECT SQL, readable table/field mapping, SQL safety validator, schema validator, user query consent |
+| 3. Data Result and Report Design | Phase 5-7 | production SELECT evidence, raw data preview, local SQLite table, enriched preview, 50-row table preview, chart/table/report options |
+| 4. Final Delivery | Phase 8-12 | report payload, single-file HTML, true `.xlsx`, validator evidence, visual evidence, residual risk decision |
+
+`state.json` is the source of truth for all transitions. A checkpoint can advance only when the current `run_id`, `checkpoint_id`, and `payload_hash` match the persisted confirmation. Stale files, stale browser tabs, and chat memory do not unlock a gate.
+
+The companion can be simplified to 4 user steps, but the harness must not remove validator execution, SQLite enrichment, prompt repair, production SELECT-only safety, or final delivery evidence.
+
+Capability ownership remains explicit: use Build Web Apps for the companion and final HTML UI, Build Web Data Visualization for real-data KPI/chart/table/report visualization, and spreadsheets for true `.xlsx` workbook generation and verification.

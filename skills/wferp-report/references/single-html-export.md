@@ -38,3 +38,12 @@ Repair checkpoint rules:
 - Credential string: repair package/evidence source and rerun package validation.
 - Invalid manifest/hash: repair exporter manifest generation only.
 - User asks layout/chart changes after export: reopen dynamic design brief checkpoint, regenerate HTML with the same data package or a newly confirmed package.
+## Plugin-Assisted Final HTML UI
+
+When available, use Build Web Apps for the final HTML app shell and interaction model, and Build Web Data Visualization for KPI, chart, table, and report visual encodings.
+
+The final HTML must be generated from confirmed current-run payloads. It must not contain stale sample data, fake charts, hidden live DB calls, network requests, credentials, or executable SQL.
+
+Before final delivery, validators must visually inspect the HTML in at least desktop and mobile widths, confirm the content is not blank, text does not overlap, and numbers can be traced back to SQL/data/SQLite evidence.
+
+If true Excel output is part of the requested delivery, the final manifest must include the `.xlsx` path and `excel_workbook_evidence` produced by the spreadsheets skill / `@oai/artifact-tool` exporter.

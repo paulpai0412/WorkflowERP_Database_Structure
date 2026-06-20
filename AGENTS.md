@@ -118,6 +118,17 @@ python -m skill_scripts.cli_report_harness check-delivery-artifacts --run-dir <r
 
 - If companion serving, user confirmation, or validator execution is blocked, stop and report the blocker instead of continuing.
 
+## WFERP Report 4-Step Visual Companion
+- Preserve the internal 13-phase harness. Only simplify the user-facing Visual Companion into 4 steps: Source-to-Output Logic, SQL Query, Data Result and Report Design, Final Delivery.
+- `state.json` controls all progression. Do not advance from chat memory, stale browser tabs, stale confirmation files, or artifact presence alone.
+- Visual Companion confirmations must match the current `run_id`, `checkpoint_id`, and `payload_hash`.
+- Step 1 must render source-to-output logic from prompt and/or Excel to final HTML/Excel outputs, including formulas, lookup tables, SQLite enrichment, and unresolved assumptions.
+- Step 3 must render real current-run table previews, with default preview capped at 50 rows. JSON-only preview or column-only preview is not enough.
+- Use Build Web Apps for Visual Companion/final HTML UI and Build Web Data Visualization for KPI/chart/table/report visualization when available.
+- Use the spreadsheets skill and `@oai/artifact-tool` for true `.xlsx` generation and workbook verification. Do not use `openpyxl` as the default path.
+- Required validators must be fresh reviewer/subagent artifacts with reviewer identity, checked scope, input artifacts, timestamp, findings, and evidence. The main agent cannot self-approve validator gates.
+- Validator/gating logic must remain generic and must not hardcode any customer, database, table, field, report type, or business domain.
+
 ## Repo-Specific Gotchas
 - Preserve UTF-8 when editing Chinese/Vietnamese text or generated JSON/HTML.
 - Keep existing Windows-style generated paths such as `HTML\\...` and `SQL\\...`; several generators intentionally emit them.

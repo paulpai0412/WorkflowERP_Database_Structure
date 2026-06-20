@@ -8,6 +8,7 @@ from urllib.request import Request, urlopen
 from skill_scripts.checkpoint_companion import CheckpointCompanionServer
 from skill_scripts.dynamic_design_brief import build_design_brief, validate_design_brief
 from skill_scripts.report_harness import ReportHarness
+from skill_scripts.report_harness_state import CHECKPOINT_DEFINITIONS
 from skill_scripts.validator_contracts import REQUIRED_VALIDATORS
 from skill_scripts.visual_checkpoint import build_visual_checkpoint_payload
 
@@ -42,6 +43,10 @@ def _validator_result(role: str, status: str = "pass") -> dict[str, object]:
     return {
         "role": role,
         "status": status,
+        "reviewer_identity": {"kind": "subagent", "id": f"{role}-agent"},
+        "checked_scope": ["run-dir"],
+        "input_artifact_paths": ["checkpoints/current.json"],
+        "reviewed_at": "2026-06-20T00:00:00Z",
         "evidence": evidence,
         "findings": [] if status == "pass" else [f"{role} failed"],
         "requiredFixes": [] if status == "pass" else [f"repair {role}"],
@@ -143,6 +148,33 @@ def test_confirmation_post_writes_confirmation_and_audit(tmp_path: Path):
     ).splitlines()
     assert len(audit_lines) == 1
     assert json.loads(audit_lines[0])["event"] == "checkpoint_confirmed"
+
+
+def test_companion_prompt_repair_posts_changes_requested_with_scope(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="run-001", prompt="query expenses")
+    harness.write_sql_review("SELECT department, amount FROM expenses", {"status": "pass"})
+    repair_action = CHECKPOINT_DEFINITIONS["sql_review"]["actions"][1]
+
+    with CheckpointCompanionServer.serve(tmp_path / "run-001") as server:
+        result = post_json(
+            f"{server.base_url}/api/runs/run-001/checkpoints/sql_review/confirm",
+            {
+                "action": repair_action,
+                "checkpointId": "sql_review",
+                "comment": "add date condition",
+                "selectedOptions": {
+                    "changeScope": "sql_conditions",
+                    "targetUserStep": 2,
+                    "requiresRerender": True,
+                },
+            },
+        )
+
+    assert result["status"] == "confirmed"
+    state = harness.state()
+    assert state["blocking_repair_request"]["comment"] == "add date condition"
+    assert state["blocking_repair_request"]["changeScope"] == "sql_conditions"
+    assert state["allowed_next_actions"] == ["repair_current_step"]
 
 
 def test_companion_server_uses_daemon_request_threads(tmp_path: Path):

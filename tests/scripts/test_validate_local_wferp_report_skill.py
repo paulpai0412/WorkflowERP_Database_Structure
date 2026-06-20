@@ -29,6 +29,7 @@ REQUIRED_PARITY_FILES = [
     "references/validators.md",
     "references/e2e-expense-analysis.md",
     "references/single-html-export.md",
+    "references/visual-companion-ui.md",
     "references/dynamic-design-brief.md",
     "references/style-replay.md",
     "scripts/scaffold-report.sh",
@@ -380,3 +381,34 @@ def test_validator_rejects_missing_single_html_safety_text(tmp_path, needle):
 
     assert result.ok is False
     assert f"single-html-export.md missing required text: {needle}" in result.errors
+
+
+def test_wferp_report_skill_documents_4_step_stateful_visual_companion():
+    repo_root = ROOT
+    skill = (repo_root / "skills" / "wferp-report" / "SKILL.md").read_text(encoding="utf-8")
+    harness = (repo_root / "skills" / "wferp-report" / "references" / "harness.md").read_text(encoding="utf-8")
+    ui = (repo_root / "skills" / "wferp-report" / "references" / "visual-companion-ui.md").read_text(
+        encoding="utf-8"
+    )
+    validators = (repo_root / "skills" / "wferp-report" / "references" / "validators.md").read_text(
+        encoding="utf-8"
+    )
+    excel = (repo_root / "skills" / "wferp-report" / "references" / "excel-intake.md").read_text(
+        encoding="utf-8"
+    )
+
+    for text in (skill, harness, ui):
+        assert "13" in text
+        assert "4-step" in text or "4 user-facing" in text
+        assert "state.json" in text
+        assert "Build Web Apps" in text
+        assert "Build Web Data Visualization" in text
+        assert "spreadsheets" in text
+        assert "50" in text
+        assert "prompt" in text and "repair" in text
+
+    assert "fresh reviewer" in validators
+    assert "subagent" in validators
+    assert "hardcode" in validators
+    assert "source-to-output" in excel.lower()
+    assert "@oai/artifact-tool" in excel

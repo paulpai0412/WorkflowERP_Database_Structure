@@ -39,6 +39,10 @@ def _validator_result(role: str, status: str = "pass") -> dict[str, object]:
     return {
         "role": role,
         "status": status,
+        "reviewer_identity": {"kind": "subagent", "id": f"{role}-agent"},
+        "checked_scope": ["run-dir"],
+        "input_artifact_paths": ["checkpoints/current.json"],
+        "reviewed_at": "2026-06-20T00:00:00Z",
         "evidence": evidence,
         "findings": [] if status == "pass" else [f"{role} failed"],
         "requiredFixes": [] if status == "pass" else [f"repair {role}"],
