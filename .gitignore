@@ -2,6 +2,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .playwright-mcp/
+.worktrees/
 prompt.txt
 
 # Local portable tool payloads and downloads. Keep small wrappers/scripts only.
