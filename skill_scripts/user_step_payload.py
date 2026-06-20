@@ -58,6 +58,7 @@ def _step_1(run_dir: Path, state: dict[str, Any]) -> dict[str, Any]:
         "source_inventory": classification.get("source_inventory", []),
         "source_to_output_matrix": classification.get("source_to_output_matrix", []),
         "formula_semantics": classification.get("formula_semantics", []),
+        "excel_workbook_preview": classification.get("excel_workbook_preview", {}),
         "unresolved_items": classification.get("unresolved_items", []),
         "technical_checkpoints": ["excel_confirmation", "field_formula_classification"],
     }

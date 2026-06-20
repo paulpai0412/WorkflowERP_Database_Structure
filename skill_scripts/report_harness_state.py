@@ -9,6 +9,7 @@ from typing import Any
 import uuid
 
 from skill_scripts.harness_state_machine import GATE_DEFINITIONS, evaluate_gate, initialize_state_machine
+from skill_scripts.report_gate_checks import scan_text_readability
 
 
 CHECKPOINT_DEFINITIONS: dict[str, dict[str, Any]] = {
@@ -98,6 +99,13 @@ def _state_path(run_dir: str | Path) -> Path:
 def _write_json(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _assert_readable_artifact_text(relative_path: str, text: str) -> None:
+    readability = scan_text_readability(text)
+    if not readability["valid"]:
+        errors = ", ".join(readability["errors"])
+        raise ValueError(f"text readability failed for {relative_path}: {errors}")
 
 
 def _payload_hash(payload: dict[str, Any]) -> str:
@@ -216,12 +224,16 @@ def record_checkpoint(run_dir: str | Path, checkpoint: str, payload: dict[str, A
         "payload_hash": payload_hash,
         "created_at": _now(),
     }
-    _write_json(run_path / "checkpoints" / definition["file"], checkpoint_payload)
+    checkpoint_relative_path = f"checkpoints/{definition['file']}"
+    checkpoint_text = json.dumps(checkpoint_payload, ensure_ascii=False, indent=2)
+    _assert_readable_artifact_text(checkpoint_relative_path, checkpoint_text)
+    (run_path / checkpoint_relative_path).parent.mkdir(parents=True, exist_ok=True)
+    (run_path / checkpoint_relative_path).write_text(checkpoint_text, encoding="utf-8")
 
     entry = {
         "checkpoint": checkpoint,
         "checkpoint_id": checkpoint,
-        "file": f"checkpoints/{definition['file']}",
+        "file": checkpoint_relative_path,
         "payload_hash": payload_hash,
         "created_at": checkpoint_payload["created_at"],
     }

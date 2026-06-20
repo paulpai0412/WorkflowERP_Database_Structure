@@ -22,10 +22,43 @@ MOJIBAKE_MARKERS = (
 
 def scan_text_readability(text: str) -> dict[str, Any]:
     errors: list[str] = []
-    if "????" in text:
+    if re.search(r"\?{2,}", text):
         errors.append("repeated_question_marks")
     if any(marker in text for marker in MOJIBAKE_MARKERS):
         errors.append("mojibake_marker")
+    return {"valid": not errors, "errors": errors}
+
+
+def scan_run_text_artifacts(run_dir: str | Path) -> dict[str, Any]:
+    run_path = Path(run_dir)
+    roots = [
+        run_path / "checkpoints",
+        run_path / "plan",
+        run_path / "source",
+        run_path / "data",
+        run_path / "review" / "validators",
+    ]
+    candidate_paths = [run_path / "state.json"]
+    for root in roots:
+        if root.exists():
+            candidate_paths.extend(sorted(root.rglob("*.json")))
+            candidate_paths.extend(sorted(root.rglob("*.html")))
+            candidate_paths.extend(sorted(root.rglob("*.sql")))
+
+    errors: list[str] = []
+    for path in candidate_paths:
+        if not path.exists() or not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            relative = path.relative_to(run_path).as_posix()
+            errors.append(f"{relative}:utf8_decode")
+            continue
+        readability = scan_text_readability(text)
+        if not readability["valid"]:
+            relative = path.relative_to(run_path).as_posix()
+            errors.extend(f"{relative}:{error}" for error in readability["errors"])
     return {"valid": not errors, "errors": errors}
 
 

@@ -153,7 +153,7 @@ def evaluate_gate(state: dict[str, Any], gate: str) -> dict[str, Any]:
     confirmation = _confirmation_for_checkpoint(state.get("confirmation_identity") or {}, checkpoint_id)
     if confirmation is None:
         blocking_reason.append(f"missing_confirmation:{checkpoint_id}")
-        payload_hash = None
+        payload_hash = _checkpoint_payload_hash(state, checkpoint_id)
     else:
         payload_hash = confirmation.get("payload_hash") if isinstance(confirmation, dict) else None
 
@@ -204,6 +204,18 @@ def _confirmation_for_checkpoint(confirmation_identity: dict[str, Any], checkpoi
     return confirmation
 
 
+def _checkpoint_payload_hash(state: dict[str, Any], checkpoint_id: str) -> str | None:
+    for checkpoint in state.get("checkpoints") or []:
+        if not isinstance(checkpoint, dict):
+            continue
+        if checkpoint.get("checkpoint") != checkpoint_id and checkpoint.get("checkpoint_id") != checkpoint_id:
+            continue
+        payload_hash = checkpoint.get("payload_hash")
+        if isinstance(payload_hash, str) and payload_hash:
+            return payload_hash
+    return None
+
+
 def _validator_status_by_role(validator_results: list[Any]) -> dict[str, Any]:
     statuses: dict[str, Any] = {}
     for result in validator_results:
@@ -246,6 +258,6 @@ def _merge_confirmation_metadata(existing: Any, evaluated: dict[str, Any]) -> di
     merged = deepcopy(existing)
     merged["required"] = evaluated["required"]
     merged["checkpoint_id"] = evaluated["checkpoint_id"]
-    if "payload_hash" not in merged:
+    if not merged.get("payload_hash"):
         merged["payload_hash"] = evaluated.get("payload_hash")
     return merged

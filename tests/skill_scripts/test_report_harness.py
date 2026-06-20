@@ -113,6 +113,21 @@ def test_rejects_state_transition_without_required_confirmation(tmp_path: Path):
         harness.write_data_preview({"rows": [], "row_count": 0})
 
 
+def test_field_formula_readability_failure_does_not_pollute_state(tmp_path: Path):
+    harness = ReportHarness.create(tmp_path, run_id="demo-run", prompt="prompt")
+
+    with pytest.raises(ReportHarnessError, match="text readability"):
+        harness.write_field_formula_classification(
+            {"source_to_output_matrix": [{"Excel??": "A", "label": "????"}]}
+        )
+
+    state = harness.state()
+    assert state["column_classification"] is None
+    assert not (
+        tmp_path / "demo-run" / "checkpoints" / "01b_field_formula_classification.json"
+    ).exists()
+
+
 def test_confirmed_sql_allows_data_preview_checkpoint(tmp_path: Path):
     harness = ReportHarness.create(tmp_path, run_id="demo-run", prompt="請查詢費用")
     harness.write_sql_review("SELECT * FROM ACPTA")

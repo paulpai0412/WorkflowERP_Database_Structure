@@ -819,6 +819,11 @@ def _render_source_to_output_logic(payload: Mapping[str, Any]) -> str:
     matrix = payload.get("source_to_output_matrix")
     inventory = payload.get("source_inventory")
     formulas = payload.get("formula_semantics")
+    excel_preview = (
+        payload.get("excel_workbook_preview")
+        if isinstance(payload.get("excel_workbook_preview"), Mapping)
+        else {}
+    )
     return (
         "<section class=\"panel user-step-panel\">"
         "<h2>來源到產出邏輯</h2>"
@@ -828,6 +833,7 @@ def _render_source_to_output_logic(payload: Mapping[str, Any]) -> str:
         + _render_table(inventory if isinstance(inventory, list) else [])
         + "<h3>公式與計算邏輯</h3>"
         + _render_table(formulas if isinstance(formulas, list) else [])
+        + _render_excel_workbook_preview(excel_preview)
         + "</section>"
     )
 
@@ -836,7 +842,7 @@ def _render_excel_workbook_preview(payload: Mapping[str, Any]) -> str:
     sheets = payload.get("sheets")
     if not isinstance(sheets, list) or not sheets:
         return "<p class=\"muted\">尚未產生 Excel Workbook Preview。</p>"
-    parts = ["<div class=\"workbook-preview\"><h3>Excel Workbook Preview</h3>"]
+    parts = ["<div class=\"workbook-preview\"><h3>Excel 工作簿預覽</h3>"]
     for sheet in sheets:
         if not isinstance(sheet, Mapping):
             continue

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from skill_scripts.harness_state_machine import GATE_DEFINITIONS, GateBlockedError, assert_can_advance, evaluate_gate
+from skill_scripts.report_gate_checks import scan_text_readability
 from skill_scripts.validator_contracts import ValidatorContractError, build_final_review_gate
 from skill_scripts.report_harness_state import (
     CHECKPOINT_DEFINITIONS,
@@ -43,6 +44,13 @@ class ReportHarness:
         state = self.state()
         state.update(updates)
         return save_run_state(self.run_dir, state)
+
+    def _assert_payload_readable(self, checkpoint: str, payload: dict[str, Any]) -> None:
+        text = json.dumps(payload, ensure_ascii=False, indent=2)
+        readability = scan_text_readability(text)
+        if not readability["valid"]:
+            errors = ", ".join(readability["errors"])
+            raise ReportHarnessError(f"text readability failed for {checkpoint}: {errors}")
 
     def invalidate_confirmations(self, *checkpoints: str) -> dict[str, Any]:
         state = self.state()
@@ -216,6 +224,7 @@ class ReportHarness:
         return record_checkpoint(self.run_dir, "sql_review", {"sql": sql, "validation": validation or {}})
 
     def write_field_formula_classification(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self._assert_payload_readable("field_formula_classification", payload)
         self.update_state(column_classification=payload)
         self.invalidate_confirmations(
             "sql_review",

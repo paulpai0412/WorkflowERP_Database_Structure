@@ -64,6 +64,9 @@ python3 -m skill_scripts.cli_report_harness write-sql-review \
   --run-dir wferp-report-runs/run-001 \
   --sql "SELECT department, amount FROM expenses"
 
+python3 -m skill_scripts.cli_report_harness check-run-text-artifacts \
+  --run-dir wferp-report-runs/run-001
+
 python3 -m skill_scripts.cli_report_harness serve-checkpoint \
   --run-dir wferp-report-runs/run-001 \
   --host 127.0.0.1 \
@@ -139,6 +142,8 @@ python3 -m skill_scripts.cli_report_harness wait-confirmation \
 
 ## Gate Rules
 
+- 每次寫入 checkpoint、plan、source、data、validator 或 `state.json` 後，必須先執行 `check-run-text-artifacts`。若出現 `repeated_question_marks`、`mojibake_marker` 或 UTF-8 decode failure，不得開 Visual Companion、不得等待使用者確認、不得推進 gate。
+- 中文 prompt、workbook 摘要、JSON payload、HTML 或 report content 不得透過 PowerShell command-line argument、here-string 或 pipeline 傳給 Python/Node；必須寫入 UTF-8 檔案，CLI 只傳 ASCII path/flag。
 - `write-raw-table` 必須在 SQL Review Checkpoint action 為 `同意查詢`，且 `sql_safety_reviewer`、`schema_mapping_reviewer` 都 pass 後才能執行。
 - `write-raw-preview` 必須在 raw table 寫入後執行，讓使用者先確認 DB 資料本身。
 - `run-sqlite-enrichment` 必須在 Field & Formula Checkpoint 已確認、lookup import 完成、raw preview 可追溯時執行。

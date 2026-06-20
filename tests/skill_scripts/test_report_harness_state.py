@@ -103,6 +103,21 @@ def test_checkpoint_records_payload_hash_and_checkpoint_id(tmp_path: Path):
     assert state["gate_status"]["phase_4_sql_review"]["confirmation"]["payload_hash"] == checkpoint["payload_hash"]
 
 
+def test_record_checkpoint_rejects_replacement_question_mark_payload(tmp_path: Path):
+    create_report_run(tmp_path, run_id="demo-run", prompt="prompt")
+
+    with pytest.raises(ValueError, match="text readability"):
+        record_checkpoint(
+            tmp_path / "demo-run",
+            "field_formula_classification",
+            {"source_to_output_matrix": [{"Excel??": "A", "label": "????"}]},
+        )
+
+    assert not (
+        tmp_path / "demo-run" / "checkpoints" / "01b_field_formula_classification.json"
+    ).exists()
+
+
 def test_write_confirmation_requires_matching_identity(tmp_path: Path):
     create_report_run(tmp_path, run_id="demo-run", prompt="prompt")
     checkpoint = record_checkpoint(tmp_path / "demo-run", "sql_review", {"sql": "SELECT 1"})

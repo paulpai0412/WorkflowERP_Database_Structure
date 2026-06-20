@@ -89,7 +89,7 @@ Excel 在本 skill 中可能同時是來源資料欄位、lookup 對照表、公
 - data preview 只有 JSON 路徑或摘要，沒有表格顯示至少數筆資料、欄位名、row count、source summary。
 - validator 由主 agent 自己宣稱通過，未以 reviewer/subagent artifact 寫入 `review/validators/`。
 - validator fail / blocked 仍推進下一 phase，或一次性等到最後才驗證全部。
-- 中文 prompt / workbook path / payload 經 PowerShell command-line argument 傳遞造成亂碼；大量中文內容必須透過 UTF-8 檔案或 structured payload 傳遞。
+- 中文 prompt / workbook path / payload 經 PowerShell command-line argument、here-string 或 pipeline 傳遞造成亂碼；大量中文內容必須透過 UTF-8 檔案或 structured in-process payload 傳遞，命令列只傳 ASCII path/flag。
 - Production DB 查詢前未完成 SQL Review checkpoint、SQL safety validator、schema mapping validator 與使用者同意。
 - 對 production DB 執行任何非 `SELECT` SQL，包含 DML、DDL、stored procedure、transaction-changing command。
 - Checkpoint、validator、gating、report design 或測試資料寫死特定 business domain、customer、database、table、view 或欄位，而不是從使用者 prompt、uploaded files、Normalized Report Plan 與 schema evidence 讀取。
@@ -150,9 +150,10 @@ Validator 是逐 gate 的獨立 reviewer，不是最後一次總審，也不是�
 ### 中文與工具契約
 
 - 回覆使用者、checkpoint、report UI 預設使用繁體中文。
-- 不在 PowerShell command-line argument 中塞大型中文 prompt、workbook 摘要、JSON payload 或 HTML；改用 UTF-8 檔案輸入。
+- 不在 PowerShell command-line argument、here-string、pipeline 中塞大型中文 prompt、workbook 摘要、JSON payload 或 HTML；改用 UTF-8 檔案輸入，並只在 shell 傳 ASCII 檔案路徑或 flags。
 - 檔案必須以 UTF-8 寫入；validator/final-review/manifest JSON 必須能 parse，且不得含 mojibake、連續問號替代中文字。
-- 亂碼零容忍掃描範圍至少包含 checkpoint payload、report payload、HTML、validator JSON、manifest、SQL readable labels、檔名顯示、chart/table labels 與 final review。
+- 每個 checkpoint/plan/source/data/validator/state artifact 寫入後，必須執行 `python -m skill_scripts.cli_report_harness check-run-text-artifacts --run-dir <run-dir>`；若出現 `repeated_question_marks`、`mojibake_marker` 或 UTF-8 decode failure，停止並修復，不得開 Visual Companion 或推進 gate。
+- 亂碼零容忍掃描範圍至少包含 checkpoint payload、report payload、HTML、validator JSON、manifest、SQL readable labels、檔名顯示、chart/table labels、state.json 與 final review。
 - 進 repo 後先啟用 `.tools/activate.ps1`，確保 portable `git`、`gh`、`python`、`pytest` 可用。
 
 ### Domain-Agnostic Gate Rule

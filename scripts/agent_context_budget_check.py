@@ -114,7 +114,7 @@ def artifact_cap_failures(root: Path = ROOT) -> list[str]:
             continue
 
         expected_cap = EXPECTED_LINE_CAP_BY_KIND[kind]
-        relative_path = str(path.relative_to(root))
+        relative_path = path.relative_to(root).as_posix()
         declared_cap = top_level_scalar(text, "line_cap")
         if not declared_cap:
             failures.append(

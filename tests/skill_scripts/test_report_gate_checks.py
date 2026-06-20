@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from skill_scripts.report_gate_checks import evaluate_delivery_artifacts
 from skill_scripts.report_gate_checks import load_json_no_bom
+from skill_scripts.report_gate_checks import scan_run_text_artifacts
 from skill_scripts.report_gate_checks import scan_text_readability
 
 
@@ -24,6 +25,49 @@ def test_readability_scan_rejects_repeated_question_marks_and_mojibake() -> None
     assert result["valid"] is False
     assert "repeated_question_marks" in result["errors"]
     assert "mojibake_marker" in result["errors"]
+
+
+def test_run_text_artifact_scan_covers_checkpoint_plan_data_and_state_json() -> None:
+    run_dir = _case_dir("run-readability") / "run"
+    for relative_path, text in {
+        "checkpoints/01b_field_formula_classification.json": '{"label": "????"}',
+        "plan/source-to-output-matrix.json": '[{"column": "Excel??"}]',
+        "data/excel-workbook-preview.json": '{"status": "ok"}',
+        "state.json": '{"status": "ok"}',
+    }.items():
+        path = run_dir / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+    result = scan_run_text_artifacts(run_dir)
+
+    assert result["valid"] is False
+    assert "checkpoints/01b_field_formula_classification.json:repeated_question_marks" in result["errors"]
+    assert "plan/source-to-output-matrix.json:repeated_question_marks" in result["errors"]
+
+
+def test_cli_check_run_text_artifacts_blocks_unreadable_run_payload() -> None:
+    run_dir = _case_dir("cli-run-readability") / "run"
+    checkpoint_path = run_dir / "checkpoints" / "01b_field_formula_classification.json"
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint_path.write_text('{"label": "????"}', encoding="utf-8")
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "skill_scripts.cli_report_harness",
+            "check-run-text-artifacts",
+            "--run-dir",
+            str(run_dir),
+        ],
+        capture_output=True,
+        check=False,
+        encoding="utf-8",
+    )
+
+    assert completed.returncode == 2
+    assert "repeated_question_marks" in completed.stdout
 
 
 def test_load_json_no_bom_rejects_utf8_bom() -> None:

@@ -35,6 +35,24 @@ python3 -m pip install pymssql pandas pytest
 .tools\activate.cmd
 ```
 
+## Windows UTF-8 and Payload Safety
+- On Windows, PowerShell display settings are not enough to protect generated
+  files. Always activate `.tools/activate.ps1` or `.tools/activate.cmd` before
+  report-harness work so the console, `$OutputEncoding`, and Python I/O use
+  UTF-8.
+- Do not pass Chinese prompt text, workbook summaries, report JSON, HTML, or
+  checkpoint payloads through PowerShell command-line arguments, here-strings,
+  or pipelines. PowerShell code page or `$OutputEncoding` drift can replace
+  characters with literal `?` before Python or Node receives the data.
+- Pass large or multilingual payloads by UTF-8 files and pass only ASCII file
+  paths/flags on the command line, for example
+  `--classification-payload payload.json`.
+- After writing checkpoint, plan, source, data, validator, or state artifacts,
+  run `python -m skill_scripts.cli_report_harness check-run-text-artifacts
+  --run-dir <run-dir>` before opening the Visual Companion or advancing a gate.
+  Any `repeated_question_marks`, `mojibake_marker`, or UTF-8 decode failure is
+  blocking.
+
 ## Autonomous Workflow Role Priority
 - When the user asks to follow the autonomous development workflow, `docs/agents/autonomous-development-workflow.yaml` is the active repo operating contract for that unit of work.
 - In that mode, the main agent is an orchestrator only. It may select issues, build issue packets, spawn worker/verifier sessions, validate returned artifact schemas, update handoff metadata, and publish PR/issue summaries.
@@ -148,6 +166,9 @@ python3 -m skill_scripts.cli_generate_select --prompt "查詢2026年的工程預
   handling decisions.
 - Final visual review must include desktop and mobile viewport evidence through visual comparison, browser screenshots, or equivalent validator evidence. Mobile overflow, unreadable text, or overlapping UI is blocking.
 - Large workbook, schema, or report payloads must be passed through files or current-session Codex context, not as full command-line arguments to Codex CLI.
+- Do not use PowerShell here-strings, pipelines, or command-line arguments as
+  the transport for Chinese prompt/workbook/report payloads. Use UTF-8 files or
+  structured in-process data, and keep shell arguments ASCII-only.
 - Validator/final-review/manifest JSON must be strict UTF-8 without BOM, parse as a JSON object, and contain no mojibake markers or repeated question-mark text.
 - If a checkpoint, SQL, data preview, report payload, HTML, or validator file
   contains mojibake or replacement-question-mark Chinese, stop and fix encoding
@@ -155,6 +176,10 @@ python3 -m skill_scripts.cli_generate_select --prompt "查詢2026年的工程預
 - Mojibake scanning must cover checkpoint payloads, report payloads, HTML,
   validator JSON, manifests, SQL readable labels, file-name displays,
   chart/table labels, and final review artifacts.
+- Use `python -m skill_scripts.cli_report_harness check-run-text-artifacts
+  --run-dir <run-dir>` as the run-wide scan before Visual Companion
+  confirmation and before any validator marks the encoding/readability scope as
+  passed.
 - After changing visual companion behavior, run a smoke check for current URL,
   POST confirm, POST request changes, comments, selectedOptions, and persisted
   confirmation before using it for a report run.

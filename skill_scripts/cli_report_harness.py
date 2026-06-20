@@ -16,6 +16,7 @@ from skill_scripts.excel_intake import build_excel_confirmation_payload, parse_e
 from skill_scripts.html_self_validator import validate_single_html_static
 from skill_scripts.llm_workbook_classifier import classify_workbook_with_llm
 from skill_scripts.report_gate_checks import evaluate_delivery_artifacts
+from skill_scripts.report_gate_checks import scan_run_text_artifacts
 from skill_scripts.sqlite_enrichment import run_enrichment
 from skill_scripts.sqlite_workspace import SQLiteRunWorkspace
 from skill_scripts.report_catalog import build_report_selection_payload
@@ -1112,6 +1113,16 @@ def _check_delivery_artifacts(argv: list[str]) -> int:
     return 0 if result["allowed"] else 2
 
 
+def _check_run_text_artifacts(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Scan current run artifacts for UTF-8 readability issues.")
+    parser.add_argument("--run-dir", required=True)
+    args = parser.parse_args(argv)
+
+    result = scan_run_text_artifacts(Path(args.run_dir))
+    _write_stdout_json({"status": "ok", **result})
+    return 0 if result["valid"] else 2
+
+
 def _write_user_step_preview(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Write a 4-step Visual Companion payload.")
     parser.add_argument("--run-dir", required=True)
@@ -1182,6 +1193,7 @@ COMMANDS = {
     "write-final-review": _write_final_review,
     "can-deliver": _can_deliver,
     "check-delivery-artifacts": _check_delivery_artifacts,
+    "check-run-text-artifacts": _check_run_text_artifacts,
     "write-user-step-preview": _write_user_step_preview,
     "export-excel-workbook": _export_excel_workbook,
     "serve-checkpoint": _serve_checkpoint,

@@ -162,6 +162,34 @@ def test_evaluate_gate_returns_complete_when_gate_inputs_are_ready():
     assert evaluation["blocking_reason"] == []
 
 
+def test_evaluate_gate_preserves_checkpoint_hash_before_confirmation():
+    state = initialize_state_machine(
+        {
+            "artifact_status": {
+                "checkpoints/01b_field_formula_classification.json": "complete",
+            },
+            "validator_results": [
+                {"role": "requirement_understanding_reviewer", "status": "pass"},
+                {"role": "schema_mapping_reviewer", "status": "pass"},
+            ],
+            "checkpoints": [
+                {
+                    "checkpoint": "field_formula_classification",
+                    "checkpoint_id": "field_formula_classification",
+                    "file": "checkpoints/01b_field_formula_classification.json",
+                    "payload_hash": "checkpoint-hash",
+                }
+            ],
+        }
+    )
+
+    evaluation = evaluate_gate(state, "phase_3_field_formula")
+
+    assert evaluation["status"] == "blocked"
+    assert evaluation["blocking_reason"] == ["missing_confirmation:field_formula_classification"]
+    assert evaluation["confirmation"]["payload_hash"] == "checkpoint-hash"
+
+
 def test_initialize_state_machine_merges_existing_gate_status_without_resetting_progress():
     initialized = initialize_state_machine(
         {
