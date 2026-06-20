@@ -20,6 +20,7 @@ from skill_scripts.user_step_payload import build_user_step_payload
 
 
 MAX_REQUEST_BYTES = 65536
+MAX_DRAIN_BYTES = 1048576
 MAX_TABLE_ROWS = 50
 CHART_TYPE_OPTIONS = [
     ("combo", "Combo：實際 / 預算 / 差異"),
@@ -805,6 +806,15 @@ def _render_user_step_nav(current_step: int) -> str:
     return "<ol class=\"progress user-step-nav\">" + "".join(items) + "</ol>"
 
 
+def _render_checkpoint_history(state: Mapping[str, Any], current: str, run_id: str) -> str:
+    return (
+        "<details class=\"checkpoint-history\" open>"
+        "<summary>技術 checkpoint 歷史</summary>"
+        + _render_progress(state, current, run_id)
+        + "</details>"
+    )
+
+
 def _render_source_to_output_logic(payload: Mapping[str, Any]) -> str:
     matrix = payload.get("source_to_output_matrix")
     inventory = payload.get("source_inventory")
@@ -950,6 +960,7 @@ def _render_checkpoint_page(
             "<main class=\"shell\">",
             "<aside class=\"side-rail\">",
             _render_user_step_nav(current_user_step),
+            _render_checkpoint_history(state, checkpoint, run_id),
             "</aside>",
             f"<section class=\"content\" data-confirm-url=\"{escape(confirm_url)}\" "
             f"data-checkpoint=\"{escape(checkpoint)}\" "
@@ -1204,6 +1215,7 @@ class CheckpointCompanionServer:
                     return None
 
                 if content_length > MAX_REQUEST_BYTES:
+                    self.rfile.read(min(content_length, MAX_DRAIN_BYTES))
                     self._json(413, {"status": "request_too_large"})
                     return None
 

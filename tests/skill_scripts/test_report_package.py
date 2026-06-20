@@ -54,6 +54,13 @@ def _all_validator_results() -> list[dict[str, object]]:
     return [_validator_result(role) for role in REQUIRED_VALIDATORS]
 
 
+def _sql_gate_validator_results() -> list[dict[str, object]]:
+    return [
+        _validator_result("sql_safety_reviewer"),
+        _validator_result("schema_mapping_reviewer"),
+    ]
+
+
 def _confirm_design_brief(harness: ReportHarness) -> None:
     brief = build_design_brief(
         {
@@ -99,6 +106,7 @@ def _accepted_report_run(tmp_path: Path) -> ReportHarness:
         "SELECT department, amount FROM expenses",
         {"readonly": True, "status": "pass"},
     )
+    harness.update_state(validator_results=_sql_gate_validator_results())
     harness.confirm("sql_review", "同意查詢")
     harness.write_data_preview(
         {
@@ -179,6 +187,10 @@ def test_large_row_count_uses_summary_plus_preview_policy(tmp_path: Path):
         {"department": "研發部", "amount": 2500},
         {"department": "業務部", "amount": 3000},
     ]
+    harness.update_state(
+        validator_results=_sql_gate_validator_results(),
+        blocking_repair_request=None,
+    )
     harness.write_data_preview(
         {
             "rows": preview_rows,
@@ -199,6 +211,10 @@ def test_large_row_count_uses_summary_plus_preview_policy(tmp_path: Path):
 def test_rewriting_data_preview_invalidates_downstream_delivery_state(tmp_path: Path):
     harness = _accepted_report_run(tmp_path)
 
+    harness.update_state(
+        validator_results=_sql_gate_validator_results(),
+        blocking_repair_request=None,
+    )
     harness.write_data_preview(
         {
             "rows": [{"department": "客服部", "amount": 9000}],
