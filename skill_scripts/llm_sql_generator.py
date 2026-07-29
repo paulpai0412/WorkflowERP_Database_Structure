@@ -1,5 +1,7 @@
 import json
 import os
+from pathlib import Path
+import shutil
 import subprocess
 from typing import Any
 from urllib import error, request
@@ -90,47 +92,67 @@ def _call_openai_compatible(model: str, prompt_text: str, timeout_sec: float) ->
         raise RuntimeError("LLM_BAD_RESPONSE") from exc
 
 
-def _call_opencode_local(model: str, prompt_text: str, timeout_sec: float) -> str:
-    command = ["opencode", "run", "--format", "json"]
-    model_name = str(model or "").strip()
-    if model_name and model_name.lower() not in {"none", "default", "auto"}:
-        command.extend(["--model", model_name])
-    command.append(prompt_text)
+def _sdk_bridge_path() -> Path:
+    return Path(__file__).with_name("llm_sdk") / "bridge.mjs"
 
+
+def _sdk_error(stderr: str) -> str:
+    for line in reversed(str(stderr or "").splitlines()):
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        code = str(payload.get("code", "")).strip()
+        if code:
+            return code
+    return "LLM_PROVIDER_ERROR"
+
+
+def _call_sdk(provider: str, model: str, prompt_text: str, timeout_sec: float) -> str:
+    node = os.getenv("WFERP_NODE_EXECUTABLE", "").strip() or shutil.which("node")
+    if not node:
+        raise RuntimeError("NODE_NOT_INSTALLED")
+
+    bridge = _sdk_bridge_path()
+    if not bridge.exists():
+        raise RuntimeError("LLM_SDK_NOT_INSTALLED")
+
+    payload = {
+        "provider": provider,
+        "model": str(model or ""),
+        "prompt": prompt_text,
+        "timeoutSec": float(timeout_sec),
+        "cwd": str(Path.cwd()),
+    }
+    env = os.environ.copy()
+    env["WFERP_LLM_PROVIDER"] = provider
     try:
         result = subprocess.run(
-            command,
+            [node, str(bridge)],
+            input=json.dumps(payload, ensure_ascii=False),
             capture_output=True,
             text=True,
+            encoding="utf-8",
             check=False,
-            timeout=timeout_sec,
+            timeout=max(1.0, float(timeout_sec)) + 5.0,
+            env=env,
         )
     except FileNotFoundError as exc:
-        raise RuntimeError("OPENCODE_CLI_NOT_INSTALLED") from exc
+        raise RuntimeError("NODE_NOT_INSTALLED") from exc
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError("LLM_TIMEOUT") from exc
 
     if result.returncode != 0:
-        raise RuntimeError("LLM_PROVIDER_ERROR")
+        raise RuntimeError(_sdk_error(result.stderr))
+    try:
+        response = json.loads(str(result.stdout or ""))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("LLM_BAD_RESPONSE") from exc
 
-    last_text = ""
-    for line in str(result.stdout or "").splitlines():
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if str(event.get("type", "")).strip().lower() != "text":
-            continue
-        part = event.get("part", {})
-        if not isinstance(part, dict):
-            continue
-        text = str(part.get("text", "")).strip()
-        if text:
-            last_text = text
-
-    if not last_text:
+    text = str(response.get("text", "")).strip()
+    if not text:
         raise RuntimeError("LLM_BAD_RESPONSE")
-    return last_text
+    return text
 
 
 def call_llm(provider: str, model: str, prompt_text: str, timeout_sec: float = 30.0) -> str:
@@ -156,7 +178,13 @@ def call_llm(provider: str, model: str, prompt_text: str, timeout_sec: float = 3
     if provider_name in {"openai-compatible", "openai_compatible", "openai"}:
         return _call_openai_compatible(model=model, prompt_text=prompt_text, timeout_sec=timeout_sec)
 
+    if provider_name in {"pi", "local-pi"}:
+        return _call_sdk(provider="pi", model=model, prompt_text=prompt_text, timeout_sec=timeout_sec)
+
+    if provider_name in {"codex", "openai-codex"}:
+        return _call_sdk(provider="codex", model=model, prompt_text=prompt_text, timeout_sec=timeout_sec)
+
     if provider_name in {"opencode", "open-code", "local-opencode", "native"}:
-        return _call_opencode_local(model=model, prompt_text=prompt_text, timeout_sec=timeout_sec)
+        return _call_sdk(provider="opencode", model=model, prompt_text=prompt_text, timeout_sec=timeout_sec)
 
     raise RuntimeError("LLM_PROVIDER_UNSUPPORTED")

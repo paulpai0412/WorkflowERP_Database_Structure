@@ -1,6 +1,8 @@
 import json
 from types import SimpleNamespace
 
+import pytest
+
 from skill_scripts.llm_sql_generator import build_llm_prompt, call_llm, parse_llm_response
 
 
@@ -49,29 +51,24 @@ def test_parse_llm_response_accepts_markdown_fence():
     assert parsed["used_tables"] == ["ACTMK"]
 
 
-def test_call_llm_opencode_provider_reads_text_event(monkeypatch):
-    stdout = "\n".join(
-        [
-            json.dumps({"type": "step_start"}),
-            json.dumps(
-                {
-                    "type": "text",
-                    "part": {
-                        "text": '{"sql":"SELECT TOP 3 * FROM [VPIC1].[dbo].[ACTMK]","used_tables":["ACTMK"],"assumptions":[],"confidence":0.77}'
-                    },
-                }
-            ),
-            json.dumps({"type": "step_finish"}),
-        ]
-    )
+@pytest.mark.parametrize("provider", ["pi", "codex", "opencode"])
+def test_call_llm_sdk_providers_use_node_bridge(monkeypatch, provider):
+    response = {
+        "text": '{"sql":"SELECT TOP 3 * FROM [VPIC1].[dbo].[ACTMK]","used_tables":["ACTMK"],"assumptions":[],"confidence":0.77}'
+    }
 
-    def _fake_run(command, capture_output, text, check, timeout):
-        assert command[:3] == ["opencode", "run", "--format"]
-        assert command[3] == "json"
-        return SimpleNamespace(returncode=0, stdout=stdout)
+    def _fake_run(command, input, capture_output, text, encoding, check, timeout, env):
+        assert command[1].endswith("skill_scripts/llm_sdk/bridge.mjs")
+        payload = json.loads(input)
+        assert payload["provider"] == provider
+        assert payload["prompt"] == "anything"
+        assert timeout == 6.0
+        assert env["WFERP_LLM_PROVIDER"] == provider
+        return SimpleNamespace(returncode=0, stdout=json.dumps(response), stderr="")
 
     monkeypatch.setattr("skill_scripts.llm_sql_generator.subprocess.run", _fake_run)
+    monkeypatch.setattr("skill_scripts.llm_sql_generator.shutil.which", lambda name: "/usr/bin/node")
 
-    raw = call_llm(provider="opencode", model="none", prompt_text="anything", timeout_sec=1.0)
+    raw = call_llm(provider=provider, model="none", prompt_text="anything", timeout_sec=1.0)
     parsed = parse_llm_response(raw)
     assert parsed["sql"].startswith("SELECT TOP 3")

@@ -35,8 +35,12 @@ Current recorded baseline from conversation:
 Primary arguments:
 
 - `--prompt`, `--source`, `--mode`
-- `--llm-provider` (`opencode`, `mock`, `openai-compatible`, `none`)
+- `--llm-provider` (`pi`, `codex`, `opencode`, `mock`, `openai-compatible`, `none`)
 - `--llm-model`, `--llm-timeout-sec`, `--llm-min-confidence`, `--llm-repair-attempts`
+
+`pi`, `codex`, and `opencode` are implemented through the Node SDK bridge at
+`skill_scripts/llm_sdk/`. Set `WFERP_LLM_PROVIDER` and `WFERP_LLM_MODEL` to
+configure defaults without repeating CLI flags.
 - `--validate-execution`, `--required-columns`, `--min-rows`, `--max-rows`, `--aggregate-checks`
 - `--allow-non-test-db-execution` (unsafe override)
 - `--db-driver`, `--db-connection-string`, `--db-auth-mode`, `--db-env`
@@ -54,6 +58,9 @@ Primary arguments:
 - `DB_PASSWORD`
 - `DB_DOMAIN`
 - `DB_ODBC_DRIVER`
+- `WFERP_LLM_PROVIDER`
+- `WFERP_LLM_MODEL`
+- `WFERP_NODE_EXECUTABLE` (optional Node.js path override)
 
 ## Common Mistakes
 

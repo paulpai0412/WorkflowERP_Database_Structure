@@ -44,6 +44,11 @@ Do not use this skill for write operations (`INSERT`/`UPDATE`/`DELETE`/DDL/`EXEC
 | Rule mode only | `python3 -m skill_scripts.cli_generate_select --prompt "..." --mode rule` |
 | Execution validation | `python3 -m skill_scripts.cli_generate_select --prompt "..." --validate-execution --required-columns MK002,MK006 --min-rows 1` |
 
+LLM provider selection is configurable with `--llm-provider` or
+`WFERP_LLM_PROVIDER`: `pi`, `codex`, and `opencode` use the official SDK bridge
+under `skill_scripts/llm_sdk/`. Set `--llm-model` or `WFERP_LLM_MODEL` when a
+specific model is required. `--mode rule` does not call an LLM.
+
 ## Supporting References
 
 Use these references as needed (kept separate to keep this main skill lightweight):

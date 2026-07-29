@@ -28,7 +28,12 @@ Install the verified dependencies used by this repo:
 
 ```bash
 python3 -m pip install pymssql pandas pytest
+npm install --prefix skill_scripts/llm_sdk
 ```
+
+The Node bridge uses official SDKs for Pi, Codex, and OpenCode. OpenCode also
+requires the `opencode` executable in `PATH` because its SDK starts the local
+OpenCode server.
 
 Notes:
 
@@ -78,6 +83,18 @@ Run a sample SQL prompt:
 ```bash
 python3 -m skill_scripts.cli_generate_select --prompt "查詢採購單前 20 筆"
 ```
+
+Select the LLM SDK explicitly when needed:
+
+```bash
+python3 -m skill_scripts.cli_generate_select --llm-provider pi --llm-model openai-codex/gpt-5.4 --prompt "查詢採購單前 20 筆"
+python3 -m skill_scripts.cli_generate_select --llm-provider codex --llm-model gpt-5.4 --prompt "查詢採購單前 20 筆"
+python3 -m skill_scripts.cli_generate_select --llm-provider opencode --llm-model opencode/claude-opus-4-6 --prompt "查詢採購單前 20 筆"
+```
+
+Provider defaults can be configured with `WFERP_LLM_PROVIDER` and
+`WFERP_LLM_MODEL`. Pi and Codex use their own local authentication stores;
+OpenCode uses its local CLI configuration.
 
 ## 6) Optional legacy regeneration setup
 

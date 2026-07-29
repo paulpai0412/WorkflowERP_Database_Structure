@@ -62,6 +62,19 @@ python3 -m skill_scripts.cli_generate_select --prompt "查詢2026年的工程預
 python3 -m skill_scripts.cli_generate_select --prompt "查詢2026年的工程預算明細" --mode llm-first
 ```
 
+The default provider is `opencode`. Override it per command or with
+`WFERP_LLM_PROVIDER`:
+
+```bash
+python3 -m skill_scripts.cli_generate_select --llm-provider pi --llm-model openai-codex/gpt-5.4 --prompt "查詢2026年的工程預算明細"
+python3 -m skill_scripts.cli_generate_select --llm-provider codex --llm-model gpt-5.4 --prompt "查詢2026年的工程預算明細"
+python3 -m skill_scripts.cli_generate_select --llm-provider opencode --llm-model opencode/claude-opus-4-6 --prompt "查詢2026年的工程預算明細"
+```
+
+`pi` uses the Pi SDK and Pi credentials, `codex` uses the Codex SDK and Codex
+credentials, and `opencode` uses the OpenCode SDK to start the local OpenCode
+server. `--mode rule` remains completely LLM-free.
+
 ## 4) Validate SQL execution and result correctness
 
 Start and seed the test DB if needed:

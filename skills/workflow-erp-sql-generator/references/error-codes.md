@@ -35,5 +35,10 @@
 | `LLM_BAD_RESPONSE` | LLM response format/content could not be parsed as expected. |
 | `LLM_NETWORK_ERROR` | Network failure occurred while calling remote LLM endpoint. |
 | `LLM_HTTP_ERROR:<status>` | Remote LLM endpoint returned HTTP error status code. |
-| `OPENCODE_CLI_NOT_INSTALLED` | Local `opencode` CLI is not installed or not in PATH. |
+| `NODE_NOT_INSTALLED` | Node.js is required for the SDK bridge but was not found. |
+| `LLM_SDK_NOT_INSTALLED` | The local SDK bridge files or dependencies are not installed. |
+| `PI_AUTH_NOT_CONFIGURED` | Pi SDK has no authenticated available model. |
+| `PI_MODEL_NOT_AVAILABLE` | Requested Pi SDK model is not configured or unavailable. |
+| `CODEX_CLI_NOT_INSTALLED` | Codex SDK cannot find the Codex CLI it wraps. |
+| `OPENCODE_CLI_NOT_INSTALLED` | OpenCode SDK cannot find the local `opencode` executable. |
 | `LLM_REPAIR_FAILED:<reason>` | All llm-first repair attempts were exhausted without a valid result. |
